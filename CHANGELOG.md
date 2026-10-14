@@ -2,7 +2,7 @@
 
 ## 0.5.20 — 2026-10-14
 
-- Fix stale adaptive resolution evidence after switching files. Native Video can retain its previous streamingSegment; codec changes no longer poll that field. Only a fresh segment notification during an active HLS/DASH handoff can establish displayed dimensions/HDR. Missing or rejected evidence stays unknown.
+- Fix stale adaptive resolution evidence after switching files. Native Video can retain its previous streamingSegment; codec changes no longer poll that field. Only a fresh segment notification during an active HLS/DASH handoff can establish displayed dimensions/HDR. A new handoff starts unknown; audio-only notifications preserve the last fresh video dimensions within that same file.
 - Add regression coverage for HLS-to-HLS switches, HD downgrades, DASH, stopped/exited/deferred playback and missing segment dimensions.
 - Retain the 0.5.19 Back/checkpoint, shared source-request deadline, UHD-first and online-subtitle opt-in fixes. Controlled physical tests of that core passed native component saves, durable periodic/Back checkpoints, repeated screen exits, source-request cancellation, 3840×2160 HEVC/AAC HLS decoding and seek/pause. They exposed this additional resolution-display defect.
 

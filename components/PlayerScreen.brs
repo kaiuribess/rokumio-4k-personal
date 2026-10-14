@@ -1237,7 +1237,8 @@ sub onStreamingSegmentChanged(event as object)
     if m.resolvedPlayback = invalid then return
     if m.resolvedPlayback.streamFormat <> "hls" and m.resolvedPlayback.streamFormat <> "dash" then return
     segment = event.GetData()
-    m.playingSegment = invalid
+    ' Audio-only notifications have no dimensions; keep the last fresh
+    ' video segment within this handoff. StartPlayback/exit clear it.
     if Type(segment) = "roAssociativeArray"
         if PlaybackInfo_PositiveDimension(segment.width) and PlaybackInfo_PositiveDimension(segment.height)
             m.playingSegment = {width:segment.width,height:segment.height,hdrModeStr:segment.hdrModeStr}

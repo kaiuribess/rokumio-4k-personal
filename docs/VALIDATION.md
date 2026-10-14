@@ -2,7 +2,7 @@
 
 Validated on 2026-10-14. This remains an experimental prerelease without physical Roku sign-off.
 
-- The full test chain passed **4,874 BrightScript assertions plus 71 cinema policy assertions: 4,945 total**. Separate Node media, transport, mock-provider and setup-server suites also passed; their counts are separate.
+- The full test chain passed **4,876 BrightScript assertions plus 71 cinema policy assertions: 4,947 total**. Separate Node media, transport, mock-provider and setup-server suites also passed; their counts are separate.
 - New tests execute production store and controller code against native boundary doubles: held A results/publishers/imports after switching to B; A in flight with distinct B/C edits; failed writes and restart outbox recovery; fresh baseline before explicit retry; independent Write/Flush refusals; cross-section registry budgeting; account add-on configuration/removal/order; public HTTP rejection; oversized decoded response files, long fields, deep JSON and subtitle floods; early-pool discovery recovery; periodic durable checkpoints, seek to zero and old-screen exit isolation.
 - CI builds once after tests and verifies the install ZIP: 201 members, 52 XML components, 267 package-root plus 3 relative script references, 158 implemented interface functions, valid inheritance, manifest artwork and licensing, and no development files.
 - CI records the exact ZIP hash, commit and run ID in artifact-provenance.json. Publication promotes that artifact directly, with its checksum and package-check.json. The public ZIP must be downloaded and checked against the CI bytes; a local rebuild is not substituted.
