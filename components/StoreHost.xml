@@ -61,6 +61,9 @@
         <function name="SettingsGetAudioMode" />
         <function name="SettingsSetAudioMode" />
         <function name="SettingsGetPlaybackOptions" />
+        <function name="SettingsGetProviderPriority" />
+        <function name="SettingsSetPreferredProviderKey" />
+        <function name="SettingsRecordWorkingProviderKey" />
         <function name="SettingsSetPlaybackOption" />
         <function name="SettingsGetServerAddress" />
         <function name="SettingsSaveFailed" />

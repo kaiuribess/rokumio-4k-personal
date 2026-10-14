@@ -116,7 +116,7 @@ sub Main()
         end function }
     }
     OnEnter(invalid)
-    Harness_Equal(m.rows.Count(), 11, "Guest sees playback preferences, audio, add-on checks and About")
+    Harness_Equal(m.rows.Count(), 12, "Guest sees provider and playback preferences, audio and add-on checks")
     Harness_Equal(m.rows[4].value, "Start sooner", "automatic Play exposes early-start choice")
     Harness_Equal(m.rows[1].value, "TV / projector", "default preset is clearly named")
     m.top = { getScene: function() as dynamic
@@ -129,7 +129,7 @@ sub Main()
     Harness_Equal(m.rows[1].value, "TV / projector", "second OK returns to projector setup")
     Harness_Ok(m.status.text.InStr("Stereo") >= 0, "projector choice explains required Roku stereo setting")
     Harness_Equal(m.rows[0].action, "login", "Optional Stremio sync is accessible")
-    Harness_Equal(m.rows[8].value, "Not needed", "Server row explains direct playback needs no server")
+    Harness_Equal(m.rows[9].value, "Not needed", "Server row explains direct playback needs no server")
     Harness_Ok(m.list.focused, "Setup list receives remote focus")
     Harness_Equal(m.list.jumpToRowItem[0], 0, "First setup entry begins at first row")
     m.list.rowItemFocused = [1, 0]
@@ -142,7 +142,7 @@ sub Main()
     Harness_Equal(m.status.text, "Server address updated.", "Modal restore keeps operation feedback")
     Harness_Equal(m.heartbeatTask.id, "still-pending", "Modal restore leaves heartbeat active")
     Harness_Equal(m.netDiagTask.id, "also-pending", "Modal restore leaves diagnostics active")
-    Harness_Equal(m.rows[8].value, "Configured", "Configured server row hides its private URL")
+    Harness_Equal(m.rows[9].value, "Configured", "Configured server row hides its private URL")
     m.stores.auth.session = "stremio"
     BuildRows(true)
     Harness_Equal(m.rows[0].action, "logout", "Signed-in profile exposes disconnect")
@@ -150,7 +150,7 @@ sub Main()
     m.showNetDiag = true
     m.list.rowItemFocused = [2, 0]
     BuildRows(true)
-    Harness_Equal(m.rows.Count(), 12, "Advanced diagnostics remain available after normal setup rows")
+    Harness_Equal(m.rows.Count(), 13, "Advanced diagnostics remain available after normal setup rows")
     Harness_Equal(m.list.jumpToRowItem[0], 2, "Revealing diagnostics preserves selected connection check")
     m.list.rowItemFocused = [99, 0]
     BuildRows(true)

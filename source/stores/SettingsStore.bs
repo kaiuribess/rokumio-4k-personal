@@ -29,6 +29,9 @@ class SettingsStore
     autoNextEpisode as boolean
     autoSourceRetry as boolean
     waitForProviders as boolean
+    preferredProviderKey as string
+    lastWorkingProviderKey as string
+    workingProviderDirty as boolean
     saveRefused as boolean
 
     sub new(registry = invalid as dynamic)
@@ -40,6 +43,9 @@ class SettingsStore
         m.autoNextEpisode = true
         m.autoSourceRetry = true
         m.waitForProviders = false
+        m.preferredProviderKey = ""
+        m.lastWorkingProviderKey = ""
+        m.workingProviderDirty = false
         m.saveRefused = false
         m.Load()
     end sub
@@ -119,6 +125,33 @@ class SettingsStore
         return {fourKOnly:m.fourKOnly,autoNextEpisode:m.autoNextEpisode,autoSourceRetry:m.autoSourceRetry,waitForProviders:m.waitForProviders}
     end function
 
+    function GetProviderPriority() as object
+        return {preferredProviderKey:m.preferredProviderKey,lastWorkingProviderKey:m.lastWorkingProviderKey}
+    end function
+
+    function IsProviderKey(value as string) as boolean
+        return CreateObject("roRegex","^[0-9a-f]{64}$","").IsMatch(value)
+    end function
+
+    function SetPreferredProviderKey(value as string) as boolean
+        if value <> "" and not m.IsProviderKey(value) then return false
+        m.preferredProviderKey = value
+        return m.Save()
+    end function
+
+    function RecordWorkingProviderKey(value as string) as boolean
+        if not m.IsProviderKey(value) then return false
+        if value = m.lastWorkingProviderKey and not m.workingProviderDirty then return true
+        m.lastWorkingProviderKey = value
+        m.workingProviderDirty = true
+        if m.registry = invalid then m.workingProviderDirty = false:return true
+        ok = m.registry.Write("lastWorkingProviderKey",value)
+        m.registry.Flush()
+        m.saveRefused = not ok
+        m.workingProviderDirty = not ok
+        return ok
+    end function
+
     function SetPlaybackOption(optionName as string, value as boolean) as boolean
         if optionName <> "fourKOnly" and optionName <> "autoNextEpisode" and optionName <> "autoSourceRetry" and optionName <> "waitForProviders" then return false
         m[optionName] = value
@@ -140,6 +173,10 @@ class SettingsStore
         ok = m.registry.Write("serverAddress", m.serverAddress)
         if not m.registry.Write("language", m.language) then ok = false
         if not m.registry.Write("audioMode", m.audioMode) then ok = false
+        if not m.registry.Write("preferredProviderKey",m.preferredProviderKey) then ok = false
+        lastSaved = m.registry.Write("lastWorkingProviderKey",m.lastWorkingProviderKey)
+        m.workingProviderDirty = not lastSaved
+        if not lastSaved then ok = false
         for each optionName in ["fourKOnly","autoNextEpisode","autoSourceRetry","waitForProviders"]
             value = "false"
             if m[optionName] then value = "true"
@@ -166,6 +203,10 @@ class SettingsStore
         if language <> "" then m.language = language
         audioMode = m.registry.Read("audioMode")
         if audioMode = "projector" or audioMode = "surround" then m.audioMode = audioMode
+        preferred = m.registry.Read("preferredProviderKey")
+        recent = m.registry.Read("lastWorkingProviderKey")
+        if m.IsProviderKey(preferred) then m.preferredProviderKey = preferred
+        if m.IsProviderKey(recent) then m.lastWorkingProviderKey = recent
         for each optionName in ["fourKOnly","autoNextEpisode","autoSourceRetry","waitForProviders"]
             value = m.registry.Read(optionName)
             if value = "true" then m[optionName] = true

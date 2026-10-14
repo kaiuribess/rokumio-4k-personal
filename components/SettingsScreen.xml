@@ -9,6 +9,9 @@
         <field id="pushRequest" type="assocarray" alwaysNotify="true" />
     </interface>
 
+    <script type="text/brightscript" uri="pkg:/source/util/ProviderPriority.brs" />
+    <script type="text/brightscript" uri="pkg:/components/SettingsProvider.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/AddonDiagnostics.brs" />
     <script type="text/brightscript" uri="pkg:/components/SettingsScreen.brs" />
     <script type="text/brightscript" uri="pkg:/source/core/AsyncTask.bs" />
     <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
@@ -32,7 +35,7 @@
             translation="[80, 128]"
             width="1760"
             height="40"
-            text="OK opens an option Â· Back returns to Home"
+            text="OK opens an option · Back returns to Home"
             font="font:SmallSystemFont" />
 
         <RowList

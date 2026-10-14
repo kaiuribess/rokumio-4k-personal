@@ -7,7 +7,8 @@
            episodeOverview for a series from EpisodesScreen). Two panes:
            - left: title (series + episode line), synopsis, and the Cinemeta
              background artwork (no poster), all from the params;
-           - right: one selectable stream card per candidate, collected from
+           - right: pages of up to 48 source cards with Previous/More navigation,
+             collected from
              eligible installed add-ons through a shared two-worker queue.
              Provider cards appear progressively; automatic Play can use a
              short comparison window or explicitly wait for all responses.
@@ -24,6 +25,7 @@
 
     <script type="text/brightscript" uri="pkg:/components/StreamsScreen.brs" />
     <script type="text/brightscript" uri="pkg:/source/util/SourcePrefetch.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/ProviderPriority.brs" />
     <script type="text/brightscript" uri="pkg:/source/core/AsyncTask.bs" />
     <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
     <script type="text/brightscript" uri="pkg:/source/util/CinemaStreams.brs" />

@@ -11,10 +11,11 @@ function PrefetchTest_Node() as object
         m.observed = callback
     end sub, UnobserveField:sub(field as string)
         m.observed = ""
-    end sub, callFunc:function(name as string, value as dynamic) as dynamic
+    end sub, callFunc:function(name as string, value as dynamic, priority=invalid as dynamic) as dynamic
         if name = "Prepare" then return PrefetchTest_Prepare(value)
         if name = "Snapshot" then return PrefetchTest_Snapshot(value)
         if name = "Adopt" then return PrefetchTest_Adopt(value)
+        if name = "SetPriority" then PrefetchTest_SetPriority(value,priority)
         if name = "Suspend" then PrefetchTest_Suspend(value)
         if name = "Resume" then return PrefetchTest_Resume(value)
         if name = "Cancel" then PrefetchTest_Cancel(value)
@@ -85,14 +86,18 @@ sub PrefetchTest_Setup(providerCount = 2 as integer)
         return m.now
     end function}}
     installed = []
+    m.priorityHashKeys = {}
     for i = 0 to providerCount - 1
-        installed.Push({id:"provider"+i.ToStr(),name:"Provider "+i.ToStr(),address:"https://provider.example.test/config"+i.ToStr(),resources:["stream"],types:["movie","series"],idPrefixes:["tt"]})
+        addon = {id:"provider"+i.ToStr(),name:"Provider "+i.ToStr(),address:"https://provider.example.test/config"+i.ToStr(),resources:["stream"],types:["movie","series"],idPrefixes:["tt"]}
+        installed.Push(addon)
+        m.priorityHashKeys[ProviderPriority_Identity(addon)] = String(64, Mid("abcdef0123456789", i+1, 1))
     end for
     m.stores = {addons:{installed:installed,callFunc:function(name as string,a=invalid as dynamic,b=invalid as dynamic,c=invalid as dynamic,d=invalid as dynamic,e=invalid as dynamic,f=invalid as dynamic) as dynamic
         if name = "AddonsGetAll" then return m.installed
         if name = "AddonsSupportsResource" then return true
         return invalid
-    end function},settings:{mode:"projector",callFunc:function(name as string) as string
+    end function},settings:{mode:"projector",priority:{preferredProviderKey:"",lastWorkingProviderKey:""},callFunc:function(name as string) as dynamic
+        if name = "SettingsGetProviderPriority" then return m.priority
         return m.mode
     end function},episodes:{callFunc:function(name as string,id as string,season as integer,episode as integer,meta as object) as string
         return id+":"+season.ToStr()+":"+episode.ToStr()
@@ -145,6 +150,169 @@ function PrefetchTest_Registry() as object
     return m.testRegistry
 end function
 
+function PrefetchTest_PriorityHash(identity as string) as dynamic
+    m.lastPriorityIdentity = identity
+    value = m.priorityHashKeys[identity]
+    if Type(value) = "String" or Type(value) = "roString" then return value
+    return ""
+end function
+
+function PrefetchTest_InvalidPriorityHash(identity as string) as dynamic
+    return "not-a-digest"
+end function
+
+function PrefetchTest_WarmCount(entries as object) as integer
+    count = 0
+    for each entry in entries
+        if entry.warm = true then count = count + 1
+    end for
+    return count
+end function
+
+Harness_Suite("Provider keys contain public ID and hostname only, never configuration")
+PrefetchTest_Setup(6)
+addon = m.stores.addons.installed[0]
+identity = ProviderPriority_Identity(addon)
+firstKey = ProviderPriority_Key(addon, PrefetchTest_PriorityHash)
+Harness_Equal(firstKey,String(64,"a"),"injected digest is an opaque validated lowercase key")
+Harness_Ok(identity.InStr("config0") < 0 and identity.InStr("https://") < 0,"configured path and scheme do not enter provider identity")
+addon.address = "https://PROVIDER.EXAMPLE.TEST:443/new-private-config?token=private-value#fragment"
+Harness_Equal(ProviderPriority_Key(addon, PrefetchTest_PriorityHash),firstKey,"path query fragment port and host case do not change priority")
+Harness_Equal(ProviderPriority_StreamKey({sourceMemoryProvider:"provider0|PROVIDER.EXAMPLE.TEST:443"}, PrefetchTest_PriorityHash),firstKey,"loaded source and manifest produce the same opaque key")
+Harness_Equal(ProviderPriority_StreamKey({sourceMemoryProvider:"provider0|provider.example.test/private"}, PrefetchTest_PriorityHash),"","stream identity cannot smuggle a path")
+Harness_Equal(ProviderPriority_StreamKey({sourceMemoryProvider:"provider0|provider.example.test?token=private-value"}, PrefetchTest_PriorityHash),"","stream identity cannot smuggle a query")
+Harness_Equal(ProviderPriority_StreamKey({sourceMemoryProvider:"provider0|user:private-value@provider.example.test"}, PrefetchTest_PriorityHash),"","stream identity rejects userinfo")
+Harness_Equal(ProviderPriority_StreamKey({sourceMemoryProvider:"provider0|provider.example.test|extra"}, PrefetchTest_PriorityHash),"","extra provider separator is refused")
+addon.address = "https://user:private-value@provider.example.test/config"
+Harness_Equal(ProviderPriority_Key(addon, PrefetchTest_PriorityHash),"","configured userinfo disables priority instead of persisting it")
+addon.address = "https://provider.example.test:bad/config"
+Harness_Equal(ProviderPriority_Key(addon, PrefetchTest_PriorityHash),"","invalid port cannot acquire a scheduling identity")
+addon.address = "https://provider.example.test./private"
+Harness_Equal(ProviderPriority_Key(addon, PrefetchTest_PriorityHash),firstKey,"trailing hostname dot is normalized")
+addon.id = "https://private.example.test/token"
+Harness_Equal(ProviderPriority_Key(addon, PrefetchTest_PriorityHash),"","a configured URL cannot substitute for a public add-on ID")
+addon.id = "provider0"
+Harness_Equal(ProviderPriority_Key(addon, PrefetchTest_InvalidPriorityHash),"","unavailable invalid digest never falls back to clear identity")
+Harness_Equal(ProviderPriority_Key(invalid, PrefetchTest_PriorityHash),"","malformed provider does not interrupt scheduling")
+Harness_Equal(ProviderPriority_Hostname("http://localhost:8080/config?key=private-value"),"localhost","local HTTP provider identity excludes port and configuration")
+Harness_Equal(ProviderPriority_Hostname("https://[2001:db8::1]:443/config"),"[2001:db8::1]","IPv6 authority is normalized without its port")
+Harness_Equal(ProviderPriority_Hostname("https://bad..example.test/config"),"","invalid hostname labels are rejected")
+Harness_Equal(ProviderPriority_Snapshot({preferredProviderKey:"configured-url",lastWorkingProviderKey:String(64,"A")}).preferredProviderKey,"","raw configured values are excluded from priority snapshot")
+Harness_Equal(ProviderPriority_Snapshot({preferredProviderKey:"",lastWorkingProviderKey:String(64,"A")}).lastWorkingProviderKey,"","stored keys must be lowercase hexadecimal")
+Harness_Ok(not ProviderPriority_IsKey(" " + String(64,"a")),"stored keys cannot contain surrounding whitespace")
+Harness_Ok(not ProviderPriority_IsKey(123),"numeric configured values cannot become opaque keys")
+
+Harness_Suite("Preferred and recent providers choose warm slots without changing UI indices")
+PrefetchTest_Setup(6)
+m.stores.settings.priority = {preferredProviderKey:String(64,"f"),lastWorkingProviderKey:String(64,"e")}
+context = SourcePrefetch_Context(m.stores,m.params)
+Harness_Equal(context.providers[5].priority,2,"preferred provider retains its original late index")
+Harness_Equal(context.providers[4].priority,1,"recently accepted provider is second priority")
+Harness_Equal(context.providers[0].priority,0,"ordinary providers retain stable ordinal ties")
+snapshot = SourcePrefetch_Prepare(m.top,context)
+Harness_Equal(m.launched[0].providerIndex,5,"preferred provider beyond the original first four warms first")
+Harness_Equal(m.launched[1].providerIndex,4,"recently working provider takes the other free warm slot")
+Harness_Equal(snapshot.entries.Count(),6,"snapshot remains aligned to every original provider index")
+Harness_Equal(PrefetchTest_WarmCount(snapshot.entries),4,"only four providers are retained in the warm budget")
+Harness_Equal(snapshot.entries[0].status,"queued","ordinary ordinal zero is next warm lookup")
+Harness_Equal(snapshot.entries[1].status,"queued","ordinary ordinal one follows stable order")
+Harness_Equal(snapshot.entries[2].status,"idle","unselected provider is aligned but not warmed")
+first = m.launched[0]
+first.result = PrefetchTest_Result("preferred")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(first))
+Harness_Equal(m.launched[2].providerIndex,0,"first completion fills a free slot in stable ordinary order")
+LoadStreams(m.params)
+Harness_Equal(m.providers[5].streams[0].url,first.result.streams[0].url,"adoption routes preferred late-index result to its matching provider")
+Harness_Equal(m.prefetchState.entries[2].status,"queued","explicit Play queues providers omitted from warming")
+Harness_Equal(m.launched.Count(),3,"adoption never raises two active-transfer budget")
+Harness_Equal(m.prefetchState.activeTasks.Count(),2,"priority never preempts an active request")
+
+Harness_Suite("Busy slots choose priority next, missing keys keep stable order")
+PrefetchTest_Setup(6)
+old = SourcePrefetch_Context(m.stores,m.params)
+SourcePrefetch_Prepare(m.top,old)
+oldFirst = m.launched[0]
+oldSecond = m.launched[1]
+SourcePrefetch_Cancel(m.top,old)
+m.stores.settings.priority = {preferredProviderKey:String(64,"f"),lastWorkingProviderKey:String(64,"e")}
+nextContext = SourcePrefetch_Context(m.stores,{metaType:"movie",videoId:"tt-next"})
+SourcePrefetch_Prepare(m.top,nextContext)
+Harness_Equal(m.launched.Count(),2,"preferred queued title does not preempt two abandoned transfers")
+oldSecond.result = PrefetchTest_Result("abandoned")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(oldSecond))
+Harness_Equal(m.launched[2].providerIndex,5,"first freed old slot starts preferred provider of latest title")
+Harness_Equal(m.launched[2].videoId,"tt-next","old ownership never launches abandoned title work")
+Harness_Equal(m.prefetchState.entries[1].status,"queued","old result cannot satisfy a latest-title provider slot")
+oldFirst.result = PrefetchTest_Result("abandoned-again")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(oldFirst))
+Harness_Equal(m.launched[3].providerIndex,4,"next freed slot starts recently accepted provider")
+revision = m.prefetchState.top.revision
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(oldSecond))
+Harness_Equal(m.launched.Count(),4,"duplicate old callback does not release a current slot")
+Harness_Equal(m.prefetchState.top.revision,revision,"duplicate old callback cannot republish current queue")
+PrefetchTest_Setup(3)
+m.stores.settings.priority = {preferredProviderKey:String(64,"f"),lastWorkingProviderKey:String(64,"e")}
+missingContext = SourcePrefetch_Context(m.stores,m.params)
+SourcePrefetch_Prepare(m.top,missingContext)
+Harness_Equal(m.launched[0].providerIndex,0,"uninstalled preferred identity falls back to stable original order")
+Harness_Equal(m.launched[1].providerIndex,1,"missing recent identity cannot hide another provider")
+
+Harness_Suite("Configured variants share public priority with stable original ordering")
+PrefetchTest_Setup(3)
+m.stores.addons.installed[2].id = "provider1"
+m.stores.addons.installed[2].address = "https://provider.example.test/other-private-configuration?key=private-value"
+m.stores.settings.priority.preferredProviderKey = String(64,"b")
+variants = SourcePrefetch_Context(m.stores,m.params)
+Harness_Equal(variants.providers[1].priorityKey,variants.providers[2].priorityKey,"same public ID and host deliberately share priority across private configurations")
+SourcePrefetch_Prepare(m.top,variants)
+Harness_Equal(m.launched[0].providerIndex,1,"first equivalent preferred variant keeps earlier installed ordinal")
+Harness_Equal(m.launched[1].providerIndex,2,"second equivalent variant stays independently addressable")
+Harness_Equal(m.prefetchState.entries[0].status,"queued","ordinary provider remains queued instead of being lost")
+
+Harness_Suite("Priority changes preserve source validity and only update waiting lookup order")
+PrefetchTest_Setup(6)
+firstContext = SourcePrefetch_Context(m.stores,m.params)
+SourcePrefetch_Prepare(m.top,firstContext)
+oldFirst = m.launched[0]
+oldSecond = m.launched[1]
+m.stores.settings.priority.preferredProviderKey = String(64,"f")
+secondContext = SourcePrefetch_Context(m.stores,m.params)
+Harness_Equal(firstContext.key,secondContext.key,"preferred provider change does not invalidate still-current sources")
+PrefetchTest_SetPriority(secondContext.key,secondContext.providerPriority)
+Harness_Equal(m.launched.Count(),2,"updating priority starts no request and never preempts two transfers")
+Harness_Equal(m.prefetchState.entries[5].status,"queued","preferred idle provider replaces an unstarted warm slot")
+Harness_Equal(PrefetchTest_WarmCount(m.prefetchState.entries),4,"reprioritized warming still has at most four attempts")
+Harness_Equal(m.prefetchState.entries[3].status,"idle","latest ordinary unstarted warm slot returns to idle")
+oldFirst.result = PrefetchTest_Result("same-current-source")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(oldFirst))
+Harness_Equal(m.launched[2].providerIndex,5,"new preference wins the next available slot after ordinary completion")
+Harness_Equal(m.prefetchState.entries[0].result.streams[0].url,oldFirst.result.streams[0].url,"completed source remains valid after priority update")
+LoadStreams(m.params)
+Harness_Equal(m.providers[0].streams.Count(),1,"Play adopts earlier completed source despite changed preference")
+Harness_Equal(m.launched.Count(),3,"Play does not refetch accepted current-context results")
+SuspendSourceLoading()
+m.top.screenActive = false
+m.stores.settings.priority.lastWorkingProviderKey = String(64,"e")
+recentContext = SourcePrefetch_Context(m.stores,m.params)
+Harness_Equal(recentContext.key,secondContext.key,"recent native success cannot invalidate current URL cache")
+PrefetchTest_SetPriority(recentContext.key,recentContext.providerPriority)
+Harness_Equal(m.launched.Count(),3,"hidden priority update never launches queued work")
+preferred = m.launched[2]
+preferred.result = PrefetchTest_Result("preferred-ready")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(preferred))
+onSourcePrefetchChanged()
+Harness_Equal(m.launched.Count(),3,"hidden completion keeps other providers queued")
+Harness_Equal(m.providers[5].streams.Count(),1,"late preferred result remains attached to correct source tab")
+Harness_Ok(not m.reloadNeeded,"recording recent provider does not trigger a needless source reload")
+m.top.screenActive = true
+OnEnter(invalid)
+Harness_Equal(m.launched.Count(),4,"Back fills only the free slot without re-fetching completed providers")
+Harness_Equal(m.launched[3].providerIndex,4,"updated recently accepted provider wins the next waiting ordinary slot")
+Harness_Equal(m.providers[0].streams.Count(),1,"Back preserves earlier completed sources")
+Harness_Equal(m.prefetchState.activeTasks.Count(),2,"Back respects active ownership while queue priorities change")
+PrefetchTest_SetPriority("wrong-title",{preferredProviderKey:String(64,"b"),lastWorkingProviderKey:""})
+Harness_Equal(m.prefetchState.context.providerPriority.preferredProviderKey,String(64,"f"),"stale title cannot reprioritize a current queue")
+
 Harness_Suite("Exact source prefetch context never crosses changed configuration")
 PrefetchTest_Setup()
 context = SourcePrefetch_Context(m.stores,m.params)
@@ -174,7 +342,8 @@ PrefetchTest_Setup(6)
 context = SourcePrefetch_Context(m.stores,m.params)
 snapshot = SourcePrefetch_Prepare(m.top,context)
 Harness_Equal(m.launched.Count(),2,"warm browse starts only two source-list workers")
-Harness_Equal(snapshot.entries.Count(),4,"warm browse retains four provider entries")
+Harness_Equal(snapshot.entries.Count(),6,"warm browse keeps original provider indices aligned")
+Harness_Equal(PrefetchTest_WarmCount(snapshot.entries),4,"warm browse selects only four provider lookups")
 Harness_Equal(snapshot.entries[2].status,"queued","warm providers beyond slots remain queued")
 Harness_Equal(m.prefetchState.activeTasks.Count(),2,"shared budget owns exactly two transfers")
 SourcePrefetch_Prepare(m.top,context)
@@ -449,6 +618,12 @@ m.streams = m.providers[0].streams
 m.autoPlayEnabled = true
 m.pendingCount = 0
 m.loadToken = "live"
+m.sourceRows = [{kind:"source",index:0,loadToken:"live",providerIndex:0,page:0}]
+m.sourcePage = 0
+m.activeIndex = 0
+m.listFilled = true
+m.pageSelectionBlocked = invalid
+m.streamsList.rowItemFocused = [0,0]
 MaybeStartAutomaticPlayback()
 selection = m.selectionTask
 Harness_Ok(selection <> invalid,"explicit Play can rank completed sources")

@@ -54,8 +54,14 @@ sub init()
     m.qualityHint.color = t.accentInfo
 
     m.streamsList.ObserveField("rowItemSelected", "onStreamSelected")
+    m.streamsList.ObserveField("rowItemFocused", "onSourceRowFocused")
 
     m.streams = []
+    m.sourcePage = 0
+    m.sourceRows = []
+    m.pageFocusTarget = invalid
+    m.pageSelectionBlocked = invalid
+    m.hasSourcePaging = false
     m.loadTasks = invalid
     m.loadKey = ""
     m.loadContextKey = ""
@@ -98,7 +104,11 @@ function OnEnter(params as object) as void
             LoadStreams(m.params,false)
             ResetProviderNavigation()
         end if
-        if m.prefetchNode <> invalid and m.prefetchContext <> invalid then m.prefetchNode.callFunc("Resume",m.prefetchContext.key)
+        if m.prefetchNode <> invalid and m.prefetchContext <> invalid
+            reentryContext = SourcePrefetch_Context(m.stores,m.params)
+            if reentryContext <> invalid and reentryContext.key = m.prefetchContext.key then m.prefetchNode.callFunc("SetPriority",reentryContext.key,reentryContext.providerPriority)
+            m.prefetchNode.callFunc("Resume",m.prefetchContext.key)
+        end if
         onSourcePrefetchChanged()
         PumpProviderSources()
         RenderActiveProvider()
@@ -123,7 +133,10 @@ function OnEnter(params as object) as void
     sameContext = currentContext <> invalid and currentContext.key = m.loadContextKey
     if m.pendingCount > 0 and m.loadKey <> "" and EpisodeKey(params) = m.loadKey and sameContext
         m.sourcesSuspended = false
-        if m.prefetchNode <> invalid and m.prefetchContext <> invalid then m.prefetchNode.callFunc("Resume",m.prefetchContext.key)
+        if m.prefetchNode <> invalid and m.prefetchContext <> invalid
+            m.prefetchNode.callFunc("SetPriority",currentContext.key,currentContext.providerPriority)
+            m.prefetchNode.callFunc("Resume",m.prefetchContext.key)
+        end if
         onSourcePrefetchChanged()
         PumpProviderSources()
         MaybeStartAutomaticPlayback()
@@ -199,6 +212,7 @@ sub EmptyStreamsList()
     content = CreateObject("roSGNode", "ContentNode")
     m.streamsList.content = content
     m.streamsList.numRows = 0
+    ResetSourcePagination()
 end sub
 
 ' Kick the stream-list fetches off the render thread. The coordinator owns up
@@ -216,6 +230,8 @@ end sub
 sub LoadStreams(params as object, allowPrefetch = true as boolean)
     if m.stores = invalid then return
     if m.loadTasks <> invalid and m.loadTasks.Count() > 0 then return
+    ResetSourcePagination()
+    m.hasSourcePaging = false
     m.audioMode = CurrentAudioMode()
     requestContext = SourcePrefetch_Context(m.stores, params)
     m.loadContextKey = ""
@@ -351,6 +367,7 @@ sub onSourcePrefetchChanged()
         ResetProviderNavigation()
         return
     end if
+    m.prefetchNode.callFunc("SetPriority",context.key,context.providerPriority)
     snapshot = m.prefetchNode.callFunc("Snapshot", context.key)
     for i = 0 to m.prefetchWaiting.Count() - 1
         if m.prefetchWaiting[i] <> true then continue for
@@ -513,6 +530,7 @@ end sub
 ' player pops skips this and only restores focus (OnEnter's invalid-params
 ' branch), so the last-viewed provider is preserved.
 sub ResetProviderNavigation()
+    ResetSourcePagination()
     if m.providers = invalid or m.providers.Count() = 0
         m.activeIndex = -1
         m.streams = []
@@ -534,7 +552,7 @@ sub SelectProvider(index as integer)
     if index < 0 or index >= m.providers.Count() then return
     if index = m.activeIndex then return
     m.activeIndex = index
-    m.listFilled = false
+    ResetSourcePagination()
     UpdateHeader()
     RenderActiveProvider()
 end sub
@@ -637,7 +655,14 @@ sub UpdateStreamsStatus()
         end for
     end if
     if m.pendingCount > 0
-        m.status.text = m.pendingCount.ToStr() + "/" + m.providersTotal.ToStr() + " providers loading…"
+        requesting = 0
+        queued = 0
+        for i = 0 to m.providers.Count() - 1
+            state = ProviderRequestState(i)
+            if state = "pending" then requesting = requesting + 1
+            if state = "queued" then queued = queued + 1
+        end for
+        m.status.text = requesting.ToStr() + " requesting sources; " + queued.ToStr() + " queued."
     else
         if total = 0
             if m.loadError <> ""
@@ -665,7 +690,13 @@ sub UpdateProviderStatus()
     provider = m.providers[m.activeIndex]
     skipped = invalid
     if count = 0 then skipped = CinemaSkippedSources(provider.streams)
-    label.text = AddonDiagnostics_ProviderLabel(provider,isTaskPending(m.activeIndex),count,skipped)
+    label.text = AddonDiagnostics_ProviderLabel(provider,ProviderRequestState(m.activeIndex),count,skipped)
+    if count > 48 and m.sourcePage <> invalid
+        first = m.sourcePage * 48 + 1
+        last = first + 47
+        if last > count then last = count
+        label.text = label.text + " | " + first.ToStr() + "-" + last.ToStr() + " of " + count.ToStr()
+    end if
     if AddonDiagnostics_Text(provider.error) <> "" then label.color = Theme().accentWarm
 end sub
 
@@ -770,8 +801,8 @@ end function
 ' placeholder in the list area (still loading / provider error / no streams).
 ' Focus falls to the list on the first fill after a switch; when the active
 ' provider has nothing to show, the screen Group keeps focus so Left/Right can
-' still move on. m.streams aliases the active provider's own array, so the card
-' index hand-out in onStreamSelected always matches the visible list.
+' still move on. m.streams retains every eligible candidate; sourceRows maps
+' the bounded page's native rows to full-array indexes or page navigation.
 sub RenderActiveProvider()
     if m.providers = invalid or m.activeIndex < 0 or m.activeIndex >= m.providers.Count() then return
     provider = m.providers[m.activeIndex]
@@ -808,10 +839,29 @@ sub RenderActiveProvider()
 
     m.streamsPlaceholder.visible = false
 
+    ' Preserve the remote's current row when this same provider is refreshed or
+    ' the player returns. Unrelated provider results never rebuild this content.
+    focusedRow = 0
+    focused = m.streamsList.rowItemFocused
+    if Type(focused) = "roArray" and focused.Count() >= 2
+        if Type(focused[0]) = "Integer" or Type(focused[0]) = "roInt" then focusedRow = focused[0]
+    end if
+    if m.sourcePage = invalid or m.sourcePage < 0 then m.sourcePage = 0
+    lastPage = Int((m.streams.Count() - 1) / 48)
+    if m.sourcePage > lastPage then m.sourcePage = lastPage
+    pageStart = m.sourcePage * 48
+    pageEnd = pageStart + 48
+    if pageEnd > m.streams.Count() then pageEnd = m.streams.Count()
+    m.sourceRows = []
     content = CreateObject("roSGNode", "ContentNode")
-    visibleCount = m.streams.Count()
-    if visibleCount > 48 then visibleCount = 48
-    for i = 0 to visibleCount - 1
+    if m.streams.Count() > 48 then m.hasSourcePaging = true
+    ' Keep the two control indexes reserved for this title even when another
+    ' provider/filter has fewer sources. A stale control can never become a film.
+    if m.hasSourcePaging = true
+        AddSourcePageNavigation(content, "previous", m.sourcePage - 1, lastPage + 1)
+        AddSourcePageNavigation(content, "more", m.sourcePage + 1, lastPage + 1)
+    end if
+    for i = pageStart to pageEnd - 1
         row = content.CreateChild("ContentNode")
         item = row.CreateChild("ContentNode")
         stream = m.streams[i]
@@ -826,17 +876,80 @@ sub RenderActiveProvider()
             end for
             item.description = description
         end if
+        m.sourceRows.Push({kind:"source",index:i,loadToken:m.loadToken,providerIndex:m.activeIndex,page:m.sourcePage})
     end for
     m.streamsList.content = content
     UpdateProviderStatus()
-    ' numRows describes the viewport, NOT the amount of content. Every source
-    ' remains in content and can be reached by scrolling on the remote.
+    ' The viewport shows three rows; the page has at most 48 real source cards
+    ' plus Previous/More. Every candidate remains available through these pages.
     m.streamsList.numRows = 3
-    if m.streams.Count() < 3 then m.streamsList.numRows = m.streams.Count()
+    if m.sourceRows.Count() < 3 then m.streamsList.numRows = m.sourceRows.Count()
+    if not m.listFilled
+        focusedRow = 0
+        if m.hasSourcePaging = true then focusedRow = 2
+        if m.pageFocusTarget = "last"
+            focusedRow = pageEnd - pageStart - 1
+            if m.hasSourcePaging = true then focusedRow = focusedRow + 2
+        end if
+    end if
+    if focusedRow < 0 then focusedRow = 0
+    if focusedRow >= m.sourceRows.Count() then focusedRow = m.sourceRows.Count() - 1
+    m.streamsList.jumpToRowItem = [focusedRow, 0]
+    m.pageFocusTarget = invalid
     if not m.listFilled
         m.listFilled = true
-        m.streamsList.jumpToRowItem = [0, 0]
         if m.top.screenActive then m.streamsList.SetFocus(true)
+    end if
+end sub
+
+' Paging owns only lightweight content nodes. It does not trim the fallback pool
+' or make a network request, and Back continues to cancel the screen normally.
+sub ResetSourcePagination()
+    m.sourcePage = 0
+    m.sourceRows = []
+    m.pageFocusTarget = invalid
+    m.pageSelectionBlocked = invalid
+    m.listFilled = false
+end sub
+
+sub AddSourcePageNavigation(content as object, kind as string, targetPage as integer, pageCount as integer)
+    row = content.CreateChild("ContentNode")
+    item = row.CreateChild("ContentNode")
+    enabled = targetPage >= 0 and targetPage < pageCount
+    item.title = "More sources"
+    if kind = "previous" then item.title = "Previous sources"
+    badge = "Page " + (m.sourcePage + 1).ToStr() + " of " + pageCount.ToStr()
+    item.description = "No further page in this direction. Back cancels."
+    if enabled
+        badge = "Page " + (targetPage + 1).ToStr() + " of " + pageCount.ToStr()
+        item.description = "OK opens this page. Back cancels."
+    end if
+    item.AddFields({qualityBadge:badge})
+    m.sourceRows.Push({kind:kind,targetPage:targetPage,enabled:enabled,loadToken:m.loadToken,providerIndex:m.activeIndex,page:m.sourcePage})
+end sub
+
+sub ChangeSourcePage(targetPage as integer)
+    if Type(m.streams) <> "roArray" or m.streams.Count() = 0 then return
+    lastPage = Int((m.streams.Count() - 1) / 48)
+    if targetPage < 0 or targetPage > lastPage or targetPage = m.sourcePage then return
+    oldPage = m.sourcePage
+    m.sourcePage = targetPage
+    m.pageFocusTarget = invalid
+    if targetPage < oldPage then m.pageFocusTarget = "last"
+    m.listFilled = false
+    RenderActiveProvider()
+end sub
+
+' Paging is a deliberate manual browsing action. A ranking reply already queued
+' for automatic Play must not interrupt it; provider results can keep loading.
+sub DisableAutomaticForManualBrowse()
+    CancelAutomaticGrace()
+    m.autoPlayEnabled = false
+    m.autoPlaySent = true
+    if m.selectionTask <> invalid
+        task = m.selectionTask
+        m.selectionTask = invalid
+        AsyncTask_Reap(task, m.top, true)
     end if
 end sub
 
@@ -865,8 +978,41 @@ end function
 function ProviderEmptyLabel() as string
     provider = m.providers[m.activeIndex]
     if provider.error <> "" then return AddonDiagnostics_Error(provider.error).detail
-    if isTaskPending(m.activeIndex) then return "Checking available sources… This can take up to 45 seconds."
+    requestState = ProviderRequestState(m.activeIndex)
+    if requestState = "queued" then return "Queued for source lookup. Other requests are finishing. Back cancels."
+    if requestState = "pending" then return "Requesting sources… This can take up to 45 seconds."
     return "No streams found for this provider."
+end function
+
+' Distinguish waiting for a shared worker from an active network request.
+' Read only the exact coordinator context; provider addresses never reach UI.
+function ProviderRequestState(index as integer) as string
+    if m.providers = invalid or index < 0 or index >= m.providers.Count() then return "done"
+    if m.prefetchNode <> invalid and m.prefetchContext <> invalid
+        snapshot = m.prefetchNode.callFunc("Snapshot",m.prefetchContext.key)
+        if Type(snapshot) = "roAssociativeArray" and Type(snapshot.entries) = "roArray"
+            if index < snapshot.entries.Count()
+                entry = snapshot.entries[index]
+                if Type(entry) = "roAssociativeArray"
+                    if entry.status = "queued" then return "queued"
+                    if entry.status = "pending" then return "pending"
+                    if entry.status = "ready" or entry.status = "failed" then return "done"
+                end if
+            end if
+        end if
+    end if
+    if Type(m.sourceQueue) = "roArray"
+        for each queued in m.sourceQueue
+            if queued = index then return "queued"
+        end for
+    end if
+    if m.loadTasks <> invalid and index < m.loadTasks.Count()
+        if m.loadTasks[index] <> invalid then return "pending"
+    end if
+    if Type(m.prefetchWaiting) = "roArray" and index < m.prefetchWaiting.Count()
+        if m.prefetchWaiting[index] = true then return "queued"
+    end if
+    return "done"
 end function
 
 function isTaskPending(index as integer) as boolean
@@ -992,24 +1138,49 @@ end function
 ' a direct URL through as-is and creates a torrent engine on the server, up to
 ' the 120s long timeout on a cold engine) while its logo pulses, so the picker
 ' answers instantly and stays the place a failed source lands back on.
-sub onStreamSelected()
+sub onSourceRowFocused()
+    if m.pageSelectionBlocked = invalid then return
+    focused = m.streamsList.rowItemFocused
+    if Type(focused) <> "roArray" or focused.Count() < 2 then return
+    ' A queued selection from a page navigation must not act again until focus
+    ' has moved from that old control into the freshly displayed page.
+    if focused[0] <> m.pageSelectionBlocked then m.pageSelectionBlocked = invalid
+end sub
+
+sub onStreamSelected(event = invalid as dynamic)
+    if not m.top.screenActive or m.sourcesSuspended = true or m.listFilled <> true then return
     data = m.streamsList.rowItemSelected
-    if data = invalid or data.Count() < 2 then return
-    index = data[0]
-    if m.streams = invalid or index < 0 or index >= m.streams.Count() then return
-    CancelAutomaticGrace()
-    ' A manual choice supersedes the automatic Play request, including a source
-    ' ranking worker that was already in flight while this provider filled.
-    m.autoPlayEnabled = false
-    m.autoPlaySent = true
-    if m.selectionTask <> invalid
-        task = m.selectionTask
-        m.selectionTask = invalid
-        AsyncTask_Reap(task, m.top, true)
+    if Type(data) <> "roArray" or data.Count() < 2 then return
+    if Type(data[0]) <> "Integer" and Type(data[0]) <> "roInt" then return
+    if Type(data[1]) <> "Integer" and Type(data[1]) <> "roInt" then return
+    if data[1] <> 0 then return
+    if m.pageSelectionBlocked <> invalid and data[0] = m.pageSelectionBlocked then return
+    focused = m.streamsList.rowItemFocused
+    if Type(focused) <> "roArray" or focused.Count() < 2 then return
+    if focused[0] <> data[0] or focused[1] <> data[1] then return
+    ' Drop notifications that no longer describe the RowList's current field.
+    if event <> invalid
+        notified = event.GetData()
+        if Type(notified) <> "roArray" or notified.Count() < 2 then return
+        if notified[0] <> data[0] or notified[1] <> data[1] then return
     end if
+    rowIndex = data[0]
+    if Type(m.sourceRows) <> "roArray" or rowIndex < 0 or rowIndex >= m.sourceRows.Count() then return
+    choice = m.sourceRows[rowIndex]
+    if choice.loadToken <> m.loadToken or choice.providerIndex <> m.activeIndex or choice.page <> m.sourcePage then return
+    if choice.kind = "more" or choice.kind = "previous"
+        if choice.enabled <> true then return
+        DisableAutomaticForManualBrowse()
+        m.pageSelectionBlocked = rowIndex
+        ChangeSourcePage(choice.targetPage)
+        return
+    end if
+    if choice.kind <> "source" then return
+    index = choice.index
+    if Type(m.streams) <> "roArray" or index < 0 or index >= m.streams.Count() then return
+    DisableAutomaticForManualBrowse()
     SuspendSourceLoading()
     PushAutomaticPlayer(m.streams[index], m.streams)
-
 end sub
 
 ' Params values can carry invalid; string interface fields cannot, so coerce.
@@ -1080,7 +1251,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
             AsyncTask_Reap(selection,m.top,true)
         end if
         m.selectionRevision = -1
-        m.listFilled = false
+        ResetSourcePagination()
         RenderActiveProvider()
         MaybeStartAutomaticPlayback()
         return true

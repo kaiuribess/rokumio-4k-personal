@@ -1,4 +1,5 @@
 sub UpdateAudioGuide()
+    if m.guideTitle <> invalid then m.guideTitle.text = "Audio, made simple"
     if m.guide = invalid then return
     mode = "projector"
     if m.stores <> invalid and m.stores.settings.callFunc("SettingsGetAudioMode") = "surround" then mode = "surround"

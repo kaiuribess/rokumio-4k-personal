@@ -15,7 +15,7 @@ assert.match(read('components/DetailsScreen.brs'), /"detailsMetaLoader"\s*\+\s*m
 assert.match(read('components/EpisodesScreen.brs'), /"episodesLoader"\s*\+\s*m\.seriesTaskSequence\.ToStr\(\)/);
 const combined = path.join(root, 'out-test', 'meta-tests', '_meta.brs');
 fs.mkdirSync(path.dirname(combined), { recursive: true });
-fs.writeFileSync(combined, [read('tests/harness.brs'), read('source/util/SourcePrefetch.brs'), ...functions, read('tests/meta-ui.test.brs')].join('\n'));
+fs.writeFileSync(combined, [read('tests/harness.brs'), read('source/util/ProviderPriority.brs'), read('source/util/SourcePrefetch.brs'), ...functions, read('tests/meta-ui.test.brs')].join('\n'));
 const result = spawnSync(process.execPath, [path.join(root, 'node_modules', '@rokucommunity', 'brs', 'bin', 'cli.js'), '--root', path.dirname(combined), combined], { cwd: path.dirname(combined), encoding: 'utf8' });
 process.stdout.write(result.stdout || '');
 process.stderr.write(result.stderr || '');

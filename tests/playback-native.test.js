@@ -34,7 +34,7 @@ async function main() {
         if (!match) throw new Error(`Missing PlayerScreen test entry point: ${name}`);
         return match[0].replace(/CreateObject\(/gi, 'MockNativeObject(');
     }).join('\n');
-    const memoryScreen = fs.readFileSync(path.join(root,'components/PlayerSourceMemory.brs'),'utf8').replace(/SourceMemory_Fingerprint\(/g,'PlayerTest_Fingerprint(').replace(/CreateObject\(/gi,'MockNativeObject(');
+    const memoryScreen = fs.readFileSync(path.join(root,'components/PlayerSourceMemory.brs'),'utf8').replace(/SourceMemory_Fingerprint\(/g,'PlayerTest_Fingerprint(').replace(/ProviderPriority_StreamKey\(/g,'PlayerTest_ProviderKey(').replace(/CreateObject\(/gi,'MockNativeObject(');
     const support = fs.readFileSync(path.join(root,'source/util/TimerGuard.brs'),'utf8').replace(/CreateObject\(/gi,'MockNativeObject(') + '\n' + fs.readFileSync(path.join(root,'components/PlayerPosition.brs'),'utf8');
     const audioRecovery = fs.readFileSync(path.join(root,'components/PlayerAudioRecovery.brs'),'utf8');
     fs.writeFileSync(combined, ['harness.brs', 'mocks.brs', 'player-handoff.test.brs']

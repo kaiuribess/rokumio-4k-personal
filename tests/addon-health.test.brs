@@ -94,6 +94,8 @@ sub TestHealthPolicy()
     Harness_Ok(AddonDiagnostics_ProviderLabel({streams:[{}],error:""},false,0,{status:1,uncached:0}).InStr("account / service")>=0,"status clips identify provider-account issue")
     Harness_Ok(AddonDiagnostics_ProviderLabel({streams:[{}],error:""},false,0,{status:0,uncached:1}).InStr("pending")>=0,"uncached downloads identified")
     Harness_Ok(AddonDiagnostics_ProviderLabel({streams:[{}],error:""},false,1).InStr("checked when selected")>=0,"source choices are not playback certification")
+    Harness_Ok(AddonDiagnostics_ProviderLabel({streams:[],error:""},"queued",0).InStr("Queued")=0,"waiting provider is labelled Queued")
+    Harness_Ok(AddonDiagnostics_ProviderLabel({streams:[],error:""},"pending",0).InStr("Requesting")=0,"active provider is labelled Requesting")
 end sub
 
 sub HealthScreenFixture()

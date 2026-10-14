@@ -98,8 +98,13 @@ function AddonDiagnostics_Check(addon as dynamic, index as integer, http as obje
     return item
 end function
 
-function AddonDiagnostics_ProviderLabel(provider as object, pending as boolean, visibleCount as integer, skipped = invalid as dynamic) as string
-    if pending then return "Checking this provider…"
+function AddonDiagnostics_ProviderLabel(provider as object, pending as dynamic, visibleCount as integer, skipped = invalid as dynamic) as string
+    if Type(pending) = "String" or Type(pending) = "roString"
+        if pending = "queued" then return "Queued · Waiting for a source request slot"
+        if pending = "pending" then return "Requesting sources…"
+    else if pending = true
+        return "Requesting sources…"
+    end if
     if AddonDiagnostics_Text(provider.error) <> "" then return AddonDiagnostics_Error(provider.error).label + " · Open Add-ons > Check add-ons"
     rawCount = 0
     if Type(provider.streams) = "roArray" then rawCount = provider.streams.Count()

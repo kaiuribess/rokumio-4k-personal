@@ -8,7 +8,7 @@ function SourcePrefetch_Text(value as dynamic) as string
     return ""
 end function
 
-function SourcePrefetch_Context(stores as dynamic, params as dynamic) as dynamic
+function SourcePrefetch_Context(stores as dynamic, params as dynamic, hashFn = invalid as dynamic) as dynamic
     if stores = invalid or stores.addons = invalid or Type(params) <> "roAssociativeArray" then return invalid
     kind = SourcePrefetch_Text(params.metaType)
     videoId = SourcePrefetch_Text(params.videoId)
@@ -16,6 +16,14 @@ function SourcePrefetch_Context(stores as dynamic, params as dynamic) as dynamic
     mode = "projector"
     if stores.settings <> invalid
         if stores.settings.callFunc("SettingsGetAudioMode") = "surround" then mode = "surround"
+    end if
+    priority = ProviderPriority_Snapshot(invalid)
+    if stores.settings <> invalid
+        try
+            priority = ProviderPriority_Snapshot(stores.settings.callFunc("SettingsGetProviderPriority"))
+        catch e
+            ' Older isolated store doubles have no priority bridge.
+        end try
     end if
     installed = stores.addons.callFunc("AddonsGetAll")
     if Type(installed) <> "roArray" then return invalid
@@ -29,12 +37,13 @@ function SourcePrefetch_Context(stores as dynamic, params as dynamic) as dynamic
             if address <> ""
                 name = SourcePrefetch_Text(addon.name)
                 if name = "" then name = "Source provider"
-                providers.Push({name:name, id:SourcePrefetch_Text(addon.id), address:address})
+                providerKey = ProviderPriority_Key(addon, hashFn)
+                providers.Push({name:name, id:SourcePrefetch_Text(addon.id), address:address, priorityKey:providerKey, priority:ProviderPriority_Rank(providerKey, priority)})
             end if
         end if
     end for
     key = FormatJson({addons:signature, audioMode:mode, metaType:kind, metaId:SourcePrefetch_Text(params.metaId), videoId:videoId, season:SourcePrefetch_Text(params.season), episode:SourcePrefetch_Text(params.episode), addonAddress:SourcePrefetch_Text(params.addonAddress)})
-    return {key:key, audioMode:mode, metaType:kind, videoId:videoId, providers:providers}
+    return {key:key, audioMode:mode, metaType:kind, videoId:videoId, providers:providers, providerPriority:priority}
 end function
 
 function SourcePrefetch_Node(top as dynamic) as dynamic

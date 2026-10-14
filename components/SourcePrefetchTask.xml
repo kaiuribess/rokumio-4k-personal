@@ -11,6 +11,7 @@
         <field id="loadToken" type="string" value="" />
         <field id="result" type="assocarray" alwaysNotify="true" />
     </interface>
+    <script type="text/brightscript" uri="pkg:/source/util/ProviderPriority.brs" />
     <script type="text/brightscript" uri="pkg:/source/stores/Transport.bs" />
     <script type="text/brightscript" uri="pkg:/source/stores/PlaybackStore.bs" />
     <script type="text/brightscript" uri="pkg:/source/util/CinemaStreams.brs" />

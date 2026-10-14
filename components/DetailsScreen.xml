@@ -18,6 +18,7 @@
         <function name="OnBackPressed" />
     </interface>
 
+    <script type="text/brightscript" uri="pkg:/source/util/ProviderPriority.brs" />
     <script type="text/brightscript" uri="pkg:/components/DetailsScreen.brs" />
     <script type="text/brightscript" uri="pkg:/source/util/SourcePrefetch.brs" />
     <script type="text/brightscript" uri="pkg:/source/core/AsyncTask.bs" />

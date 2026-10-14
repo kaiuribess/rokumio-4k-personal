@@ -83,7 +83,20 @@ sub onSourceProofTick()
         m.sourceProofArmed = false
         if m.sourceProofTimer <> invalid then m.sourceProofTimer.control = "stop"
         QueueSourceOutcome("working")
+        RememberWorkingProvider()
     end if
+end sub
+
+sub RememberWorkingProvider()
+    if Type(m.playParams) <> "roAssociativeArray" or m.playParams.diagnostic = true or m.playParams.diagnosticControl = true then return
+    if m.stores = invalid or m.stores.settings = invalid then return
+    key = ProviderPriority_StreamKey(m.playParams.stream)
+    if key = "" then return
+    try
+        m.stores.settings.callFunc("SettingsRecordWorkingProviderKey",key)
+    catch e
+        ' Optional scheduling memory never changes accepted playback.
+    end try
 end sub
 
 sub onSourceMemoryPump()

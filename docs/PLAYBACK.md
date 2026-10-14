@@ -18,7 +18,8 @@ Direct HTTPS sources do not require a PC during viewing. This code also retains 
 | Add-on checks and audio setup in 0.5.13 | Production-policy/controller tests cover manifest categories, privacy, progressive updates, cancellation, stale deadlines and explicit audio choices; native screens/receiver path not physically tested in this release |
 | Home, preferences and playback stability in 0.5.14 | Production tests cover bounded preview work, complete-catalog routing, settings persistence, stale timer ownership, audio-repair delay and native terminal position resets; physical rendering/scheduling untested |
 | Early automatic Play and source scheduling in 0.5.15 | Simulated callback tests cover grace/cancellation, provider queue ownership and shared worker budget; no physical latency or frame-rate measurement |
-| Surround output, HDR variants and full-length reliability | Not certified for 0.5.15 or every display/receiver/source |
+| Paging/provider priority in 0.5.16 | Production tests cover later manual choices, full retained retry pools, stale navigation, two-slot priority, opaque key persistence and sustained-progress recording; native remote/performance untested |
+| Surround output, HDR variants and full-length reliability | Not certified for 0.5.16 or every display/receiver/source |
 
 One earlier clear HEVC MP4 control failed despite plausible metadata. Multichannel AAC also failed on the tested Stick/projector path. Those counterexamples are why the project does not claim that labels or header inspection guarantee playback.
 
@@ -39,6 +40,10 @@ Version 0.5.14 improves alternative ordering when multichannel AAC hints previou
 Saved quality, autoplay and source-recovery choices apply to new playback. Disabling automatic recovery does not disable English track checks or allow a failed file to be accepted. Terminal native position/duration resets use the last source-scoped observation for same-title recovery, while intentional active seeks to zero are respected.
 
 Automatic Play now offers Start sooner or Compare providers. Early selection can start from available candidates while other add-ons are queued/pending, so its initial recovery pool can be smaller. Compare providers collects the wider pool before selecting. Queued source-list work pauses during playback and resumes on returning to the picker. Provider results arriving behind Player never replace the accepted source. An available URL/2160p label is still a candidate; native English/audio/decoded-progress checks follow before acceptance.
+
+With HD fallback allowed, Start sooner can choose an early 1080p candidate before a slower provider returns UHD. For quality-focused selection, use Compare providers plus 4K-only, then examine actual playback facts. Priority only reorders waiting provider requests; it cannot ensure the preferred provider has the best file. Native English-track/progress observations do not constitute acoustic language recognition or a full-film stability test.
+
+Source paging exposes later retained eligible candidates while keeping 48 real cards per page. Manual playback still receives the full retained fallback pool. Warm prefetch remains capped at 256 candidates/provider; ordinary fresh requests retain their response without a new source-count cap. This update does not claim unlimited provider data or measured device memory usage.
 
 ## Practical failure cases
 

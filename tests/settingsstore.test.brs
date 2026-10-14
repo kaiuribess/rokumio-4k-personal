@@ -48,6 +48,29 @@ sub Test_Settings_PlaybackOptions()
     Harness_Ok(settings.SaveFailed(),"refused preference write is reported")
 end sub
 
+sub Test_Settings_ProviderPriority()
+    Harness_Suite("Provider preferences persist only opaque keys and retry refused writes")
+    registry = MockRegistry():settings = SettingsStore(registry)
+    keyA = String(64,"a"):keyB = String(64,"b")
+    Harness_Equal(settings.GetProviderPriority().preferredProviderKey,"","new installations use automatic priority")
+    Harness_Ok(settings.SetPreferredProviderKey(keyA),"explicit provider can be saved")
+    Harness_Ok(settings.RecordWorkingProviderKey(keyB),"verified provider can be remembered")
+    restored = SettingsStore(registry)
+    Harness_Equal(restored.GetProviderPriority().preferredProviderKey,keyA,"preferred provider survives restart")
+    Harness_Equal(restored.GetProviderPriority().lastWorkingProviderKey,keyB,"recent provider survives restart")
+    Harness_Ok(not restored.SetPreferredProviderKey("https://private.example/config"),"configured URL cannot be a priority key")
+    Harness_Ok(not restored.RecordWorkingProviderKey("invalid"),"invalid recent identity is rejected")
+    Harness_Ok(restored.SetPreferredProviderKey(""),"Automatic clears explicit preference")
+    registry.failWrites=true
+    Harness_Ok(not restored.RecordWorkingProviderKey(keyA),"refused recent write is reported")
+    registry.failWrites=false
+    Harness_Ok(restored.RecordWorkingProviderKey(keyA),"same recent provider retries after write refusal")
+    Harness_Equal(SettingsStore(registry).GetProviderPriority().lastWorkingProviderKey,keyA,"successful retry is persisted")
+    registry.Write("preferredProviderKey","garbage"):registry.Write("lastWorkingProviderKey","private-config")
+    clean = SettingsStore(registry).GetProviderPriority()
+    Harness_Ok(clean.preferredProviderKey="" and clean.lastWorkingProviderKey="","malformed saved identities are ignored")
+end sub
+
 sub Test_Settings_SetServerAddress()
     Harness_Suite("SettingsStore.SetServerAddress validates and normalizes")
     settings = SettingsStore(invalid)

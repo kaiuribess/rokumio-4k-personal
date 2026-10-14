@@ -10,7 +10,7 @@
     <children>
         <Poster uri="pkg:/images/crimson-mark.png" translation="[80, 84]" width="112" height="112" />
         <Label id="aboutTitle" text="Crimson Cinema" translation="[224, 92]" width="1536" height="80" font="font:LargeBoldSystemFont" />
-        <Label id="aboutVersion" text="Version 0.5.15" translation="[228, 180]" width="1500" height="40" font="font:SmallSystemFont" />
+        <Label id="aboutVersion" text="Version 0.5.16" translation="[228, 180]" width="1500" height="40" font="font:SmallSystemFont" />
         <Label id="aboutBody" text="Movies and shows, with the Roku remote.&#10;&#10;4K-first source choices · English audio preferences&#10;Projector and HDMI surround modes · Add-on connection checks&#10;Automatic source recovery · Next-episode playback&#10;&#10;Your add-ons supply the catalog and playable streams.&#10;Available quality and audio depend on the source and connected equipment." translation="[80, 340]" width="1600" height="440" wrap="true" font="font:MediumSystemFont" />
         <Label id="aboutCredit" text="Built on Rokumio / gpratoe's MIT-licensed client. Original and third-party license notices are included." translation="[80, 936]" width="1760" height="36">
             <Font role="font" uri="pkg:/fonts/OpenSans-Regular.ttf" size="18" />

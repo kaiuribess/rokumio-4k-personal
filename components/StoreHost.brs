@@ -345,6 +345,18 @@ function SettingsGetPlaybackOptions() as object
     return m.stores.settings.GetPlaybackOptions()
 end function
 
+function SettingsGetProviderPriority() as object
+    return m.stores.settings.GetProviderPriority()
+end function
+
+function SettingsSetPreferredProviderKey(value as string) as boolean
+    return m.stores.settings.SetPreferredProviderKey(value)
+end function
+
+function SettingsRecordWorkingProviderKey(value as string) as boolean
+    return m.stores.settings.RecordWorkingProviderKey(value)
+end function
+
 function SettingsSetPlaybackOption(optionName as string, value as boolean) as boolean
     return m.stores.settings.SetPlaybackOption(optionName,value)
 end function

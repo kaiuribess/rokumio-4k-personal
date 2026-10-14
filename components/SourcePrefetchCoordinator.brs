@@ -20,17 +20,22 @@ end sub
 function Prepare(context as object) as dynamic
     if Type(context) <> "roAssociativeArray" or Type(context.providers) <> "roArray" or context.key = "" then return invalid
     current = Snapshot(context.key)
-    if current <> invalid then return current
+    if current <> invalid
+        SetPriority(context.key, context.providerPriority)
+        PrefetchPump()
+        return Snapshot(context.key)
+    end if
     PrefetchClear()
     m.context = context
     m.fullLoad = false
     m.suspended = false
-    count = context.providers.Count()
-    if count > 4 then count = 4
-    for i = 0 to count - 1
-        m.entries.Push({status:"queued", result:invalid, warm:true})
+    ' Keep original indices for Snapshot adoption and provider tabs. The warm
+    ' budget chooses up to four providers by priority, including late indices.
+    for i = 0 to context.providers.Count() - 1
+        m.entries.Push({status:"idle", result:invalid, warm:false})
         m.tasks.Push(invalid)
     end for
+    PrefetchWarmQueue()
     m.expiry.duration = 60
     m.expiry.control = "start"
     m.deadline = m.clock.TotalMilliseconds() + 60000
@@ -49,6 +54,7 @@ function Adopt(context as object) as dynamic
         m.context = context
     end if
     m.fullLoad = true
+    SetPriority(context.key, context.providerPriority)
     m.suspended = false
     m.deadline = 0
     m.expiry.control = "stop"
@@ -56,6 +62,8 @@ function Adopt(context as object) as dynamic
         if i >= m.entries.Count()
             m.entries.Push({status:"queued",result:invalid,warm:false})
             m.tasks.Push(invalid)
+        else if m.entries[i].status = "idle"
+            m.entries[i] = {status:"queued",result:invalid,warm:false}
         else if m.entries[i].status = "failed" and m.entries[i].warm = true
             m.entries[i] = {status:"queued",result:invalid,warm:false}
         else if m.entries[i].status = "queued"
@@ -65,6 +73,34 @@ function Adopt(context as object) as dynamic
     PrefetchPump()
     return Snapshot(context.key)
 end function
+
+sub SetPriority(key as string, priority as dynamic)
+    if m.context = invalid or m.context.key <> key then return
+    m.context.providerPriority = ProviderPriority_Snapshot(priority)
+    ' Priority never changes URL validity, starts a transfer or clears a result.
+    if m.fullLoad <> true then PrefetchWarmQueue()
+end sub
+
+sub PrefetchWarmQueue()
+    pinned = 0
+    for i = 0 to m.entries.Count() - 1
+        entry = m.entries[i]
+        if entry.warm = true
+            if entry.status = "queued"
+                m.entries[i] = {status:"idle",result:invalid,warm:false}
+            else
+                pinned = pinned + 1
+            end if
+        end if
+    end for
+    order = ProviderPriority_Order(m.context.providers, m.context.providerPriority)
+    for each index in order
+        if pinned >= 4 then exit for
+        if m.entries[index].status <> "idle" then continue for
+        m.entries[index] = {status:"queued",result:invalid,warm:true}
+        pinned = pinned + 1
+    end for
+end sub
 
 sub Suspend(key as string)
     if m.context <> invalid and m.context.key = key then m.suspended = true
@@ -108,9 +144,9 @@ end sub
 sub PrefetchPump()
     if m.context = invalid or m.suspended = true then return
     if Type(m.activeTasks) <> "roArray" then m.activeTasks = []
-    for i = 0 to m.entries.Count() - 1
-        if m.activeTasks.Count() >= 2 then exit for
-        if m.entries[i].status <> "queued" then continue for
+    while m.activeTasks.Count() < 2
+        i = PrefetchNextQueuedIndex()
+        if i < 0 then exit while
         provider = m.context.providers[i]
         kind = "StreamsLoaderTask"
         if m.entries[i].warm = true then kind = "SourcePrefetchTask"
@@ -125,8 +161,23 @@ sub PrefetchPump()
         m.tasks[i] = task
         m.activeTasks.Push(task)
         m.entries[i].status = "pending"
-    end for
+    end while
 end sub
+
+function PrefetchNextQueuedIndex() as integer
+    bestIndex = -1
+    bestRank = -1
+    for i = 0 to m.entries.Count() - 1
+        if m.entries[i].status <> "queued" then continue for
+        rank = ProviderPriority_Rank(m.context.providers[i].priorityKey, m.context.providerPriority)
+        ' Original ordinal wins ties. In-flight transfers are never preempted.
+        if rank > bestRank
+            bestIndex = i
+            bestRank = rank
+        end if
+    end for
+    return bestIndex
+end function
 
 sub onPrefetchExpired()
     if m.context = invalid or m.fullLoad = true then return

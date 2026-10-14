@@ -140,7 +140,11 @@ sub TestStreamsRemoteRefresh()
     } }
     Harness_Ok(not onKeyEvent("play", false), "Play/Pause key release does not launch requests")
     Harness_Equal(m.launched.Count(), 0, "no duplicate refresh on key-up")
+    m.sourcePage = 4
+    m.hasSourcePaging = true
     Harness_Ok(onKeyEvent("play", true), "Play/Pause handles source refresh")
+    Harness_Equal(m.sourcePage,0,"explicit source refresh resets page")
+    Harness_Ok(not m.hasSourcePaging,"fresh title batch resets reserved paging controls")
     Harness_Ok(firstOld.reaped and secondOld.reaped, "refresh cancels each old provider worker")
     Harness_Equal(m.launched.Count(), 2, "refresh launches one new request per current provider")
     Harness_Equal(m.loadToken, "8", "refresh mints a new batch identity")
@@ -209,6 +213,265 @@ sub TestWorkerPreparedSources()
     Harness_Equal(m.streams[0].url,"https://media.example/mixed-tracks.mkv","manual picker preserves the candidate for actual native audio inspection")
 end sub
 
+sub TestPaginationSetup(total as integer)
+    m.top = FocusNode()
+    m.top.screenActive = true
+    m.streamsList = FocusNode()
+    m.streamsList.rowItemFocused = [0,0]
+    m.qualityHint = {}
+    m.providerStatus = {}
+    m.streamsPlaceholder = {}
+    m.status = {}
+    m.headTitle = {text:"Pagination test"}
+    m.params = {metaType:"movie",metaId:"tt-pagination",videoId:"tt-pagination",name:"Pagination test"}
+    m.stores = invalid
+    m.activeIndex = 0
+    m.fourKOnly = false
+    m.hasSourcePaging = false
+    m.autoPlayEnabled = false
+    m.autoPlaySent = false
+    m.sourcesSuspended = false
+    m.selectionTask = invalid
+    m.prefetchNode = invalid
+    m.prefetchContext = invalid
+    m.prefetchWaiting = []
+    m.sourceQueue = []
+    m.loadTasks = [invalid,invalid]
+    m.pendingCount = 0
+    m.providersTotal = 2
+    m.loadToken = "pagination-live"
+    m.loadSeq = 100
+    m.loadKey = EpisodeKey(m.params)
+    m.loadContextKey = ""
+    m.loadError = ""
+    m.reloadNeeded = false
+    m.sourceRevision = 0
+    m.selectionRevision = -1
+    m.autoGraceTimer = {control:"stop"}
+    m.autoGraceToken = ""
+    m.autoGraceDeadline = invalid
+    m.providerName = {}
+    m.arrowLeft = {}
+    m.arrowRight = {}
+    m.providerSegments = {}
+    m.segments = [{},{}]
+    m.epMetaTask = invalid
+    sources = []
+    for i = 0 to total - 1
+        quality = "1080p AAC 2.0"
+        if i mod 2 = 0 then quality = "2160p HEVC AAC 2.0"
+        sources.Push({name:quality,title:"Source " + (i+1).ToStr(),url:"https://media.example.test/" + i.ToStr() + ".mkv"})
+    end for
+    m.providers = [
+        {name:"Provider A",streams:sources,readyStreams:sources,error:""},
+        {name:"Provider B",streams:[],readyStreams:[],error:""}
+    ]
+    ResetSourcePagination()
+    RenderActiveProvider()
+end sub
+
+sub TestPaginationSelect(rowIndex as integer)
+    ' Native RowList applies jumpToRowItem before the next physical remote OK.
+    if m.pageSelectionBlocked <> invalid
+        m.streamsList.rowItemFocused = m.streamsList.jumpToRowItem
+        onSourceRowFocused()
+    end if
+    m.streamsList.rowItemFocused = [rowIndex,0]
+    onSourceRowFocused()
+    m.streamsList.rowItemSelected = [rowIndex,0]
+    onStreamSelected()
+end sub
+
+sub TestSourcePagination()
+    Harness_Suite("Production source pages preserve every candidate within a native card budget")
+    for each total in [49,96,97,256]
+        TestPaginationSetup(total)
+        seen = {}
+        pages = 0
+        lastPage = Int((total-1)/48)
+        for page = 0 to lastPage
+            actual = 0
+            mappingValid = true
+            for each choice in m.sourceRows
+                if choice.kind = "source"
+                    actual = actual + 1
+                    seen[choice.index.ToStr()] = true
+                    if m.streams[choice.index].url <> "https://media.example.test/" + choice.index.ToStr() + ".mkv" then mappingValid = false
+                end if
+            end for
+            Harness_Ok(mappingValid,"every source row maps to its exact full-pool URL")
+            Harness_Ok(actual <= 48,"page " + page.ToStr() + " has at most 48 source cards for " + total.ToStr() + " candidates")
+            Harness_Ok(m.sourceRows.Count() <= 50,"bounded source cards plus two reserved navigation controls")
+            Harness_Equal(m.sourceRows[0].kind,"previous","Previous keeps fixed row zero")
+            Harness_Equal(m.sourceRows[1].kind,"more","More keeps fixed row one")
+            Harness_Equal(m.sourceRows[2].index,page*48,"first displayed source maps through page offset")
+            Harness_Equal(m.streamsList.content.children[2].children[0].title,"Play source " + (page*48+1).ToStr(),"source numbering remains global")
+            Harness_Equal(m.streams.Count(),total,"page creation never truncates Player fallback pool")
+            pages = pages + 1
+            if page < lastPage
+                TestPaginationSelect(1)
+                Harness_Equal(m.sourcePage,page+1,"More opens exactly the next page")
+                Harness_Equal(m.top.pushRequest,invalid,"paging does not launch a movie")
+                Harness_Ok(not m.sourcesSuspended,"paging leaves queued provider loading available")
+                Harness_Equal(m.streamsList.jumpToRowItem[0],2,"next page starts focused on its first real source")
+            end if
+        end for
+        finalRow = m.sourceRows.Count() - 1
+        TestPaginationSelect(finalRow)
+        Harness_Equal(m.top.pushRequest.params.stream.url,"https://media.example.test/" + (total-1).ToStr() + ".mkv","last candidate is playable for " + total.ToStr() + " sources")
+        Harness_Equal(m.top.pushRequest.params.candidates.Count(),total,"last-page manual playback retains full fallback pool")
+        OnEnter(invalid)
+        m.top.pushRequest = invalid
+        Harness_Equal(seen.Count(),total,"all " + total.ToStr() + " candidates reachable by paging")
+        Harness_Equal(pages,lastPage+1,"finite page count covers entire source list")
+        Harness_Ok(not m.sourceRows[1].enabled,"More is disabled on the final page")
+        TestPaginationSelect(1)
+        Harness_Equal(m.sourcePage,lastPage,"disabled final-page More cannot change page or play")
+        Harness_Equal(m.top.pushRequest,invalid,"disabled navigation is never a movie choice")
+        TestPaginationSelect(0)
+        Harness_Equal(m.sourcePage,lastPage-1,"Previous returns one page")
+        Harness_Equal(m.streamsList.jumpToRowItem[0],49,"Previous focuses the last real source of a full prior page")
+    end for
+
+    Harness_Suite("Queued navigation notifications cannot turn into a movie selection")
+    TestPaginationSetup(97)
+    m.autoPlayEnabled = true
+    m.selectionTask = {id:"old-selection",loadToken:m.loadToken,reaped:false,result:{streams:m.streams}}
+    ranking = m.selectionTask
+    TestPaginationSelect(1)
+    Harness_Ok(ranking.reaped and m.selectionTask = invalid,"manual paging cancels in-flight automatic ranking")
+    Harness_Ok(not m.autoPlayEnabled and m.autoPlaySent,"paging chooses manual browsing precedence")
+    m.streamsList.rowItemSelected = [1,0]
+    onStreamSelected()
+    Harness_Equal(m.sourcePage,1,"duplicate queued More cannot skip another page")
+    Harness_Equal(m.top.pushRequest,invalid,"duplicate More cannot become a real source")
+    onAutomaticSourcesReady(TestEvent(ranking))
+    Harness_Equal(m.top.pushRequest,invalid,"late automatic worker cannot interrupt source paging")
+    TestPaginationSelect(2)
+    Harness_Equal(m.top.pushRequest.params.stream.url,"https://media.example.test/48.mkv","page-two first source selects global source 49")
+    Harness_Equal(m.top.pushRequest.params.candidates.Count(),97,"manual page-two choice passes all candidates for fallback")
+    Harness_Ok(m.sourcesSuspended,"actual movie selection still pauses provider queue")
+    oldPush = m.top.pushRequest
+    onStreamSelected()
+    Harness_Equal(m.top.pushRequest.params.stream.url,oldPush.params.stream.url,"suspended duplicate OK cannot push another movie")
+    OnEnter(invalid)
+    Harness_Equal(m.sourcePage,1,"returning from Player keeps manual source page")
+    Harness_Equal(m.streamsList.jumpToRowItem[0],2,"return from Player preserves the selected source row")
+    m.top.pushRequest = invalid
+    TestPaginationSelect(0)
+    m.streamsList.rowItemSelected = [0,0]
+    onStreamSelected()
+    Harness_Equal(m.sourcePage,0,"duplicate Previous cannot advance or play")
+    Harness_Equal(m.top.pushRequest,invalid,"old Previous row always stays navigation")
+    Harness_Ok(not OnBackPressed(),"Back retains existing screen cancellation behavior")
+
+    Harness_Suite("Provider, filter, refresh and malformed selection paging safety")
+    TestPaginationSetup(97)
+    TestPaginationSelect(1)
+    TestPaginationSelect(1)
+    Harness_Equal(m.sourcePage,2,"97 candidates expose a third page")
+    m.streamsList.rowItemFocused = [2,0]
+    onSourceRowFocused()
+    m.providers[1].readyStreams = [{name:"1080p AAC",url:"https://media.example.test/other-provider.mkv"}]
+    m.providers[1].streams = m.providers[1].readyStreams
+    SelectProvider(1)
+    Harness_Equal(m.sourcePage,0,"changing provider resets page")
+    Harness_Equal(m.sourceRows.Count(),3,"small provider retains reserved navigation indexes after paging")
+    Harness_Ok(not m.sourceRows[0].enabled and not m.sourceRows[1].enabled,"single-page provider has no actionable page controls")
+    m.top.pushRequest = invalid
+    TestPaginationSelect(1)
+    Harness_Equal(m.top.pushRequest,invalid,"old More index cannot become a small-provider movie")
+    SelectProvider(0)
+    TestPaginationSelect(1)
+    Harness_Ok(onKeyEvent("options",true),"4K filter works from a later page")
+    Harness_Equal(m.sourcePage,0,"4K filter resets display page")
+    Harness_Equal(m.streams.Count(),49,"strict 4K filter keeps all and only UHD-labelled candidates")
+    Harness_Equal(m.sourceRows[2].index,0,"filter remaps real indexes from first page")
+    for each choice in m.sourceRows
+        if choice.kind = "source" then Harness_Ok(CinemaIs4KLabel(m.streams[choice.index]),"every rendered strict-4K choice retains UHD label")
+    end for
+    ChangeSourcePage(1)
+    m.providers[0].readyStreams = [m.providers[0].readyStreams[0]]
+    RenderActiveProvider()
+    Harness_Equal(m.sourcePage,0,"shrinking current provider clamps page into new bounds")
+    Harness_Equal(m.sourceRows.Count(),3,"clamped final page creates only valid source and reserved controls")
+    m.top.pushRequest = invalid
+    m.streamsList.rowItemFocused = [2,0]
+    onSourceRowFocused()
+    for each bad in [[-1,0],[99,0],[2,1],["2",0],[2.5,0],[2]]
+        m.streamsList.rowItemSelected = bad
+        onStreamSelected()
+        Harness_Equal(m.top.pushRequest,invalid,"malformed/out-of-range choice is ignored")
+    end for
+    m.streamsList.rowItemSelected = [2,0]
+    onStreamSelected({GetData:function() as object
+        return [1,0]
+    end function})
+    Harness_Equal(m.top.pushRequest,invalid,"queued selected event differing from current field is dropped")
+    m.sourceRows[2].loadToken = "stale-batch"
+    onStreamSelected()
+    Harness_Equal(m.top.pushRequest,invalid,"stale source map cannot play into a refreshed title")
+    m.sourceRows[2].loadToken = m.loadToken
+    m.sourceRows[2].providerIndex = 1
+    onStreamSelected()
+    Harness_Equal(m.top.pushRequest,invalid,"stale provider map cannot play into current provider")
+    m.sourceRows[2].providerIndex = 0
+    m.sourceRows[2].page = 1
+    onStreamSelected()
+    Harness_Equal(m.top.pushRequest,invalid,"stale page map cannot play into current page")
+    m.sourceRows[2].page = 0
+    m.top.screenActive = false
+    onStreamSelected()
+    Harness_Equal(m.top.pushRequest,invalid,"hidden source list cannot initiate playback")
+    m.top.screenActive = true
+    CancelStreamsLoad()
+    onStreamSelected()
+    Harness_Equal(m.top.pushRequest,invalid,"canceled batch disowns rendered selection records")
+
+    Harness_Suite("Other provider completions preserve manual page and focus")
+    TestPaginationSetup(97)
+    TestPaginationSelect(1)
+    m.streamsList.rowItemFocused = [20,0]
+    onSourceRowFocused()
+    beforeContent = m.streamsList.content
+    late = {loadToken:m.loadToken,providerIndex:1,result:{streams:[{name:"2160p AAC",url:"https://media.example.test/later.mkv"}],readyStreams:[{name:"2160p AAC",url:"https://media.example.test/later.mkv"}],error:""},reaped:false}
+    m.loadTasks = [invalid,late]
+    m.pendingCount = 1
+    onStreamsLoaded(TestEvent(late))
+    Harness_Equal(m.sourcePage,1,"unrelated late provider never resets current source page")
+    Harness_Equal(m.streamsList.rowItemFocused[0],20,"unrelated late provider never takes current remote focus")
+    Harness_Equal(m.streamsList.content.children[20].children[0].title,beforeContent.children[20].children[0].title,"unrelated provider completion leaves current page content unchanged")
+    Harness_Equal(m.top.pushRequest,invalid,"late provider does not resurrect auto Play after manual paging")
+    m.top.screenActive = false
+    hidden = {loadToken:m.loadToken,providerIndex:0,result:{streams:m.providers[0].streams,readyStreams:m.providers[0].readyStreams,error:""},reaped:false}
+    m.loadTasks = [hidden,invalid]
+    m.pendingCount = 1
+    oldJump = m.streamsList.jumpToRowItem[0]
+    onStreamsLoaded(TestEvent(hidden))
+    Harness_Equal(m.sourcePage,1,"hidden active-provider result preserves source page")
+    Harness_Equal(m.streamsList.jumpToRowItem[0],oldJump,"hidden source completion does not move remote selection")
+    Harness_Equal(m.top.pushRequest,invalid,"hidden late result cannot initiate playback")
+
+    Harness_Suite("Queued and requesting source statuses reflect actual worker ownership")
+    TestPaginationSetup(0)
+    m.sourceQueue = [1]
+    m.loadTasks = [{result:invalid},invalid]
+    Harness_Equal(ProviderRequestState(0),"pending","occupied worker is Requesting sources")
+    Harness_Equal(ProviderRequestState(1),"queued","waiting source provider is Queued")
+    Harness_Ok(ProviderEmptyLabel().InStr("Requesting sources") >= 0,"empty active worker has requesting text")
+    m.activeIndex = 1
+    Harness_Ok(ProviderEmptyLabel().InStr("Queued") >= 0,"empty waiting provider has queued text")
+    m.pendingCount = 2
+    UpdateStreamsStatus()
+    Harness_Ok(m.status.text.InStr("1 requesting sources; 1 queued") >= 0,"overall source status reports active and waiting counts")
+    m.prefetchContext = {key:"current"}
+    m.prefetchNode = {callFunc:function(name as string,key as string) as object
+        return {entries:[{status:"ready"},{status:"pending"}]}
+    end function}
+    Harness_Equal(ProviderRequestState(0),"done","coordinator-completed provider is no longer pending")
+    Harness_Equal(ProviderRequestState(1),"pending","coordinator-active provider takes priority over fallback queue")
+end sub
+
 sub Main()
     m.cinemaRankCalls = 0
     Harness_Suite("Production StreamsScreen callbacks")
@@ -246,18 +509,22 @@ sub Main()
     Harness_Ok(m.streamsList.focused, "First results take remote focus")
     Harness_Equal(m.streamsList.content.children[0].children[0].qualityBadge, "2160p / 4K source label", "Badge distinguishes labels from decoded resolution")
     m.streamsList.rowItemSelected = [1,0]
+    m.streamsList.rowItemFocused = [1,0]
     onStreamSelected()
     Harness_Equal(m.top.pushRequest.params.stream.url, m.streams[1].url, "OK passes exactly the visible sorted source")
     Harness_Equal(m.top.pushRequest.params.videoId, "opaque:id/with space", "Opaque episode ID preserved through playback handoff")
     Harness_Equal(m.top.pushRequest.params.position, 61.5, "Resume position passed unchanged")
     Harness_Equal(m.top.pushRequest.params.serverAddress, "", "Direct-source playback has no server requirement")
     Harness_Equal(m.top.pushRequest.params.fourKOnly, false, "All-quality selection passes an explicit false 4K-only guard")
+    m.sourcesSuspended = false
     Harness_Ok(onKeyEvent("options", true), "Star filter handled")
     Harness_Equal(m.streams.Count(), 12, "4K-only filters out HD")
     Harness_Equal(raw.Count(), 26, "Filtering leaves provider response unchanged")
     m.streamsList.rowItemSelected = [0,0]
+    m.streamsList.rowItemFocused = [0,0]
     onStreamSelected()
     Harness_Equal(m.top.pushRequest.params.fourKOnly, true, "Explicit 4K-only selection preserves the encoded-quality guard in Player")
+    m.sourcesSuspended = false
     m.providers[0].streams = [{name:"1080p",url:"https://example.invalid/hd.mp4"}]
     RenderActiveProvider()
     Harness_Equal(m.streams.Count(), 0, "No silent HD fallback in 4K-only mode")
@@ -373,5 +640,6 @@ sub Main()
     TestWorkerPreparedSources()
     TestStreamsRemoteRefresh()
     TestStreamTileRecycling()
+    TestSourcePagination()
     Harness_Finish()
 end sub

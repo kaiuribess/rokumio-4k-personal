@@ -27,6 +27,7 @@
         <field id="nextEpisodeRequest" type="assocarray" alwaysNotify="true" />
     </interface>
 
+    <script type="text/brightscript" uri="pkg:/source/util/ProviderPriority.brs" />
     <script type="text/brightscript" uri="pkg:/source/stores/SubtitlesStore.bs" />
     <script type="text/brightscript" uri="pkg:/components/PlayerScreen.brs" />
     <script type="text/brightscript" uri="pkg:/components/PlayerPosition.brs" />

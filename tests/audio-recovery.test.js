@@ -23,6 +23,7 @@ try {
   const read = name => fs.readFileSync(path.join(root, name), 'utf8');
   const memory = read('components/PlayerSourceMemory.brs')
     .replace(/SourceMemory_Fingerprint\(/g,'PlayerTest_Fingerprint(')
+    .replace(/ProviderPriority_StreamKey\(/g,'PlayerTest_ProviderKey(')
     .replace(/CreateObject\(/gi,'MockNativeObject(');
   const fixtures = `
 sub RecoverySetup()

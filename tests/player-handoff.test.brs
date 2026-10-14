@@ -30,6 +30,10 @@ function MockVideoNode() as object
     return video
 end function
 
+function PlayerTest_ProviderKey(stream as dynamic) as string
+    return String(64,"c")
+end function
+
 sub SetupPlayerFixture()
     m.lastPlaybackPosition = 0
     m.lastPlaybackDuration = 0
@@ -117,6 +121,10 @@ sub Test_SourceProofMemory()
     m.video.audioFormat = "aac"
     m.video.mute = false
     m.sourceAccepted = true
+    m.playParams.stream = {sourceMemoryProvider:"fixture|example.test"}
+    m.stores = {settings:{calls:[],callFunc:function(name as string,key as string) as boolean
+        m.calls.Push({name:name,key:key}):return true
+    end function}}
     m.video.positionInfo = {audio:100,video:100}
     onSourceProofTick()
     onSourceProofTick()
@@ -124,13 +132,20 @@ sub Test_SourceProofMemory()
     m.video.positionInfo = {audio:105,video:105}
     onSourceProofTick()
     Harness_Equal(m.sourceMemoryPending.Count(),0,"one fresh interval is insufficient")
+    Harness_Equal(m.stores.settings.calls.Count(),0,"provider priority is not saved before sustained progress")
     m.video.positionInfo = {audio:110,video:110}
     onSourceProofTick()
     Harness_Equal(m.sourceMemoryPending.Count(),1,"two fresh advancing audio/video intervals prove the source")
     Harness_Equal(m.sourceMemoryPending[0].outcome,"working","verified playback is remembered as working")
+    Harness_Equal(m.stores.settings.calls.Count(),1,"verified progress remembers one provider")
+    Harness_Equal(m.stores.settings.calls[0].key,String(64,"c"),"only an opaque provider key crosses the settings boundary")
     Harness_Equal(m.sourceProofTimer.control,"stop","proof timer stops after recording")
     onSourceProofTick()
     Harness_Equal(m.sourceMemoryPending.Count(),1,"later ticks cannot duplicate successful memory")
+    Harness_Equal(m.stores.settings.calls.Count(),1,"later proof ticks do not repeat provider writes")
+    m.playParams.diagnostic = true:RememberWorkingProvider()
+    Harness_Equal(m.stores.settings.calls.Count(),1,"diagnostic playback cannot affect preferred scheduling")
+    m.playParams.diagnostic = false
     ResetSourceProof()
     m.sourceMemoryPending = []
     m.video.positionInfo = {audio:500,video:500}

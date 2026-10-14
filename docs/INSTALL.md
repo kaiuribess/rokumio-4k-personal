@@ -2,7 +2,7 @@
 
 ## Install the release ZIP
 
-**[Download the installable Roku ZIP — 0.5.15](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.15/rokumio-4k-personal-0.5.15.zip)**. Keep it zipped. This direct link avoids GitHub's source-code archives; those archives cannot be uploaded as the channel package.
+**[Download the installable Roku ZIP — 0.5.16](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.16/rokumio-4k-personal-0.5.16.zip)**. Keep it zipped. This direct link avoids GitHub's source-code archives; those archives cannot be uploaded as the channel package.
 
 1. On the Roku remote press **Home three times, Up twice, Right, Left, Right, Left, Right**.
 2. Write down the device URL displayed on the developer screen, enable the installer, review Roku's terms, and set an installer password privately. Roku restarts.
@@ -47,6 +47,7 @@ Home opens with a featured area and five shortcuts. Choose Movies, Shows or Genr
 | Arrows / OK | Navigate and select |
 | Microphone with Search keyboard open | Native voice dictation where supported |
 | Left / Right on sources | Change provider |
+| More sources / Previous sources | Move through pages of 48 retained eligible choices |
 | \* on sources | Toggle 4K-only / all qualities |
 | Play/Pause on sources | Request fresh links |
 | Play/Pause on Home | Refresh catalog rows |
@@ -62,6 +63,12 @@ After an accepted show episode finishes, the next known episode starts after a f
 **Settings → Next episode** disables/enables that countdown. **Source recovery** controls automatic alternate-source attempts; when Off, playback uses the selected eligible source. These saved settings apply to subsequent playback and do not interrupt a running movie. English track checks remain active in both recovery modes.
 
 **Settings → Automatic Play** offers **Start sooner** (default) or **Compare providers**. Start sooner compares available candidates briefly and can begin while another provider is still loading. It has fewer initial recovery alternatives than a full comparison. Compare providers waits for all eligible responses before selecting. Both use the same quality filter and English/audio checks; a candidate label does not establish successful decoding. Returning to the source screen resumes queued providers so their choices remain available. Late provider results do not replace a movie already playing.
+
+For your highest-quality selection, use **Compare providers + Picture quality → 4K only**. With HD fallback allowed, an early 1080p source can be chosen before another provider supplies UHD. This describes selection policy, not a measured device failure; native playback facts still need to confirm the source's actual resolution.
+
+**Settings → Preferred source** opens a scrolling provider list. Choose an installed provider or **Automatic**, which uses the most recent provider to pass English-track/native A/V progress checks. This changes waiting order; it does not preempt active transfers or guarantee a file works. Source statuses now distinguish **Queued** (waiting for a slot) and **Requesting sources** (lookup running).
+
+Manual source pages retain 48 real cards plus navigation controls. More/Previous do not start playback. Back keeps its normal screen-return behavior. Pages expose all retained eligible choices; warm preload still limits each provider to 256 candidates. Play/Pause refresh uses an ordinary provider request when you need fresh/full results. Playback receives the retained pool, not just the displayed page.
 
 ## Updates
 

@@ -1,5 +1,17 @@
 # Changes
 
+## 0.5.16 — 2026-10-14
+
+- Replace the inaccessible 48-source cutoff with true pages of 48 real source cards, fixed More/Previous controls and global source/count information. Preserve the full retained candidate array for playback fallback. Provider/filter/refresh changes reset or clamp pages; returning from Player restores the page and focus.
+- Guard page navigation and stale/duplicate selections so an old More/Previous event cannot launch a movie. Explicit browsing cancels automatic selection; late provider results do not steal current page focus.
+- Prioritize waiting requests by saved preferred provider, then most recently working provider, then stable installation order. Keep original provider indices, the shared two-worker cap and abandoned-transfer ownership. Warm selection can include a preferred provider beyond the first four installed.
+- Add **Settings → Preferred source**, with Automatic and a scrolling list of installed stream providers. Reject stale Settings subsection events with distinct native list generations. Save only opaque provider fingerprints from public add-on ID/hostname; configured paths, queries and userinfo are excluded.
+- Record the last working provider only after the existing English-track/unmuted/native A/V progress gate, excluding diagnostic playback. Retry refused preference writes. Priority changes retain ready source results and do not start work behind Player.
+- Distinguish **Queued** from **Requesting sources** per provider and in overall counts. Preserve Start sooner and Compare providers, 4K-only filtering and all previous playback preferences.
+- Add paging, priority, persistence and progress-gate tests. The complete suite passes **4,704 BrightScript/cinema assertions**, plus separate Node media/transport/mock suites.
+
+This release has software/package validation and independent code review; it has not been installed or physically profiled/tested. Start sooner can use a smaller/HD pool; Compare providers plus 4K-only is the quality-focused option. Initial source labels do not certify decoded UHD. Existing warm cache limits and uncapped ordinary response bytes remain documented.
+
 ## 0.5.15 — 2026-10-14
 
 - Remove the mandatory all-provider barrier for automatic Play. **Start sooner** briefly compares ready candidates and can begin while another provider is pending; **Compare providers** retains the full comparison as a saved setting. Quality/audio filters still apply. Later provider results never replace accepted playback.

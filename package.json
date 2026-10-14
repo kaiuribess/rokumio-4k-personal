@@ -1,6 +1,6 @@
 {
     "name": "rokumio-4k-personal",
-    "version": "0.5.15",
+    "version": "0.5.16",
     "private": true,
     "description": "Native Roku client for Stremio addons and debrid streams",
     "scripts": {

@@ -7,6 +7,24 @@ function OptionsEvent(node as object) as object
         return m.node
     end function}
 end function
+function OptionsList() as object
+    return {rowItemSelected:[0,0],ObserveField:sub(name as string,handler as string)
+    end sub,UnobserveField:sub(name as string)
+        m.unobserved=true
+    end sub,SetFocus:sub(value as boolean)
+        m.focused=value
+    end sub}
+end function
+function OptionsContent() as object
+    return {children:[],CreateChild:function(kind as string) as object
+        node=OptionsContent():m.children.Push(node):return node
+    end function}
+end function
+function OptionsProviderKey(addon as object) as string
+    if addon.id="a" then return String(64,"a")
+    if addon.id="b" then return String(64,"b")
+    return ""
+end function
 function NextSettingsWorkerId(prefix as string) as string
     m.sequence=m.sequence+1
     return prefix+m.sequence.ToStr()
@@ -29,12 +47,20 @@ sub OptionsSetup()
         if name="SettingsSaveFailed" then return m.data.SaveFailed()
         if name="SettingsGetAudioMode" then return m.data.GetAudioMode()
         if name="SettingsGetServerAddress" then return m.data.GetServerAddress()
+        if name="SettingsGetProviderPriority" then return m.data.GetProviderPriority()
+        if name="SettingsSetPreferredProviderKey" then return m.data.SetPreferredProviderKey(key)
         return invalid
     end function}
-    m.stores={settings:host}
+    m.stores={settings:host,addons:{callFunc:function(name as string,first=invalid as dynamic,second=invalid as dynamic) as dynamic
+        if name="AddonsHasResource" then return true
+        if name="AddonsGetAll" then return [{id:"a",name:"Provider A",resources:["stream"]},{id:"b",name:"Provider B",resources:["stream"]}]
+        return invalid
+    end function}}
     m.top={scene:{dialog:invalid},getScene:function() as object
         return m.scene
-    end function}
+    end function,AppendChild:sub(node as object)
+    end sub,RemoveChild:sub(node as object)
+    end sub}
     m.list={SetFocus:sub(value as boolean)
         m.focused=value
     end sub}
@@ -101,4 +127,26 @@ Harness_Ok(not prefs.fourKOnly and prefs.autoNextEpisode and prefs.autoSourceRet
 Harness_Ok(not prefs.waitForProviders,"absent settings choose early automatic selection")
 Harness_Ok(not PlaybackPreferences(invalid,{waitForProviders:"true"}).waitForProviders,"wrong-type comparison override is ignored")
 Harness_Ok(PlaybackPreferences(invalid,{waitForProviders:true}).waitForProviders,"explicit boolean can request full comparison")
+
+Harness_Suite("Preferred-provider list preserves explicit choices and rejects previous list events")
+OptionsSetup():m.list=OptionsList():m.list.id="original"
+oldList=m.list:m.rows=[{action:"preferredSource"}]:m.list.rowItemSelected=[0,0]
+onRowSelected(OptionsEvent(oldList))
+Harness_Equal(m.rows.Count(),3,"scrolling choices include Automatic and every installed source provider")
+Harness_Equal(m.settingsSection,"providers","preferred-source action opens its own list")
+Harness_Ok(oldList.unobserved,"previous list observer is removed")
+onRowSelected(OptionsEvent(oldList))
+Harness_Equal(m.stores.settings.data.GetProviderPriority().preferredProviderKey,"","queued old selection cannot save a provider")
+providerList=m.list:providerList.rowItemSelected=[2,0]
+onRowSelected(OptionsEvent(providerList))
+Harness_Equal(SettingsStore(m.registry).GetProviderPriority().preferredProviderKey,String(64,"b"),"explicit provider choice persists through native-style host")
+Harness_Ok(m.list.id<>providerList.id,"closing creates a distinct selection generation")
+before=m.rebuilds:onRowSelected(OptionsEvent(providerList))
+Harness_Equal(m.rebuilds,before,"old provider event cannot trigger another main Settings action")
+Harness_Equal(m.list.jumpToRowItem[0],5,"selection returns to Preferred source row")
+ShowPreferredProvider()
+Harness_Ok(OnBackPressed(),"Back closes source choices without leaving Settings")
+Harness_Equal(SettingsStore(m.registry).GetProviderPriority().preferredProviderKey,String(64,"b"),"Back does not change the saved provider")
+ShowPreferredProvider():m.list.rowItemSelected=[0,0]:onRowSelected(OptionsEvent(m.list))
+Harness_Equal(SettingsStore(m.registry).GetProviderPriority().preferredProviderKey,"","Automatic clears the explicit source preference")
 Harness_Finish()

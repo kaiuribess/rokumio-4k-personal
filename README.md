@@ -2,13 +2,13 @@
 
 A native Roku client with a dark red interface for browsing Stremio-compatible catalogs, searching movies and shows, and playing compatible direct streams with the Roku remote. This community derivative adds English audio selection, projector/surround preferences, clearer source cards, automatic source recovery, next-episode playback, and add-on checks. The repository and ZIP filename remain `rokumio-4k-personal` so existing links and build instructions continue to work.
 
-**Version 0.5.15 is an experimental community release.** Software tests and package validation pass. The new screens have authoring previews, but this version has not been installed or tested on a physical Roku. It cannot guarantee that every provider file plays, has English audio, or is genuine 4K.
+**Version 0.5.16 is an experimental community release.** Software tests and package validation pass. The new screens have authoring previews, but this version has not been installed or tested on a physical Roku. It cannot guarantee that every provider file plays, has English audio, or is genuine 4K.
 
-**[Download the Roku install ZIP — 0.5.15](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.15/rokumio-4k-personal-0.5.15.zip)**
+**[Download the Roku install ZIP — 0.5.16](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.16/rokumio-4k-personal-0.5.16.zip)**
 
 Upload that ZIP without extracting it. GitHub's green Code button and “Source code” archives are for developers; they are not the Roku install package.
 
-[Release notes and checksum](https://github.com/kaiuribess/rokumio-4k-personal/releases/tag/v0.5.15) · [Installation](docs/INSTALL.md) · [Add-on checks](docs/ADDON_CHECKS.md) · [Playback and 4K](docs/PLAYBACK.md) · [Development](docs/DEVELOPMENT.md) · [Changes](CHANGELOG.md)
+[Release notes and checksum](https://github.com/kaiuribess/rokumio-4k-personal/releases/tag/v0.5.16) · [Installation](docs/INSTALL.md) · [Add-on checks](docs/ADDON_CHECKS.md) · [Playback and 4K](docs/PLAYBACK.md) · [Development](docs/DEVELOPMENT.md) · [Changes](CHANGELOG.md)
 
 ## What you can do
 
@@ -18,11 +18,13 @@ Upload that ZIP without extracting it. GitHub's green Code button and “Source 
 - Play direct HTTPS MP4/MKV or HLS/DASH streams that your Roku supports. The direct path needs no PC or external streaming server during playback.
 - Choose labelled 4K or 1080p sources. Press **\*** on the source screen to toggle **4K-only / all qualities**.
 - Let automatic playback rank source candidates, try compatible alternatives, and remember previously successful file identities.
+- Browse retained source choices in pages of 48 with **More sources** and **Previous sources**. The selected page does not shrink the player's available fallback pool.
 - Choose **TV / projector speakers** or **HDMI soundbar / receiver** under **Settings → Audio mode**. **Audio connection** shows current Roku capability reports and explains a remaining Stereo setting. Audio compatibility still depends on the actual track and connected equipment.
 - Open **Add-ons → Check add-ons** to see which installed manifest is reachable or needs attention. The source picker also shows the selected provider's request status. An empty title response or a catalog-only add-on is not automatically labelled broken.
 - Continue shows automatically after an accepted episode ends: a **five-second countdown** names the next episode; **Back cancels**. The next episode gets fresh sources and retains the quality filter/audio mode. Regular seasons roll forward without jumping into specials.
 - Save resume positions locally; optional Stremio pairing provides account synchronization.
 - Save **Picture quality**, **Automatic Play**, **Next episode** and **Source recovery** preferences under Settings. Start sooner is the automatic selection default; Compare providers keeps broader comparison available. Defaults retain 1080p fallback, autoplay and bounded automatic recovery; English dialogue checks stay active.
+- Choose **Settings → Preferred source** to request that installed provider first when a slot is free. Automatic uses the most recent provider that passed the existing English-track/native A/V progress checks. Queued providers and active requests have distinct status labels.
 
 The built-in Cinemeta catalog supplies title metadata. **Playable movies, shows, provider accounts and configured stream add-ons are not bundled.** Install your own compatible provider manifest and use content you are authorized to access. Searching a title does not establish that a playable 4K source exists.
 
@@ -64,6 +66,10 @@ The app does not save movies. Source preloading is RAM-only for one title, expir
 Preloading and explicit source requests share two worker slots. All eligible providers remain queued and browsable. Queued requests pause while Player is in front; returning resumes them. A lookup already in flight keeps its slot across title changes until it reports completion, so rapid navigation cannot create a new full batch on each visit. This can delay a new title behind previous requests. It limits owned source-list workers, not all HTTPS connections or provider response sizes. Explicit source results stay with the current source screen until it is canceled/reloaded; the 60-second TTL describes the warm cache.
 
 Start sooner may begin with fewer recovery alternatives than Compare providers. Both retain native quality/audio checks. Later providers do not switch a movie that is already playing.
+
+For a quality-first 4K setup, choose **Compare providers** and **4K only**. With HD fallback enabled, Start sooner may select an available 1080p candidate before a slower provider returns UHD. Initial 2160p labels remain hints; they do not universally prove native UHD decoding.
+
+The source list displays 48 real cards per page, plus two fixed navigation controls when paging is enabled. More/Previous expose later **retained, eligible** choices without growing the current page. Warm prefetch still has its existing 256-candidate/provider cap; Play/Pause refresh uses an ordinary provider response. Ordinary response bytes are not capped by paging. Provider priority reorders waiting jobs only; active transfers are not preempted. Only two opaque hashes are saved for preferred/last working provider identity, excluding configured paths, queries and userinfo.
 
 These limits protect memory and background work without disabling search, full browsing, 4K/1080p selection, voice controls, subtitles, resume, add-on checks or next-episode playback. Actual smoothness and network buffering still require device observation.
 

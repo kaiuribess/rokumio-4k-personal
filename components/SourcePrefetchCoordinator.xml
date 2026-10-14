@@ -5,11 +5,13 @@
         <function name="Prepare" />
         <function name="Snapshot" />
         <function name="Adopt" />
+        <function name="SetPriority" />
         <function name="Suspend" />
         <function name="Resume" />
         <function name="Cancel" />
     </interface>
     <script type="text/brightscript" uri="pkg:/source/core/AsyncTask.bs" />
+    <script type="text/brightscript" uri="pkg:/source/util/ProviderPriority.brs" />
     <script type="text/brightscript" uri="pkg:/components/SourcePrefetchCoordinator.brs" />
     <children><Timer id="prefetchExpiry" duration="60" repeat="false" /></children>
 </component>

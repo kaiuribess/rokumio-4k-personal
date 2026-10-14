@@ -22,6 +22,7 @@ sub init()
     m.status = m.top.FindNode("settingsStatus")
     m.list = m.top.FindNode("settingsList")
     m.guide = m.top.FindNode("settingsGuide")
+    m.guideTitle = m.top.FindNode("settingsGuideTitle")
     m.settingsAudioDialog = invalid
 
     t = Theme()
@@ -53,11 +54,13 @@ function OnEnter(params as object) as void
 end function
 
 function OnExit() as void
+    m.settingsSection = ""
     CancelTestServer()
     CancelNetDiag()
 end function
 
 function OnBackPressed() as boolean
+    if m.settingsSection = "providers" then ClosePreferredProvider():return true
     return false
 end function
 
@@ -68,6 +71,9 @@ end sub
 ' first so it is the handiest action: a guest is offered the Stremio login, a
 ' stremio user their email + logout. The rest follow in fixed order.
 sub BuildRows(preserveFocus = false as boolean)
+    m.settingsSection = ""
+    if m.title <> invalid then m.title.text = "Settings"
+    if m.sub <> invalid then m.sub.text = "Choose your picture, playback and speaker preferences"
     focusedRow = 0
     if preserveFocus
         focus = m.list.rowItemFocused
@@ -100,6 +106,7 @@ sub BuildRows(preserveFocus = false as boolean)
     startLabel = "Start sooner"
     if prefs.waitForProviders then startLabel = "Compare providers"
     m.rows.Push({action:"autoStart",title:"Automatic Play",value:startLabel})
+    m.rows.Push({action:"preferredSource",title:"Preferred source",value:PreferredProviderValue()})
     m.rows.Push({action:"autoplay",title:"Next episode",value:nextLabel})
     m.rows.Push({action:"recovery",title:"Source recovery",value:recoveryLabel})
     m.rows.Push({ action: "addonChecks", title: "Add-on checks", value: "Find problems" })
@@ -165,12 +172,18 @@ sub ToggleAudioSetup()
     ApplyAudioSetup(value)
 end sub
 
-sub onRowSelected()
+sub onRowSelected(event = invalid as dynamic)
+    if event <> invalid
+        sender = event.GetRoSGNode()
+        if sender = invalid or sender.id <> m.list.id then return
+    end if
     data = m.list.rowItemSelected
     if data = invalid or data.Count() < 2 then return
     index = data[0]
     if index < 0 or index >= m.rows.Count() then return
     action = m.rows[index].action
+    if action = "providerChoice" then ApplyPreferredProvider(m.rows[index].providerKey):return
+    if action = "preferredSource" then ShowPreferredProvider():return
     if action = "login"
         SignIn()
     else if action = "logout"

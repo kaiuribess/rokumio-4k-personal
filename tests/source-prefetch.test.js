@@ -11,12 +11,12 @@ const extract = (file, name) => {
   assert.ok(match, `${file}: ${name}`);
   return match[0];
 };
-const coordinatorNames = ['Prepare','Adopt','Suspend','Resume','Snapshot','Cancel','PrefetchClear','PrefetchPump','onPrefetchExpired','onPrefetchLoaded'];
+const coordinatorNames = ['Prepare','Adopt','SetPriority','PrefetchWarmQueue','Suspend','Resume','Snapshot','Cancel','PrefetchClear','PrefetchPump','PrefetchNextQueuedIndex','onPrefetchExpired','onPrefetchLoaded'];
 let coordinator = coordinatorNames.map(name => extract('components/SourcePrefetchCoordinator.brs', name)).join('\n').replace(/\bm\./g,'m.prefetchState.');
 for (const name of coordinatorNames) coordinator = coordinator.replace(new RegExp(`\\b${name}\\b`, 'g'), `PrefetchTest_${name}`);
 const screenNames = ['OnEnter','LoadStreams','LaunchProviderSources','ApplyProviderSources','onSourcePrefetchChanged',
   'CancelStreamsLoad','onStreamsLoaded','RefreshStreams','CurrentAudioMode','EpisodeKey','ParamString','isTaskPending',
-  'UpdateStreamsStatus','UpdateProviderStatus','MaybeStartAutomaticPlayback','CancelAutomaticGrace','onAutomaticGrace','SuspendSourceLoading','PumpProviderSources','onKeyEvent','BlurFocus','onStreamSelected','onAutomaticSourcesReady'];
+  'UpdateStreamsStatus','UpdateProviderStatus','MaybeStartAutomaticPlayback','ProviderRequestState','ResetSourcePagination','ChangeSourcePage','DisableAutomaticForManualBrowse','CancelAutomaticGrace','onAutomaticGrace','SuspendSourceLoading','PumpProviderSources','onKeyEvent','BlurFocus','onStreamSelected','onAutomaticSourcesReady'];
 const screen = screenNames.map(name => extract('components/StreamsScreen.brs', name)).join('\n');
 const details = ['ScheduleDetailsPrefetch','DetailsPrefetchParams','onDetailsPrefetch','BlurFocus'].map(name => extract('components/DetailsScreen.brs', name)).join('\n').replace(/\bBlurFocus\b/g,'DetailsTest_BlurFocus');
 const episodes = ['ScheduleEpisodePrefetch','EpisodePrefetchParams','onEpisodePrefetch','PushEpisode','BlurFocus'].map(name => extract('components/EpisodesScreen.brs', name)).join('\n').replace(/\bBlurFocus\b/g,'EpisodesTest_BlurFocus');
@@ -31,7 +31,7 @@ assert.match(read('components/SourcePrefetchTask.xml'), /id="providerIndex" type
 const isolated = path.join(root,'out-test','source-prefetch');
 fs.mkdirSync(isolated,{recursive:true});
 const file = path.join(isolated,'source-prefetch.brs');
-fs.writeFileSync(file,[read('tests/harness.brs'),read('source/util/CinemaStreams.brs') + '\n' + read('source/util/AddonDiagnostics.brs'), read('source/util/PlaybackPreferences.brs'),read('source/util/SourceMemory.brs'),read('source/util/SourcePrefetch.brs'),coordinator,screen,details,episodes,task,normalLoader,read('tests/source-prefetch.test.brs')].join('\n'));
+fs.writeFileSync(file,[read('tests/harness.brs'),read('source/util/CinemaStreams.brs') + '\n' + read('source/util/AddonDiagnostics.brs'), read('source/util/PlaybackPreferences.brs'),read('source/util/SourceMemory.brs'),read('source/util/ProviderPriority.brs'),read('source/util/SourcePrefetch.brs').replace('ProviderPriority_Key(addon, hashFn)', 'ProviderPriority_Key(addon, PrefetchTest_PriorityHash)'),coordinator,screen,details,episodes,task,normalLoader,read('tests/source-prefetch.test.brs')].join('\n'));
 const result = spawnSync(process.execPath,[path.join(root,'node_modules/@rokucommunity/brs/bin/cli.js'),'--root',isolated,file],{cwd:isolated,encoding:'utf8'});
 process.stdout.write(result.stdout||''); process.stderr.write(result.stderr||'');
 process.exit(result.status===0 && !(result.stderr||'').trim() && /RESULT: PASS/.test(result.stdout||'') ? 0 : 1);
