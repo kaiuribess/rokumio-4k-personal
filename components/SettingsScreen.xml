@@ -15,6 +15,7 @@
     <script type="text/brightscript" uri="pkg:/source/util/AudioCapabilities.brs" />
     <script type="text/brightscript" uri="pkg:/source/util/AudioSetup.brs" />
     <script type="text/brightscript" uri="pkg:/components/SettingsAudio.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/PlaybackPreferences.brs" />
 
     <children>
         <Rectangle id="settingsBg" width="1920" height="1080" color="0x0" />

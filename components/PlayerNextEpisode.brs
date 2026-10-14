@@ -18,12 +18,16 @@ sub PrepareNextEpisode(params as object)
     if params.metaType <> "series" or params.diagnostic = true or params.autoNextEpisode = false then return
     if Type(m.nextEpisodeMeta) = "roAssociativeArray" and Type(m.nextEpisodeMeta.videos) = "roArray" and m.nextEpisodeMeta.videos.Count() > 0 then return
     if NextEpisode_Text(params.addonAddress) = "" or NextEpisode_Text(params.metaId) = "" then return
-    if m.nextEpisodeSetup <> invalid then m.nextEpisodeSetup.control = "start"
+    m.nextSetupPending = true
+    m.nextSetupGuard = TimerGuard_Start(m.nextEpisodeSetup,100)
 end sub
 
 sub onNextEpisodeSetup()
+    if m.nextSetupPending <> true then return
     if m.playbackActive <> true or m.top.screenActive <> true then return
-    if Type(m.playParams) <> "roAssociativeArray" or m.playParams.metaType <> "series" or m.playParams.diagnostic = true then return
+    if not TimerGuard_Ready(m.nextEpisodeSetup,m.nextSetupGuard) then return
+    m.nextSetupPending = false
+    if Type(m.playParams) <> "roAssociativeArray" or m.playParams.metaType <> "series" or m.playParams.diagnostic = true or m.playParams.autoNextEpisode = false then return
     if m.nextEpisodeTask <> invalid then return
     m.nextEpisodeTask = AsyncTask_Launch(m.top, "MetaLoaderTask", "onNextEpisodeMetaLoaded", {addonAddress:NextEpisode_Text(m.playParams.addonAddress),metaType:"series",metaId:NextEpisode_Text(m.playParams.metaId)}, NextPlayerWorkerId("nextEpisodeMeta"))
 end sub
@@ -59,7 +63,7 @@ function ScheduleNextEpisode() as boolean
     m.nextEpisodeSeconds = 5
     m.nextEpisodePending = true
     UpdateNextEpisodeCountdown()
-    m.nextEpisodeTimer.control = "start"
+    m.nextEpisodeGuard = TimerGuard_Start(m.nextEpisodeTimer,1000)
     return true
 end function
 
@@ -80,8 +84,10 @@ sub onNextEpisodeTick()
         CancelNextEpisode()
         return
     end if
+    if not TimerGuard_Ready(m.nextEpisodeTimer,m.nextEpisodeGuard) then return
     m.nextEpisodeSeconds = m.nextEpisodeSeconds - 1
     if m.nextEpisodeSeconds > 0
+        m.nextEpisodeGuard = TimerGuard_Start(m.nextEpisodeTimer,1000)
         UpdateNextEpisodeCountdown()
         return
     end if
@@ -96,6 +102,9 @@ end sub
 
 sub CancelNextEpisode()
     m.nextEpisodePending = false
+    m.nextSetupPending = false
+    m.nextEpisodeGuard = invalid
+    m.nextSetupGuard = invalid
     m.nextEpisodeParams = invalid
     if m.nextEpisodeTimer <> invalid then m.nextEpisodeTimer.control = "stop"
     if m.nextEpisodeSetup <> invalid then m.nextEpisodeSetup.control = "stop"

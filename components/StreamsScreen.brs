@@ -108,7 +108,7 @@ function OnEnter(params as object) as void
     CancelStreamsLoad()
     CancelEpisodeLoad()
     m.params = params
-    if params.fourKOnly <> invalid then m.fourKOnly = params.fourKOnly = true
+    m.fourKOnly = PlaybackPreferences(m.stores,params).fourKOnly
     m.autoPlayEnabled = params.autoPlay = true
     m.autoPlaySent = false
     ApplyParamsChrome(params)
@@ -347,8 +347,9 @@ end sub
 
 sub PushAutomaticPlayer(first as object, candidates as object, remembered = false as boolean)
     serverAddress = ""
+    prefs = PlaybackPreferences(m.stores,m.params)
     if m.stores <> invalid then serverAddress = m.stores.settings.callFunc("SettingsGetServerAddress")
-    m.top.pushRequest = {screen:"playerScreen",params:{stream:first,candidates:candidates,rememberedSource:remembered,fourKOnly:m.fourKOnly = true,serverAddress:serverAddress,audioMode:CurrentAudioMode(),diagnostic:m.params.diagnostic = true,metaType:m.params.metaType,metaId:m.params.metaId,videoId:m.params.videoId,season:m.params.season,episode:m.params.episode,position:m.params.position,name:m.headTitle.text,poster:m.params.poster,posterShape:m.params.posterShape,logo:m.params.logo,background:m.params.background,addonAddress:m.params.addonAddress,seriesMeta:m.params.seriesMeta,autoNextEpisode:m.params.autoNextEpisode}}
+    m.top.pushRequest = {screen:"playerScreen",params:{stream:first,candidates:candidates,rememberedSource:remembered,fourKOnly:m.fourKOnly = true,serverAddress:serverAddress,audioMode:CurrentAudioMode(),diagnostic:m.params.diagnostic = true,metaType:m.params.metaType,metaId:m.params.metaId,videoId:m.params.videoId,season:m.params.season,episode:m.params.episode,position:m.params.position,name:m.headTitle.text,poster:m.params.poster,posterShape:m.params.posterShape,logo:m.params.logo,background:m.params.background,addonAddress:m.params.addonAddress,seriesMeta:m.params.seriesMeta,autoNextEpisode:prefs.autoNextEpisode,autoSourceRetry:prefs.autoSourceRetry}}
 end sub
 
 ' A single provider's stream list landed (or failed). The task reports which
@@ -957,6 +958,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
     if m.providers = invalid or m.activeIndex < 0 then return false
     if key = "options"
         m.fourKOnly = not m.fourKOnly
+        m.params.fourKOnly = m.fourKOnly
         m.listFilled = false
         RenderActiveProvider()
         return true

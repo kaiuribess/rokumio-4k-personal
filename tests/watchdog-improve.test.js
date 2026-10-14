@@ -20,12 +20,16 @@ try {
     const resume = /^function PlaybackInfo_ResumeOffset\([^]*?^end function/mi.exec(playbackInfo);
     if (!resume) throw new Error('Missing production resume number validator');
     const fixtures = `
+function WatchdogClock() as dynamic
+    return invalid
+end function
 function WatchdogVideo() as object
     return {state:"buffering",mute:false,HasField:function(name as string) as boolean
         return m.DoesExist(name)
     end function}
 end function
 sub WatchdogSetup()
+    m.lastPlaybackPosition=0: m.lastPlaybackDuration=0: m.naturalEnd=false
     m.top = {screenActive:true}
     m.nextEpisodePending = false
     m.hasPlayed = false
@@ -147,7 +151,10 @@ WatchdogSetup()
 ArmSourceStartupLimit(true)
 m.video.state = "stopped"
 onVideoStateChanged()
-Harness_Ok(not m.startupLimitArmed,"a fully stopped player has no leftover startup timer")
+Harness_Ok(m.startupLimitArmed,"unaccepted native stopped state cannot strand startup forever")
+m.sourceAccepted=true
+onVideoStateChanged()
+Harness_Ok(not m.startupLimitArmed,"accepted stopped playback cancels its deadline")
 
 Harness_Suite("Retry overlays cannot be overwritten by old buffering events")
 WatchdogSetup()
@@ -185,6 +192,31 @@ WatchdogSetup()
 m.video.state = "finished"
 onVideoStateChanged()
 Harness_Equal(m.retries[0],"ended-before-audio","an unaccepted source finishing early remains a failure")
+
+Harness_Suite("A queued previous deadline cannot expire a new attempt")
+WatchdogSetup()
+ArmSourceStartupLimit(true)
+m.startupGuard = {delayMs:35000,clock:{elapsed:0,TotalMilliseconds:function() as integer
+    return m.elapsed
+end function}}
+onSourceStartupTimeout()
+Harness_Equal(m.retries.Count(),0,"old queued timer does not cut short a fresh startup")
+Harness_Ok(m.startupLimitArmed,"current source retains its full deadline")
+m.startupGuard.clock.elapsed=35000
+onSourceStartupTimeout()
+Harness_Equal(m.retries.Count(),1,"current deadline still triggers bounded recovery")
+
+Harness_Suite("A reset terminal position preserves measured mid-movie progress")
+WatchdogSetup()
+m.sourceAccepted=true
+m.video.state="finished"
+m.video.duration=3600
+m.video.position=0
+m.lastPlaybackPosition=120
+m.lastPlaybackDuration=3600
+onVideoStateChanged()
+Harness_Equal(m.retries.Count(),1,"last measured early position still triggers recovery after native reset")
+Harness_Ok(m.naturalEnd<>true,"a measured interruption cannot advance to the next episode")
 WatchdogSetup()
 m.startupLimit = invalid
 ArmSourceStartupLimit(true)
@@ -194,7 +226,7 @@ Harness_Finish()
 `;
     const combined = path.join(staging, 'watchdog-tests.brs');
     fs.writeFileSync(combined, fs.readFileSync(path.join(__dirname, 'harness.brs'), 'utf8') + '\n' +
-        resume[0] + '\n' + production + '\n' + fs.readFileSync(path.join(root,'source/util/NextEpisode.brs'),'utf8') + '\n' + fs.readFileSync(path.join(root,'components/PlayerNextEpisode.brs'),'utf8') + '\n' + fixtures);
+        resume[0] + '\n' + fs.readFileSync(path.join(root,'source/util/TimerGuard.brs'),'utf8').replace('CreateObject("roTimespan")','WatchdogClock()') + '\n' + fs.readFileSync(path.join(root,'components/PlayerPosition.brs'),'utf8') + '\n' + production + '\n' + fs.readFileSync(path.join(root,'source/util/NextEpisode.brs'),'utf8') + '\n' + fs.readFileSync(path.join(root,'components/PlayerNextEpisode.brs'),'utf8') + '\n' + fixtures);
     const result = spawnSync(process.execPath, [
         path.join(root, 'node_modules/@rokucommunity/brs/bin/cli.js'), '--root', staging, combined
     ], { cwd: root, encoding: 'utf8' });

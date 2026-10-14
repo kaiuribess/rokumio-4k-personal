@@ -324,12 +324,31 @@ m.devicePlaybackInfo = {audioCapabilities:{codecs:{eac3:true}}}
 RecoveryAccept()
 Harness_Ok(m.sourceAccepted,"native English Dolby and rendered progress can accept a receiver-compatible candidate")
 
+Harness_Suite("Projector alternatives reach usable MP3/PCM before repeated multichannel AAC")
+RecoverySetup()
+m.video.currentAudioTrack="failed"
+m.video.availableAudioTracks=[{Track:"failed",Language:"eng",Name:"AAC 5.1"},{Track:"aac1",Language:"eng",Name:"AAC 5.1"},{Track:"aac2",Language:"eng",Name:"AAC 5.1"},{Track:"aac3",Language:"eng",Name:"AAC 5.1"},{Track:"mp3",Language:"eng",Name:"MP3 stereo"},{Track:"pcm",Language:"eng",Name:"PCM stereo"}]
+choices=AudioRecovery_Alternatives()
+Harness_Equal(choices[0].id,"mp3","MP3 is not crowded out by a limited queue of AAC 5.1 attempts")
+Harness_Equal(choices[1].id,"pcm","PCM remains ahead of unsupported-looking multichannel AAC")
+Harness_Ok(QueueAudioTrackRepair(),"same-file compatible alternative is attempted")
+Harness_Equal(m.audioRecoveryTrack,"mp3","repair chooses the stronger projector fallback")
+m.audioRecoveryPending=false
+m.playParams.audioMode="surround"
+m.devicePlaybackInfo={audioCapabilities:{codecs:{eac3:false,ac3:true}}}
+m.video.availableAudioTracks=[{Track:"plus",Language:"eng",Name:"English DD+ 5.1"},{Track:"dd",Language:"eng",Name:"English Dolby Digital 5.1"},{Track:"aac",Language:"eng",Name:"English AAC stereo"}]
+choices=AudioRecovery_Alternatives()
+Harness_Equal(choices[0].id,"dd","receiver explicitly rejecting DD+ prefers supported Dolby")
+Harness_Equal(choices[1].id,"aac","stereo fallback stays ahead of explicitly rejected DD+")
+m.devicePlaybackInfo={audioCapabilities:{codecs:{}}}
+Harness_Equal(AudioRecovery_Alternatives()[0].id,"plus","unknown receiver facts retain DD+ preference without claiming support")
+
 Harness_Finish()
 `;
   const code = ['tests/harness.brs','tests/mocks.brs','tests/player-handoff.test.brs',
     'source/util/PlaybackInfo.brs','source/util/EnglishAudio.brs','source/util/NativeMedia.brs','source/util/AudioCapabilities.brs']
     .map(name => name.endsWith('player-handoff.test.brs') ? read(name).replace(/^sub PublishWatchState\([^]*?^end sub\s*/mi,'') : read(name)).join('\n') + '\n' + selected + '\n' + memory + '\n' +
-    read('components/PlayerAudioRecovery.brs') + '\n' + read('source/util/NextEpisode.brs') + '\n' + read('components/PlayerNextEpisode.brs') + '\n' + fixtures;
+    read('source/util/TimerGuard.brs').replace(/CreateObject\(/gi,'MockNativeObject(') + '\n' + read('components/PlayerPosition.brs') + '\n' + read('components/PlayerAudioRecovery.brs') + '\n' + read('source/util/NextEpisode.brs') + '\n' + read('components/PlayerNextEpisode.brs') + '\n' + fixtures;
   const file = path.join(staging,'audio-tests.brs');
   fs.writeFileSync(file, code);
   const run = spawnSync(process.execPath,[path.join(root,'node_modules/@rokucommunity/brs/bin/cli.js'),'--root',staging,file],{cwd:root,encoding:'utf8'});

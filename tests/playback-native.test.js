@@ -26,7 +26,7 @@ async function main() {
         'TrackDisplayName', 'onResolveResult', 'onSubtitleResult', 'ClearSubtitles',
         'onPlaybackFactsChanged', 'NotPlayableOnDevice', 'NextPlayerWorkerId',
         'StartResolve', 'CancelResolve', 'LaunchSubtitleFetch', 'CancelSubtitles',
-        'OnEnter', 'ResolveOrdinal', 'onVideoStateChanged', 'onBufferingStatusChanged', 'HasLogo',
+        'OnEnter', 'OnExit', 'SavePosition', 'ResolveOrdinal', 'onVideoStateChanged', 'onBufferingStatusChanged', 'HasLogo',
         'CurrentEnglishAudioFacts', 'CurrentEnglishAudioCheck', 'onEnglishAudioFactsChanged', 'onEnglishAudioTimeout',
         'ScheduleNextSource', 'onAutoSourceRetry', 'onSourceStartupTimeout', 'ArmSourceStartupLimit', 'StopSourceStartupLimit', 'PlaybackStatus', 'ShowEnglishAudioChoice', 'onEnglishAudioChoice', 'CloseEnglishAudioChoice'];
     const screen = functions.map(name => {
@@ -35,10 +35,11 @@ async function main() {
         return match[0].replace(/CreateObject\(/gi, 'MockNativeObject(');
     }).join('\n');
     const memoryScreen = fs.readFileSync(path.join(root,'components/PlayerSourceMemory.brs'),'utf8').replace(/SourceMemory_Fingerprint\(/g,'PlayerTest_Fingerprint(').replace(/CreateObject\(/gi,'MockNativeObject(');
+    const support = fs.readFileSync(path.join(root,'source/util/TimerGuard.brs'),'utf8').replace(/CreateObject\(/gi,'MockNativeObject(') + '\n' + fs.readFileSync(path.join(root,'components/PlayerPosition.brs'),'utf8');
     const audioRecovery = fs.readFileSync(path.join(root,'components/PlayerAudioRecovery.brs'),'utf8');
     fs.writeFileSync(combined, ['harness.brs', 'mocks.brs', 'player-handoff.test.brs']
         .map(f => fs.readFileSync(path.join(__dirname, f), 'utf8')).join('\n') + '\n' + ['EnglishAudio.brs', 'AudioCapabilities.brs', 'AutoPlayback.brs', 'CinemaStreams.brs', 'NativeMedia.brs'].map(f => fs.readFileSync(path.join(root, 'source/util', f), 'utf8')).join('\n') + '\n' + screen + '\n' +
-        memoryScreen + '\n' + audioRecovery + '\n' + fs.readFileSync(path.join(root, 'source/util/NextEpisode.brs'), 'utf8') + '\n' + fs.readFileSync(path.join(root, 'components/PlayerNextEpisode.brs'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'playback-native.test.brs'), 'utf8'));
+        memoryScreen + '\n' + support + '\n' + audioRecovery + '\n' + fs.readFileSync(path.join(root, 'source/util/NextEpisode.brs'), 'utf8') + '\n' + fs.readFileSync(path.join(root, 'components/PlayerNextEpisode.brs'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'playback-native.test.brs'), 'utf8'));
     const result = spawnSync(process.execPath, [
         path.join(root, 'node_modules', '@rokucommunity', 'brs', 'bin', 'cli.js'),
         '--root', staging, path.join(staging, 'source', 'bslib.brs'),

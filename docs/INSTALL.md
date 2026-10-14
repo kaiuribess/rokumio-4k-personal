@@ -20,6 +20,8 @@ Configured manifests may contain account secrets. Enter them privately; do not p
 
 ## Picture and audio
 
+**Settings → Picture quality** saves either **4K first + 1080p** (default) or **4K only**. The source screen's **\*** filter changes the current title only. A 2160p label remains a hint until actual encoded/native dimensions are available.
+
 Open **Settings → Audio mode**. Choose **TV / projector speakers** for built-in display speakers. English AAC stereo, MP3 or usable PCM tracks are the conservative native path. If needed, choose Stereo in Roku's system audio settings. The app does not change system settings for you.
 
 For a compatible soundbar/receiver with HDMI input, choose **HDMI soundbar / receiver**. Connect **Roku → soundbar/receiver HDMI IN → HDMI OUT / eARC → display**, select the bar's HDMI input, set Roku digital audio to **Auto**, and keep Roku volume modes **Off**. Use the soundbar remote for volume while setting it up. The app's preference changes source ranking/compatibility checks; it cannot create discrete surround or certify every receiver.
@@ -36,6 +38,8 @@ Open **Add-ons → Check add-ons**, or **Settings → Add-on checks**. Select a 
 
 ## Remote controls and shows
 
+Home opens with a featured area and five shortcuts. Choose Movies, Shows or Genres to enter full Discover filters, or My list for saved titles. **Down** from the shortcuts expands catalog browsing; **Up** at the first row returns to the shortcuts. **\*** moves between browsing, the side menu and shortcuts. Each catalog row's **See all** tile opens the complete provider catalog and genre. Home previews are intentionally smaller than full catalogs to limit memory.
+
 | Control | Action |
 | --- | --- |
 | Arrows / OK | Navigate and select |
@@ -44,12 +48,16 @@ Open **Add-ons → Check add-ons**, or **Settings → Add-on checks**. Select a 
 | \* on sources | Toggle 4K-only / all qualities |
 | Play/Pause on sources | Request fresh links |
 | Play/Pause on Home | Refresh catalog rows |
+| Down from Home shortcuts | Expand two-row catalog browser |
+| \* on Home | Move between catalog, menu and shortcuts |
 | Play/Pause on Add-on checks | Repeat manifest checks |
 | Play/Pause, seek, FF/Rewind in playback | Native playback controls |
 | \* in playback | Native options/captions |
 | Back | Return; cancel pending lookup/countdown |
 
 After an accepted show episode finishes, the next known episode starts after a five-second countdown. Quality/audio preferences carry forward. The last episode, unavailable metadata and a known future release date stop the sequence. An early playback failure retries the current episode rather than skipping it. This does not detect credits or provide a skip-intro feature.
+
+**Settings → Next episode** disables/enables that countdown. **Source recovery** controls automatic alternate-source attempts; when Off, playback uses the selected eligible source. These saved settings apply to subsequent playback and do not interrupt a running movie. English track checks remain active in both recovery modes.
 
 ## Updates
 

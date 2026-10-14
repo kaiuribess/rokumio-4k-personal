@@ -67,6 +67,7 @@ sub init()
     ' that survives every pop, so CreateVideo runs once per play and observing
     ' there would re-observe the same two fields on each one.
     m.video.ObserveField("state", "onVideoStateChanged")
+    if m.video.HasField("position") then m.video.ObserveField("position", "onPlaybackPositionChanged")
     m.video.ObserveField("bufferingStatus", "onBufferingStatusChanged")
     for each field in ["videoFormat", "audioFormat", "streamingSegment"]
         if m.video.HasField(field) then m.video.ObserveField(field, "onPlaybackFactsChanged")
@@ -129,6 +130,7 @@ function OnEnter(params as object) as void
     m.playbackActive = true
     m.retryPending = false
     m.sourceQueue = AutoPlayback_Candidates(params.stream, params.candidates)
+    if params.autoSourceRetry = false then m.sourceQueue = AutoPlayback_Candidates(params.stream,invalid)
     if params.diagnosticControl = true then m.sourceQueue = [params.stream]
     m.sourceIndex = 0
     m.sourceAccepted = false
@@ -967,6 +969,9 @@ end sub
 ' defaults an unset streamFormat to MP4, so an MKV or an HLS manifest handed over
 ' with nothing declared buffers and then errors.
 sub StartPlayback(url as string, streamFormat = "" as string)
+    m.lastPlaybackPosition = 0
+    m.lastPlaybackDuration = 0
+    m.naturalEnd = false
     m.status.text = "Starting playback…" + Chr(10) + "Back returns to sources"
     m.playArmed = false
     if m.playTimer <> invalid then m.playTimer.control = "stop"
@@ -1054,8 +1059,7 @@ sub StartPlayback(url as string, streamFormat = "" as string)
     ' so the player died on the one function that must never throw.
     m.playArmed = true
     if m.playTimer <> invalid
-        m.playTimer.control = "stop"
-        m.playTimer.control = "start"
+        m.playGuard = TimerGuard_Start(m.playTimer,250)
     else
         m.playArmed = false
         m.video.control = "play"
@@ -1066,6 +1070,7 @@ end sub
 ' so a failure in it cannot be anything else.
 sub onPlayKickFire()
     if not m.playArmed then return
+    if not TimerGuard_Ready(m.playTimer,m.playGuard) then return
     m.playArmed = false
     if m.video = invalid then return
     if m.video.content = invalid then return
@@ -1095,9 +1100,10 @@ sub onVideoStateChanged()
         HidePlaybackInfo()
         onPlaybackFactsChanged()
         onEnglishAudioFactsChanged()
+        onPlaybackPositionChanged()
         if m.audioGuardActive and m.video.mute and not m.audioGuardArmed
             m.audioGuardArmed = true
-            if m.audioGuardTimer <> invalid then m.audioGuardTimer.control = "start"
+            m.audioGuard = TimerGuard_Start(m.audioGuardTimer,10000)
         end if
     else if state = "error"
         m.audioGuardActive = false
@@ -1127,17 +1133,20 @@ sub onVideoStateChanged()
         ' arms the rebuffer limit; startup already has its limit in progress.
         ArmSourceStartupLimit()
     else if state = "paused"
+        onPlaybackPositionChanged()
         StopSourceStartupLimit()
         if m.playParams <> invalid and m.playParams.diagnostic <> true then PublishWatchState()
         ShowPlaybackInfo()
     else if state = "finished"
-        if m.sourceAccepted and m.video.HasField("duration") and m.video.HasField("position")
-            duration = PlaybackInfo_ResumeOffset(m.video.duration)
-            position = PlaybackInfo_ResumeOffset(m.video.position)
+        if m.sourceAccepted
+            observed = PlaybackPosition_Snapshot()
+            duration = observed.duration
+            position = observed.position
             ' A terminal Video node can report an absent/reset position. That
             ' cannot establish an early ending and must not restart a completed
             ' movie. A measured positive position before its end can.
             if duration > 60 and position > 0 and position < duration - 15
+                m.naturalEnd = false
                 ScheduleNextSource("unexpected-end")
                 return
             end if
@@ -1156,7 +1165,7 @@ sub onVideoStateChanged()
     else if state = "stopped"
         ' A fresh attempt is still allowed its resolve/play-kick deadline even
         ' if the static Video reports the previous source's stopped state.
-        if m.resolveTask = invalid and m.playArmed <> true then StopSourceStartupLimit()
+        if m.sourceAccepted = true and m.resolveTask = invalid and m.playArmed <> true then StopSourceStartupLimit()
         if m.audioGuardTimer <> invalid then m.audioGuardTimer.control = "stop"
         HideBuffering()
         HidePlaybackInfo()
@@ -1359,7 +1368,7 @@ sub onEnglishAudioFactsChanged()
         ArmAudioProgress()
         if not m.audioGuardArmed
             m.audioGuardArmed = true
-            if m.audioGuardTimer <> invalid then m.audioGuardTimer.control = "start"
+            m.audioGuard = TimerGuard_Start(m.audioGuardTimer,10000)
         end if
     end if
 end sub
@@ -1367,6 +1376,7 @@ end sub
 sub onEnglishAudioTimeout()
     if not m.audioGuardActive or m.video = invalid or m.audioGuardBlocked then return
     if m.sourceAccepted = true then return
+    if not TimerGuard_Ready(m.audioGuardTimer,m.audioGuard) then return
     if m.video.state <> "playing"
         AudioRecovery_SyncState()
         return
@@ -1462,7 +1472,7 @@ sub ScheduleNextSource(reason as string)
     if m.audioGuardTimer <> invalid then m.audioGuardTimer.control = "stop"
     StopSourceStartupLimit()
     if m.video <> invalid
-        if m.sourceAccepted and m.video.HasField("position") and m.video.position <> invalid then m.playParams.position = m.video.position
+        if m.sourceAccepted then m.playParams.position = PlaybackPosition_Snapshot().position
         m.video.mute = true
     end if
     print "[auto] failed attempt "; m.sourceIndex + 1; " reason "; reason
@@ -1483,12 +1493,13 @@ sub ScheduleNextSource(reason as string)
     if Type(m.playParams) = "roAssociativeArray" and m.playParams.fourKOnly = true
         m.status.text = "Trying another English 4K source automatically…" + Chr(10) + "Back cancels"
     end if
-    if m.retryTimer <> invalid then m.retryTimer.control = "start"
+    m.retryGuard = TimerGuard_Start(m.retryTimer,500)
 end sub
 
 ' Tasks are launched from a timer, never from a native Video observer stack.
 sub onAutoSourceRetry()
     if not m.playbackActive or not m.retryPending then return
+    if not TimerGuard_Ready(m.retryTimer,m.retryGuard) then return
     if m.sourceQueue = invalid or m.sourceIndex + 1 >= m.sourceQueue.Count() then return
     m.retryPending = false
     CancelResolve()
@@ -1510,12 +1521,12 @@ sub ArmSourceStartupLimit(force = false as boolean)
     if m.startupLimit = invalid then return
     if force <> true and m.startupLimitArmed = true then return
     m.startupLimitArmed = true
-    m.startupLimit.control = "stop"
-    m.startupLimit.control = "start"
+    m.startupGuard = TimerGuard_Start(m.startupLimit,35000)
 end sub
 
 sub StopSourceStartupLimit()
     m.startupLimitArmed = false
+    m.startupGuard = invalid
     if m.startupLimit <> invalid then m.startupLimit.control = "stop"
 end sub
 
@@ -1523,6 +1534,7 @@ sub onSourceStartupTimeout()
     ' An already queued fire must not restart playback after Back, pause,
     ' acceptance, or another failure that is already being retried.
     if m.startupLimitArmed <> true then return
+    if not TimerGuard_Ready(m.startupLimit,m.startupGuard) then return
     StopSourceStartupLimit()
     if m.playbackActive <> true or m.retryPending = true or m.audioGuardBlocked = true then return
     if m.video <> invalid and m.sourceAccepted = true
@@ -1634,7 +1646,7 @@ function OnKeyEvent(key as string, press as boolean) as boolean
     if key = "play" and m.playbackActive and m.sourceQueue <> invalid and m.sourceIndex + 1 >= m.sourceQueue.Count() and m.audioGuardBlocked
         m.sourceIndex = -1
         m.retryPending = true
-        if m.retryTimer <> invalid then m.retryTimer.control = "start"
+        m.retryGuard = TimerGuard_Start(m.retryTimer,500)
         return true
     end if
     if m.video = invalid
@@ -1702,6 +1714,8 @@ function OnExit() as void
     CancelSubtitles()
     SavePosition()
     ResetVideoNode()
+    m.sourceQueue = []
+    m.playParams = invalid
 end function
 
 ' Leave the node as the next play expects to find it: stopped, and carrying
@@ -1720,6 +1734,8 @@ end function
 ' off the node by the time this runs, and the stop goes before the blank so the
 ' node is not still holding a stream when we detach from it.
 sub ResetVideoNode()
+    m.lastPlaybackPosition = 0
+    m.lastPlaybackDuration = 0
     ResetSourceProof()
     ResetAudioRecovery()
     ' Back can arrive before the deferred play tick. Cancel that tick before
@@ -1805,10 +1821,9 @@ sub SavePosition()
     if metaType = invalid then metaType = ""
     if m.stores.library.callFunc("LibraryIsChannelType", metaType) then return
 
-    position = m.video.position
-    duration = m.video.duration
-    if position = invalid then position = 0
-    if duration = invalid then duration = 0
+    observed = PlaybackPosition_Snapshot()
+    position = observed.position
+    duration = observed.duration
     if m.naturalEnd = true and duration > 0 then position = duration
 
     season = 0
@@ -1852,10 +1867,9 @@ sub PublishWatchState()
     if params.metaType <> invalid then metaType = params.metaType
     if m.stores.library.callFunc("LibraryIsChannelType", metaType) then return
 
-    position = m.video.position
-    duration = m.video.duration
-    if position = invalid then position = 0
-    if duration = invalid then duration = 0
+    observed = PlaybackPosition_Snapshot()
+    position = observed.position
+    duration = observed.duration
     if m.naturalEnd = true and duration > 0 then position = duration
 
     name = ""

@@ -18,6 +18,9 @@
     </interface>
 
     <script type="text/brightscript" uri="pkg:/components/HomeScreen.brs" />
+    <script type="text/brightscript" uri="pkg:/components/HomeCinema.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/HomeCatalogPolicy.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/TimerGuard.brs" />
     <script type="text/brightscript" uri="pkg:/source/core/AsyncTask.bs" />
     <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
     <script type="text/brightscript" uri="pkg:/source/core/TileSize.bs" />
@@ -33,14 +36,28 @@
             font="font:LargeBoldSystemFont" />
         <Label
             id="homeSub"
-            translation="[260, 128]"
+            translation="[260, 118]"
             width="1580"
             height="40"
             text="Find your next movie or show"
             font="font:SmallSystemFont" />
 
-        <Label id="homeCatalogStatus" translation="[260, 182]" width="1580" height="32"
+        <Label id="homeCatalogStatus" translation="[260, 570]" width="1580" height="32"
             font="font:SmallSystemFont" />
+
+        <Group id="homeHeroPanel" translation="[260, 164]">
+            <Rectangle id="homeHeroFace" width="1580" height="274" />
+            <Poster id="homeHeroArt" translation="[940, 0]" width="640" height="274" loadWidth="640" loadHeight="274" loadDisplayMode="scaleToZoom" loadSync="false" />
+            <Poster id="homeHeroMark" uri="pkg:/images/crimson-mark.png" translation="[1180, 60]" width="150" height="150" loadWidth="150" loadHeight="150" />
+            <Rectangle id="homeHeroAccent" translation="[0, 0]" width="6" height="274" />
+            <Label id="homeHeroTitle" translation="[36, 24]" width="868" height="98" wrap="true" maxLines="2" font="font:LargeBoldSystemFont" />
+            <Label id="homeHeroInfo" translation="[36, 126]" width="868" height="32" font="font:SmallSystemFont" />
+            <Label id="homeHeroOverview" translation="[36, 166]" width="868" height="88" wrap="true" maxLines="3">
+                <Font role="font" uri="pkg:/fonts/OpenSans-Regular.ttf" size="24" />
+            </Label>
+        </Group>
+        <RowList id="homeQuick" translation="[260, 462]" numRows="1" itemSize="[1580, 84]" rowItemSize="[[304, 80]]" rowItemSpacing="[[12, 0]]" showRowLabel="[false]" drawFocusFeedback="false" itemComponentName="HomeQuickTile" />
+        <Timer id="homeHeroDelay" duration="0.25" repeat="false" />
 
         <!-- Left rail: the vertical icon menu (Search, Discover, Library,
              Add-ons, Settings, About). A one-column RowList of RailTiles; OK
@@ -67,8 +84,8 @@
              item renders as a PosterTile component. Content is set in code. -->
         <RowList
             id="catalog"
-            translation="[260, 270]"
-            numRows="2"
+            translation="[260, 628]"
+            numRows="1"
             itemSize="[1580, 324]"
             itemSpacing="[0, 64]"
             rowItemSize="[[216, 324]]"
@@ -82,7 +99,7 @@
                 horizAlign="center" font="font:SmallBoldSystemFont" />
         </Rectangle>
         <Label id="homeHelp" translation="[260, 1004]" width="1580" height="44"
-            text="OK  Open     Left / Right  Menu     *  Switch focus     Play/Pause  Refresh"
+            text="OK  Open     *  Menu / shortcuts     Play/Pause  Refresh"
             font="font:SmallSystemFont" />
     </children>
 </component>

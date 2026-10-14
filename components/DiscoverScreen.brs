@@ -63,6 +63,15 @@ function OnEnter(params as object) as void
     ' registry that no longer exists.
     if m.stores <> invalid and CatalogSignature() <> m.sourcesSignature then ResetDiscover()
 
+    if Type(params) = "roAssociativeArray"
+        if params.metaType <> invalid or params.catalogId <> invalid or params.focusGenres = true
+            m.entryRequest = params
+            if m.sources.Count() > 0 then ReadySources():return
+            EnsureSources()
+            return
+        end if
+    end if
+
     ' Re-entry after Details: results are still here, just take focus back.
     if m.metas.Count() > 0
         m.grid.SetFocus(true)
@@ -180,14 +189,44 @@ end sub
 
 ' Sources are in hand: pick a valid selection and fetch.
 sub ReadySources()
+    request = m.entryRequest
+    m.entryRequest = invalid
+    if Type(request) = "roAssociativeArray"
+        if DiscoverText(request.metaType) <> "" then m.typeKey = TypeKey(request.metaType):m.selectedCatalog=invalid
+        m.genre = DiscoverText(request.genre)
+        if DiscoverText(request.addonAddress) <> "" and DiscoverText(request.catalogId) <> ""
+            m.selectedCatalog={address:request.addonAddress,rawType:request.metaType,catalogId:request.catalogId}
+        end if
+    end if
     if not SelectDefaults()
         ShowEmpty()
         return
+    end if
+    if Type(request) = "roAssociativeArray" and request.focusGenres = true
+        if GenreOptions().Count() = 0 then SelectGenreCatalog()
     end if
     m.loaded = false
     FetchDiscover()
     SetChips()
     m.filterBar.callFunc("FocusChips")
+    if Type(request) = "roAssociativeArray" and request.focusGenres = true
+        if GenreOptions().Count() > 0
+            m.filterBar.callFunc("FocusChips",2)
+            m.filterBar.chipActivated=2
+        end if
+    end if
+end sub
+
+sub SelectGenreCatalog()
+    oldType=m.typeKey:oldCatalog=m.selectedCatalog:oldGenre=m.genre
+    for each group in TypeGroups()
+        m.typeKey=group.key
+        for each candidate in CatalogsForType()
+            m.selectedCatalog=candidate
+            if GenreOptions().Count()>0 then EnsureGenre():return
+        end for
+    end for
+    m.typeKey=oldType:m.selectedCatalog=oldCatalog:m.genre=oldGenre
 end sub
 
 ' The catalog type keys present across the sources, in a stable order: the

@@ -1,3 +1,14 @@
+function EpisodeTimerClock() as dynamic
+    if m.testTimed = true
+        return {elapsed:0,Mark:sub()
+            m.elapsed=0
+        end sub,TotalMilliseconds:function() as integer
+            return m.elapsed
+        end function}
+    end if
+    return invalid
+end function
+
 function EpisodeMeta() as object
     return {id:"show",videos:[{id:"next-season",season:3,episode:1,name:"New season"},{id:"special",season:0,episode:1},{id:"two",season:"1",episode:"2",name:"Second",released:"2026-10-13"},{id:"one",season:1,episode:1},{id:"three",season:1,episode:3}]}
 end function
@@ -248,7 +259,37 @@ sub TestEpisodeMetadataAndRoute()
     Harness_Equal(m.stack.pops,1,"stale request cannot stop later playback")
 end sub
 
+sub TestEpisodeTimedEvents()
+    Harness_Suite("Queued countdown and metadata events respect the current episode's interval")
+    EpisodeSetup():m.testTimed=true:m.naturalEnd=true
+    ScheduleNextEpisode()
+    onNextEpisodeTick()
+    Harness_Equal(m.nextEpisodeSeconds,5,"queued old countdown cannot shorten five-second choice")
+    Harness_Equal(m.top.nextEpisodeRequest,invalid,"early countdown cannot navigate")
+    m.nextEpisodeGuard.clock.elapsed=1000:onNextEpisodeTick()
+    Harness_Equal(m.nextEpisodeSeconds,4,"a current second advances exactly once")
+    onNextEpisodeTick()
+    Harness_Equal(m.nextEpisodeSeconds,4,"duplicate queued tick cannot count another second")
+    for second=1 to 4
+        m.nextEpisodeGuard.clock.elapsed=1000:onNextEpisodeTick()
+    end for
+    Harness_Equal(m.top.nextEpisodeRequest.params.videoId,"two","mature countdown still advances to intended episode")
+    EpisodeSetup():m.playParams.seriesMeta=invalid
+    PrepareNextEpisode(m.playParams)
+    onNextEpisodeSetup()
+    Harness_Equal(m.launched,0,"old metadata setup event cannot launch early")
+    m.nextSetupGuard.clock.elapsed=100:onNextEpisodeSetup()
+    Harness_Equal(m.launched,1,"current metadata setup launches once")
+    onNextEpisodeSetup()
+    Harness_Equal(m.launched,1,"duplicate metadata setup does not launch again")
+    EpisodeSetup():m.playParams.autoNextEpisode=false
+    PrepareNextEpisode(m.playParams):onNextEpisodeSetup()
+    Harness_Equal(m.launched,0,"cancelled setup cannot fetch after autoplay is disabled")
+    m.testTimed=false
+end sub
+
 TestEpisodePolicy()
 TestEpisodeFinishAndCancel()
 TestEpisodeMetadataAndRoute()
+TestEpisodeTimedEvents()
 Harness_Finish()

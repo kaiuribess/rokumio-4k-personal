@@ -28,6 +28,7 @@
     <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
     <script type="text/brightscript" uri="pkg:/source/util/CinemaStreams.brs" />
     <script type="text/brightscript" uri="pkg:/source/util/AddonDiagnostics.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/PlaybackPreferences.brs" />
 
     <children>
         <Rectangle id="streamBg" width="1920" height="1080" />

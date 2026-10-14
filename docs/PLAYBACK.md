@@ -16,7 +16,8 @@ Direct HTTPS sources do not require a PC during viewing. This code also retains 
 | Arbitrary 4K films and sound | Not established by that control; the original tests were source-specific, and native field progression is not an acoustic listening test |
 | Automatic next episode in 0.5.12 | 67 focused software assertions cover ordering, season rollover, stale events, cancellation, completion saving and fixed-depth navigation; physical-device transition not yet tested |
 | Add-on checks and audio setup in 0.5.13 | Production-policy/controller tests cover manifest categories, privacy, progressive updates, cancellation, stale deadlines and explicit audio choices; native screens/receiver path not physically tested in this release |
-| Surround output, HDR variants and full-length reliability | Not certified for 0.5.13 or every display/receiver/source |
+| Home, preferences and playback stability in 0.5.14 | Production tests cover bounded preview work, complete-catalog routing, settings persistence, stale timer ownership, audio-repair delay and native terminal position resets; physical rendering/scheduling untested |
+| Surround output, HDR variants and full-length reliability | Not certified for 0.5.14 or every display/receiver/source |
 
 One earlier clear HEVC MP4 control failed despite plausible metadata. Multichannel AAC also failed on the tested Stick/projector path. Those counterexamples are why the project does not claim that labels or header inspection guarantee playback.
 
@@ -31,6 +32,10 @@ The 4K-only filter starts with provider labels. Complete inspected MKV metadata 
 The app excludes explicit commentary/audio-description tracks and prefers supported English dialogue. Untagged or mislabelled language remains uncertain; a file can incorrectly declare English. Projector mode prioritizes likely stereo-compatible sources and keeps available same-file MP3/PCM alternatives visible. Receiver mode consults native decode/passthrough capabilities and prefers suitable surround hints.
 
 The player clears stale audio-track selectors between files and uses bounded native track recovery. It cannot manufacture a missing English track, transform stereo into discrete 5.1, or transcode a codec the Stick cannot decode. Provider labels can confuse AAC 2.0 and AAC 5.1; inspect actual tracks and receiver input where possible.
+
+Version 0.5.14 improves alternative ordering when multichannel AAC hints previously crowded out likely usable English MP3/PCM. Receiver mode penalizes Dolby alternatives explicitly rejected by current native capability. These remain selection hints; native English/audio/progress checks are still required. No audio is converted locally.
+
+Saved quality, autoplay and source-recovery choices apply to new playback. Disabling automatic recovery does not disable English track checks or allow a failed file to be accepted. Terminal native position/duration resets use the last source-scoped observation for same-title recovery, while intentional active seeks to zero are respected.
 
 ## Practical failure cases
 

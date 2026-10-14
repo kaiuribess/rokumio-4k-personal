@@ -89,6 +89,16 @@ sub BuildRows(preserveFocus = false as boolean)
     end if
     m.rows.Push({ action: "audio", title: "Audio mode", value: AudioSetupValue() })
     m.rows.Push({ action: "audioConnection", title: "Audio connection", value: "Check speakers" })
+    prefs = PlaybackPreferences(m.stores)
+    quality = "4K first + 1080p"
+    if prefs.fourKOnly then quality = "4K only"
+    nextLabel = "On"
+    if not prefs.autoNextEpisode then nextLabel = "Off"
+    recoveryLabel = "On"
+    if not prefs.autoSourceRetry then recoveryLabel = "Off"
+    m.rows.Push({action:"quality",title:"Picture quality",value:quality})
+    m.rows.Push({action:"autoplay",title:"Next episode",value:nextLabel})
+    m.rows.Push({action:"recovery",title:"Source recovery",value:recoveryLabel})
     m.rows.Push({ action: "addonChecks", title: "Add-on checks", value: "Find problems" })
     m.rows.Push({
         action: "server"
@@ -168,6 +178,8 @@ sub onRowSelected()
         ShowAudioSetup()
     else if action = "audioConnection"
         ShowAudioConnection()
+    else if action = "quality" or action = "autoplay" or action = "recovery"
+        ShowPlaybackOption(action)
     else if action = "addonChecks"
         m.top.pushRequest = {screen:"addonHealthScreen",params:{}}
     else if action = "about"

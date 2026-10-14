@@ -18,6 +18,7 @@ sub ResetAudioRecovery()
     m.audioProgressArmed = false
     m.audioRecoveryTrack = ""
     m.audioRecoveryQueuedGeneration = -1
+    m.audioRepairGuard = invalid
     m.audioRecoveryTried = []
     m.audioRecoveryInitialOffset = 0
     m.audioProvenTrack = ""
@@ -108,13 +109,22 @@ function AudioRecovery_Alternatives() as object
                     if name.InStr("aac") >= 0
                         rank = rank + 50
                         if stereo.IsMatch(name) then rank = rank + 40
-                        if multichannel.IsMatch(name) then rank = rank - 30
+                        if multichannel.IsMatch(name) then rank = rank - 40
                     end if
+                    if name.InStr("mp3") >= 0 then rank = rank + 70
+                    if name.InStr("pcm") >= 0 then rank = rank + 60
+                    if stereo.IsMatch(name) and (name.InStr("mp3") >= 0 or name.InStr("pcm") >= 0) then rank = rank + 10
                     if Type(m.playParams) = "roAssociativeArray" and m.playParams.audioMode = "surround"
                         if dolbyPlus.IsMatch(name)
                             rank = rank + 220
+                            if Type(m.devicePlaybackInfo) = "roAssociativeArray"
+                                if AudioCapabilities_ExplicitlyUnsupported(m.devicePlaybackInfo.audioCapabilities,"eac3") then rank = rank - 400
+                            end if
                         else if dolby.IsMatch(name)
                             rank = rank + 120
+                            if Type(m.devicePlaybackInfo) = "roAssociativeArray"
+                                if AudioCapabilities_ExplicitlyUnsupported(m.devicePlaybackInfo.audioCapabilities,"ac3") then rank = rank - 400
+                            end if
                         end if
                     end if
                     candidates.Push({id:id,rank:rank})
@@ -144,14 +154,14 @@ function QueueAudioTrackRepair() as boolean
     m.audioGuardArmed = false
     m.video.mute = true
     m.status.text = "Trying another English audio track…" + Chr(10) + "Back cancels"
-    m.audioRecoveryTimer.control = "stop"
-    m.audioRecoveryTimer.control = "start"
+    m.audioRepairGuard = TimerGuard_Start(m.audioRecoveryTimer,100)
     return true
 end function
 
 sub onAudioTrackRepair()
     if m.audioRecoveryPending <> true then return
     if m.audioRecoveryQueuedGeneration <> m.audioRecoveryGeneration then return
+    if not TimerGuard_Ready(m.audioRecoveryTimer,m.audioRepairGuard) then return
     m.audioRecoveryPending = false
     if m.playbackActive <> true or m.retryPending = true or m.sourceAccepted = true or m.audioGuardActive <> true or m.audioGuardBlocked = true then return
     if m.video = invalid or m.video.state <> "playing" then return
@@ -170,7 +180,7 @@ sub onAudioTrackRepair()
     if m.video.HasField("seek") then m.video.seek = m.audioRecoveryInitialOffset
     m.video.mute = true
     m.audioGuardArmed = true
-    if m.audioGuardTimer <> invalid then m.audioGuardTimer.control = "start"
+    m.audioGuard = TimerGuard_Start(m.audioGuardTimer,10000)
     ArmAudioProgress()
 end sub
 

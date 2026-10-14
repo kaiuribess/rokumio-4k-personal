@@ -29,6 +29,8 @@
 
     <script type="text/brightscript" uri="pkg:/source/stores/SubtitlesStore.bs" />
     <script type="text/brightscript" uri="pkg:/components/PlayerScreen.brs" />
+    <script type="text/brightscript" uri="pkg:/components/PlayerPosition.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/TimerGuard.brs" />
     <script type="text/brightscript" uri="pkg:/source/core/AsyncTask.bs" />
     <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
     <script type="text/brightscript" uri="pkg:/source/util/PlaybackInfo.brs" />

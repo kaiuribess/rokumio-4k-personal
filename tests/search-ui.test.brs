@@ -119,7 +119,10 @@ Harness_Equal(SearchUsableMetas("garbage").Count(), 0, "nonarray response safe")
 Harness_Suite("Home and Search keep all content in compact viewports")
 Harness_Equal(HomeVisibleRows(0), 0, "empty Home has zero visible rows")
 Harness_Equal(HomeVisibleRows(1), 1, "one Home row remains one")
-Harness_Equal(HomeVisibleRows(30), 2, "many Home catalogs use two visible slots")
+Harness_Equal(HomeVisibleRows(30), 1, "compact Home reserves room for featured area")
+m.homeBrowse = true
+Harness_Equal(HomeVisibleRows(30), 2, "expanded Home retains two visible catalog rows")
+m.homeBrowse = false
 Harness_Equal(SearchVisibleRows(0), 0, "empty Search has zero visible rows")
 Harness_Equal(SearchVisibleRows(30), 2, "many Search catalogs use two visible slots")
 portrait = RowCellSize({ metaType: "movie", posterShape: "poster" })

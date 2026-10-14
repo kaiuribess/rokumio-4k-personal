@@ -341,6 +341,14 @@ function SettingsGetAudioMode() as string
     return m.stores.settings.GetAudioMode()
 end function
 
+function SettingsGetPlaybackOptions() as object
+    return m.stores.settings.GetPlaybackOptions()
+end function
+
+function SettingsSetPlaybackOption(optionName as string, value as boolean) as boolean
+    return m.stores.settings.SetPlaybackOption(optionName,value)
+end function
+
 function SettingsSetAudioMode(value as string) as boolean
     return m.stores.settings.SetAudioMode(value)
 end function

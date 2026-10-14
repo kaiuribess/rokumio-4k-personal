@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="HomeQuickTile" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" />
+        <field id="itemHasFocus" type="boolean" />
+        <field id="rowHasFocus" type="boolean" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/HomeQuickTile.brs" />
+    <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
+    <children>
+        <Rectangle id="quickBorder" width="304" height="80" />
+        <Rectangle id="quickFace" translation="[3, 3]" width="298" height="74" />
+        <Label id="quickTitle" translation="[20, 10]" width="264" height="34" font="font:SmallBoldSystemFont" />
+        <Label id="quickDetail" translation="[20, 46]" width="264" height="26">
+            <Font role="font" uri="pkg:/fonts/OpenSans-Regular.ttf" size="18" />
+        </Label>
+    </children>
+</component>

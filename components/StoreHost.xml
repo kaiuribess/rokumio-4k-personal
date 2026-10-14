@@ -60,6 +60,8 @@
         <function name="SettingsGetLanguage" />
         <function name="SettingsGetAudioMode" />
         <function name="SettingsSetAudioMode" />
+        <function name="SettingsGetPlaybackOptions" />
+        <function name="SettingsSetPlaybackOption" />
         <function name="SettingsGetServerAddress" />
         <function name="SettingsSaveFailed" />
         <function name="SettingsSetLanguage" />

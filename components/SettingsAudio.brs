@@ -32,6 +32,36 @@ sub ShowAudioConnection()
     ShowSettingsAudioDialog("Audio connection",[report.summary,report.advice],["Done"],"report")
 end sub
 
+sub ShowPlaybackOption(kind as string)
+    if kind = "quality"
+        ShowSettingsAudioDialog("Picture quality",["4K first keeps 1080p alternatives available. 4K only requires labelled UHD candidates and rejects known below-UHD inspected MKV video.","Labels alone do not prove decoded resolution. The * shortcut still changes the current title's filter."],["4K first + 1080p","4K only","Cancel"],kind)
+    else if kind = "autoplay"
+        ShowSettingsAudioDialog("Next episode",["On starts the next known episode after a five-second countdown. Back cancels.","Off finishes the current episode and waits. Changes apply to new playback."],["On","Off","Cancel"],kind)
+    else if kind = "recovery"
+        ShowSettingsAudioDialog("Source recovery",["On automatically tries compatible alternatives when a source fails or stalls.","Off keeps playback on the selected source. English audio checks remain enabled. Changes apply to new playback."],["On","Off","Cancel"],kind)
+    end if
+end sub
+
+sub ApplyPlaybackOption(kind as string, index as integer)
+    if index < 0 or index > 1 or m.stores = invalid then return
+    key = ""
+    value = index = 0
+    if kind = "quality"
+        key = "fourKOnly"
+        value = index = 1
+    else if kind = "autoplay"
+        key = "autoNextEpisode"
+    else if kind = "recovery"
+        key = "autoSourceRetry"
+    end if
+    if key = "" then return
+    if m.stores.settings.callFunc("SettingsSetPlaybackOption",key,value) <> true then return
+    m.status.text = "Playback preference updated. Applies to new playback."
+    if m.stores.settings.callFunc("SettingsSaveFailed") then m.status.text = m.status.text + " — not saved"
+    ReportSaveFault()
+    BuildRows(true)
+end sub
+
 sub ShowSettingsAudioDialog(title as string, message as object, buttons as object, kind as string)
     scene = m.top.getScene()
     if scene = invalid or scene.dialog <> invalid then return
@@ -63,5 +93,6 @@ sub onSettingsAudioChoice(event as object)
         if index = 0 then ApplyAudioSetup("projector")
         if index = 1 then ApplyAudioSetup("surround")
     end if
+    if kind = "quality" or kind = "autoplay" or kind = "recovery" then ApplyPlaybackOption(kind,index)
     m.list.SetFocus(true)
 end sub

@@ -124,7 +124,7 @@ function checkDeferredVideoPlayContract() {
         const end = rest.slice(1).search(/^[ \t]*end\s+sub\b/m);
         const body = end === -1 ? rest : rest.slice(0, end + 1);
         const contentAt = body.indexOf('m.video.content =');
-        const kickAt = body.indexOf('m.playTimer.control = "start"');
+        const kickAt = /TimerGuard_Start\(m\.playTimer,\s*250\)/.test(body) ? body.indexOf('TimerGuard_Start(m.playTimer') : body.indexOf('m.playTimer.control = "start"');
         for (const hit of body.matchAll(/m\.video\.control\s*=\s*"play"/g)) {
             if (kickAt === -1) {
                 err('PlayerScreen.brs StartPlayback plays without ever starting the playKick timer — remove the deferral entirely or restore it, but do not leave a play that only runs in some paths');

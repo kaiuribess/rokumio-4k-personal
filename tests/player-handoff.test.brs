@@ -31,6 +31,8 @@ function MockVideoNode() as object
 end function
 
 sub SetupPlayerFixture()
+    m.lastPlaybackPosition = 0
+    m.lastPlaybackDuration = 0
     m.video = MockVideoNode()
     m.contentHandoffs = []
     m.playTimer = { control: "stop" }
@@ -208,7 +210,15 @@ sub Test_PlayerLoadingFeedback()
     Harness_Ok(m.status.text.InStr("Back") >= 0, "loading screen gives its remote exit control")
     Harness_Ok(not m.bufferingGroup.visible, "missing artwork is not rendered as an empty poster")
     Harness_Equal(m.logoBack.uri, "", "artwork-free title cannot reuse the previous film logo")
+    m.lastPlaybackPosition=123:m.lastPlaybackDuration=3600
     StartPlayback("https://media.example/movie.mkv", "mkv")
+    Harness_Equal(m.lastPlaybackPosition,0,"new source cannot inherit previous resume observations")
+    Harness_Equal(m.lastPlaybackDuration,0,"new source cannot inherit previous duration")
+    OnEnter({stream:{url:"https://media.example/selected.mkv"},candidates:[{url:"https://media.example/alternate.mkv"}],autoSourceRetry:false})
+    Harness_Equal(m.sourceQueue.Count(),1,"disabled recovery limits playback to the selected source")
+    OnEnter({stream:{url:"https://media.example/selected.mkv"},candidates:[{url:"https://media.example/alternate.mkv"}]})
+    Harness_Equal(m.sourceQueue.Count(),2,"default recovery retains compatible alternatives")
+    StartPlayback("https://media.example/movie.mkv","mkv")
     Harness_Ok(m.status.text.InStr("Starting playback") >= 0, "native content handoff keeps startup feedback")
     m.video.state = "buffering"
     onVideoStateChanged()
@@ -256,6 +266,12 @@ sub Test_PlayerLoadingFeedback()
     Harness_Equal(m.toastHideTimer.control, "stop", "missing native Video still tears down the toast timer")
     Harness_Ok(not m.toastGroup.visible, "missing native Video leaves no stale toast on return")
     Harness_Ok(not m.bufferingGroup.visible, "missing native Video leaves no stale loading artwork")
+    SetupPlayerFixture()
+    OnEnter({stream:{url:"https://media.example/selected.mkv"},candidates:[{url:"https://media.example/alternate.mkv"}]})
+    OnExit()
+    Harness_Equal(m.sourceQueue.Count(),0,"exit releases old candidate URLs")
+    Harness_Equal(m.playParams,invalid,"exit releases old title/source metadata")
+    Harness_Ok(not m.playbackActive and not m.retryPending,"exit cannot restart an old stream")
 end sub
 
 sub Test_PlayerResolutionAndFormatError()

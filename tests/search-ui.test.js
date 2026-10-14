@@ -18,14 +18,21 @@ const home = read('components/HomeScreen.brs');
 assert.doesNotMatch(home, /m\.rail\.jumpToItem\s*=\s*0/);
 assert.doesNotMatch(home, /m\.catalog\.numRows\s*=\s*m\.gridRows\.Count\(\)/);
 assert.doesNotMatch(read('components/SearchScreen.brs'), /m\.results\.numRows\s*=\s*m\.rows\.Count\(\)/);
-// Two portrait rows fit above Search's persistent controls, including one gap.
+// Compact Home shows one row. Its expanded browsing mode and Search show two.
 for (const component of ['HomeScreen', 'SearchScreen']) {
     const xml = read(`components/${component}.xml`);
     const grid = /<RowList\s+id="(?:catalog|searchResults)"[^]*?\/>/.exec(xml)[0];
     const y = Number(/translation="\[\d+, (\d+)\]"/.exec(grid)[1]);
     const height = Number(/itemSize="\[\d+, (\d+)\]"/.exec(grid)[1]);
     const gap = Number(/itemSpacing="\[\d+, (\d+)\]"/.exec(grid)[1]);
-    assert.ok(y + height * 2 + gap <= 990, `${component} rows fit within viewport`);
+    const visibleRows = component === 'HomeScreen' ? 1 : 2;
+    assert.ok(y + height * visibleRows + gap * (visibleRows - 1) <= 990, `${component} rows fit within viewport`);
+    if (component === 'HomeScreen') {
+        const expandedY = Number(/m\.catalog\.translation=\[260,(\d+)\]/.exec(read('components/HomeCinema.brs'))[1]);
+        const expandedGap = Number(/m\.catalog\.itemSpacing=\[0,(\d+)\]/.exec(read('components/HomeCinema.brs'))[1]);
+        assert.ok(expandedY + height * 2 + expandedGap <= 990, 'expanded Home keeps two rows above footer');
+        assert.ok(expandedY - 38 >= 164 + 80, 'expanded row label clears shortcut cards');
+    }
 }
 const combined = path.join(root, 'out-test', 'ui-tests', '_search.brs');
 fs.mkdirSync(path.dirname(combined), { recursive: true });

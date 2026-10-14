@@ -52,6 +52,8 @@ sub init()
     m.railBuilt = false
     m.homeVisited = false
     m.returnFocus = "rail"
+    m.homeGridDirty = false
+    HomeCinema_Init()
 end sub
 
 ' Kick off the catalog walk. The walking happens off the UI thread in a
@@ -153,7 +155,15 @@ sub ApplyCatalogRow(row as object)
         metaType: row.metaType
         posterShape: TilePosterShape(row.metas)
         metas: row.metas
+        catalogId: row.catalogId
+        genre: row.genre
+        browse: row.browse = true
     }
+    m.catalogRows.Push(descriptor)
+    if m.top.screenActive = false
+        m.homeGridDirty = true
+        return
+    end if
     cwOffset = 0
     if m.gridRows.Count() > 0 and m.gridRows[0].source = "library" then cwOffset = 1
     slot = cwOffset + row.index
@@ -163,11 +173,11 @@ sub ApplyCatalogRow(row as object)
     else
         m.catalog.content.AppendChild(node)
     end if
-    m.catalogRows.Push(descriptor)
     m.gridRows.Push(descriptor)
     m.catalog.numRows = HomeVisibleRows(m.gridRows.Count())
     ApplyCatalogSizes()
     ResyncRowLabels()
+    HomeCinema_OnPosterFocus()
 end sub
 
 ' Rewrite row titles so duplicated catalog names carry their type suffix; only
@@ -290,6 +300,10 @@ function MakeRowNode(row as object, counts = invalid as object) as object
         if glyph = invalid and m.stores <> invalid then glyph = m.stores.library.callFunc("LibraryWatchedGlyph", meta.id, meta.type)
         PaintTileFields(node.CreateChild("TileContent"), meta, glyph)
     end for
+    if row.browse = true
+        item = node.CreateChild("TileContent")
+        item.title = "See all":item.hdPosterUrl = "":item.progress = 0:item.watchedGlyph = ""
+    end if
     return node
 end function
 
@@ -340,11 +354,9 @@ end sub
 ' into a cell that has none. fallbackGlyph is the store-computed glyph when the
 ' meta did not carry one.
 sub PaintTileFields(item as object, meta as object, fallbackGlyph as dynamic)
-    name = meta.name
-    if name = invalid then name = ""
+    name = HomeCatalog_Text(meta.name)
     item.title = name
-    poster = meta.poster
-    if poster = invalid then poster = ""
+    poster = HomeCatalog_Text(meta.poster)
     item.hdPosterUrl = poster
     item.progress = 0
     if meta.progress <> invalid and meta.progress > 0 then item.progress = meta.progress
@@ -470,11 +482,22 @@ end function
 ' content, even when installed add-ons produce many more rows than fit on TV.
 function HomeVisibleRows(count as integer) as integer
     if count < 0 then return 0
-    if count > 2 then return 2
+    if m.homeBrowse = true
+        if count > 2 then return 2
+        return count
+    end if
+    if count > 1 then return 1
     return count
 end function
 
 function OnEnter(params as object) as void
+    HomeCinema_OnEnter()
+    if m.homeGridDirty = true
+        selected = m.catalog.rowItemFocused
+        BuildRows()
+        m.homeGridDirty = false
+        if Type(selected) = "roArray" and selected.Count() > 1 and selected[0] < m.gridRows.Count() then m.catalog.jumpToRowItem = selected
+    end if
     if not m.railBuilt then BuildRail()
     StartCatalogLoad()
     sig = ContinueWatchingSignature()
@@ -492,17 +515,20 @@ function OnEnter(params as object) as void
     ' grid, instead of the staleness being permanent until a relaunch.
     EnsureCurrentRows()
     if not m.homeVisited
-        m.returnFocus = "rail"
-        m.rail.SetFocus(true)
+        if m.quick <> invalid then m.returnFocus = "quick":m.quick.SetFocus(true) else m.returnFocus = "rail":m.rail.SetFocus(true)
         m.homeVisited = true
+    else if m.returnFocus = "quick" and m.quick <> invalid
+        m.quick.SetFocus(true)
     else if m.returnFocus = "rail" or m.gridRows.Count() = 0
         ' Keep the selected menu item on return. An empty catalog cannot take
         ' meaningful focus, so the remote always has a usable navigation target.
         m.returnFocus = "rail"
         m.rail.SetFocus(true)
     else
+        HomeCinema_Browse(true)
         m.catalog.SetFocus(true)
     end if
+    HomeCinema_RefreshHero()
 end function
 
 function OnExit() as void
@@ -524,6 +550,10 @@ sub BlurFocus()
     else if m.catalog.IsInFocusChain()
         m.returnFocus = "catalog"
     end if
+    if m.quick <> invalid
+        if m.quick.IsInFocusChain() then m.returnFocus = "quick"
+    end if
+    HomeCinema_Blur()
     CancelOpen()
 end sub
 
@@ -579,8 +609,10 @@ end sub
 ' fallback is starting Home focus on the rail. Verify on-device.
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
+    if HomeCinema_Key(key) then return true
     if key = "play"
         CancelOpen()
+        HomeCinema_Browse(false)
         m.returnFocus = "rail"
         m.rail.SetFocus(true)
         RebuildRows()
@@ -627,6 +659,10 @@ sub onRowItemSelected(event as object)
     if row < 0 or index < 0 or m.stores = invalid then return
     if row >= m.gridRows.Count() then return
     metas = m.gridRows[row].metas
+    if m.gridRows[row].browse = true and index = metas.Count()
+        HomeCinema_OpenCatalog(m.gridRows[row])
+        return
+    end if
     if index >= metas.Count() then return
 
     item = metas[index]

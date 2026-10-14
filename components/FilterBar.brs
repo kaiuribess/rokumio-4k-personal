@@ -95,7 +95,11 @@ sub HideMenu()
     m.chips.SetFocus(true)
 end sub
 
-sub FocusChips()
+sub FocusChips(index = -1 as integer)
+    if index >= 0 and index < m.entries.Count()
+        m.activeChip = index
+        m.chips.jumpToRowItem = [0,index]
+    end if
     m.chips.SetFocus(true)
 end sub
 
