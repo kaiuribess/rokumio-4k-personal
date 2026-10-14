@@ -9,6 +9,6 @@ Validated from the public source snapshot on 2026-10-14:
 - `python scripts/verify-package.py` passed ZIP integrity, manifest, component inheritance and packaged reference checks. The build has **48 XML components and 217 packaged script references**.
 - Private workstation data, account configuration and test logs were excluded from the published snapshot. API-looking strings in test fixtures are synthetic.
 
-These checks run on a computer using simulated native device boundaries. **0.5.12 has not been installed or physically playback-tested on the reference Roku.** They do not prove audible English sound, 4K decoding, surround/HDR, network throughput or uninterrupted full episodes on every source.
+These checks run on a computer using simulated native device boundaries. After publication, the release ZIP was installed on the reference Streaming Stick+ 3830RW: the installer accepted 769,327 bytes and reported success, and a read-only active-app query independently confirmed version 0.5.12 running. **The next-episode transition has not been physically playback-tested.** Installation and software checks do not prove audible English sound, 4K decoding, surround/HDR, network throughput or uninterrupted full episodes on every source.
 
 The release assets include the compiled install ZIP and its SHA-256 file. Verify the ZIP hash before installation; the repository's source archive is not directly installable. Runtime fixes and dependency advisory limits are described in [PLAYBACK.md](PLAYBACK.md) and [DEVELOPMENT.md](DEVELOPMENT.md).
