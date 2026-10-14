@@ -1,5 +1,15 @@
 # Changes
 
+## 0.5.15 — 2026-10-14
+
+- Remove the mandatory all-provider barrier for automatic Play. **Start sooner** briefly compares ready candidates and can begin while another provider is pending; **Compare providers** retains the full comparison as a saved setting. Quality/audio filters still apply. Later provider results never replace accepted playback.
+- Share a two-worker source-list budget between warm preloading and explicit source loading. Queue every eligible provider rather than discard providers. Pause queued requests while Player is in front and resume on return. Abandoned running lookups retain their slot until completion, because STOP does not prove that the network transfer ended.
+- Preserve request tokens, duplicate-result guards, manual source precedence and fresh-link refresh. Cancel/re-rank automatic selection when the quality filter changes. Empty early selections can reconsider newly arriving candidates rather than declare failure while providers are pending.
+- Add direct install-ZIP links and clearer sharing/update instructions. Developer mode, each user's private source configuration and manual updates remain necessary.
+- Update the supported interpreter/compiler patches, remove the abandoned archive-extraction dependency and eliminate the critical development advisory. Residual development advisories remain documented; Node development dependencies are excluded from the installed Roku ZIP.
+
+Early playback can have fewer initial recovery alternatives than Compare providers. Source-list workers are bounded; total network sockets, response bytes and device frame rate are not certified by this change. This release has software/package validation and has not been installed or physically tested.
+
 ## 0.5.14 — 2026-10-14
 
 - Add a featured Home, five remote-friendly shortcuts, advertised genre shelves and Continue Watching. Down expands browsing to two visible rows; See all opens the exact full catalog/genre. Keep Search, Discover, Library, Add-ons, Settings, About and native microphone search.

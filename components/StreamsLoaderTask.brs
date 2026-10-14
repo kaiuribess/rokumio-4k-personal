@@ -1,6 +1,6 @@
 ' StreamsLoaderTask — back one provider's stream-list fetch off the UI thread.
-' The screen spawns one task per add-on that advertises the "stream" resource,
-' so providers resolve in parallel and each publishes its { streams, error } as
+' The coordinator queues matching providers within its shared worker budget;
+' each publishes its { streams, error } as
 ' soon as that one address answers. Running in a Task means a hung add-on costs
 ' the worker thread, not a frozen channel. The store is built fresh in the task
 ' scope — no object created on the render thread is shared across the thread

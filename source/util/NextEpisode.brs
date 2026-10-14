@@ -41,7 +41,7 @@ function NextEpisode_Params(params as dynamic, meta as dynamic, nowIso = "" as s
     id = NextEpisode_Text(candidate.video.id)
     if id = "" then id = seriesId + ":" + candidate.season.ToStr() + ":" + candidate.episode.ToStr()
     nextParams = {autoPlay:true,metaType:"series",metaId:seriesId,videoId:id,season:candidate.season,episode:candidate.episode,position:0,seriesMeta:meta}
-    for each key in ["addonAddress", "name", "poster", "posterShape", "logo", "background", "audioMode", "fourKOnly", "autoNextEpisode", "autoSourceRetry"]
+    for each key in ["addonAddress", "name", "poster", "posterShape", "logo", "background", "audioMode", "fourKOnly", "autoNextEpisode", "autoSourceRetry", "waitForProviders"]
         if params[key] <> invalid then nextParams[key] = params[key]
     end for
     nextParams.episodeName = NextEpisode_Text(candidate.video.name)

@@ -97,6 +97,9 @@ sub BuildRows(preserveFocus = false as boolean)
     recoveryLabel = "On"
     if not prefs.autoSourceRetry then recoveryLabel = "Off"
     m.rows.Push({action:"quality",title:"Picture quality",value:quality})
+    startLabel = "Start sooner"
+    if prefs.waitForProviders then startLabel = "Compare providers"
+    m.rows.Push({action:"autoStart",title:"Automatic Play",value:startLabel})
     m.rows.Push({action:"autoplay",title:"Next episode",value:nextLabel})
     m.rows.Push({action:"recovery",title:"Source recovery",value:recoveryLabel})
     m.rows.Push({ action: "addonChecks", title: "Add-on checks", value: "Find problems" })
@@ -178,7 +181,7 @@ sub onRowSelected()
         ShowAudioSetup()
     else if action = "audioConnection"
         ShowAudioConnection()
-    else if action = "quality" or action = "autoplay" or action = "recovery"
+    else if action = "quality" or action = "autoplay" or action = "recovery" or action = "autoStart"
         ShowPlaybackOption(action)
     else if action = "addonChecks"
         m.top.pushRequest = {screen:"addonHealthScreen",params:{}}

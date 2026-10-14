@@ -4,6 +4,9 @@
         <field id="revision" type="integer" value="0" alwaysNotify="true" />
         <function name="Prepare" />
         <function name="Snapshot" />
+        <function name="Adopt" />
+        <function name="Suspend" />
+        <function name="Resume" />
         <function name="Cancel" />
     </interface>
     <script type="text/brightscript" uri="pkg:/source/core/AsyncTask.bs" />

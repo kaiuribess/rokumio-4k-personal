@@ -12,7 +12,7 @@ function SourcePrefetch_Context(stores as dynamic, params as dynamic) as dynamic
     if stores = invalid or stores.addons = invalid or Type(params) <> "roAssociativeArray" then return invalid
     kind = SourcePrefetch_Text(params.metaType)
     videoId = SourcePrefetch_Text(params.videoId)
-    if (kind <> "movie" and kind <> "series") or videoId = "" then return invalid
+    if kind = "" or videoId = "" then return invalid
     mode = "projector"
     if stores.settings <> invalid
         if stores.settings.callFunc("SettingsGetAudioMode") = "surround" then mode = "surround"

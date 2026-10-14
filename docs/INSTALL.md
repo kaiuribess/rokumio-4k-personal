@@ -2,6 +2,8 @@
 
 ## Install the release ZIP
 
+**[Download the installable Roku ZIP — 0.5.15](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.15/rokumio-4k-personal-0.5.15.zip)**. Keep it zipped. This direct link avoids GitHub's source-code archives; those archives cannot be uploaded as the channel package.
+
 1. On the Roku remote press **Home three times, Up twice, Right, Left, Right, Left, Right**.
 2. Write down the device URL displayed on the developer screen, enable the installer, review Roku's terms, and set an installer password privately. Roku restarts.
 3. On a browser on the same network, open that device URL. Username: **`rokudev`**. Use the password you chose.
@@ -59,6 +61,10 @@ After an accepted show episode finishes, the next known episode starts after a f
 
 **Settings → Next episode** disables/enables that countdown. **Source recovery** controls automatic alternate-source attempts; when Off, playback uses the selected eligible source. These saved settings apply to subsequent playback and do not interrupt a running movie. English track checks remain active in both recovery modes.
 
+**Settings → Automatic Play** offers **Start sooner** (default) or **Compare providers**. Start sooner compares available candidates briefly and can begin while another provider is still loading. It has fewer initial recovery alternatives than a full comparison. Compare providers waits for all eligible responses before selecting. Both use the same quality filter and English/audio checks; a candidate label does not establish successful decoding. Returning to the source screen resumes queued providers so their choices remain available. Late provider results do not replace a movie already playing.
+
 ## Updates
 
 Upload a new release ZIP through the same installer when you are ready to restart the app. App updates are manual. Catalog/search/source responses come from online add-ons and can change independently of app releases. Fresh links or a refreshed manifest may be needed after provider changes. Registry configuration is separate from the ZIP; do not delete/reset/rekey the app if you intend to retain it.
+
+For someone using the app for the first time, share the README's direct **Download the Roku install ZIP** link together with this setup guide. Each person enables developer mode and configures their own provider privately. The ZIP cannot enable developer mode, supply subscriptions or update itself.

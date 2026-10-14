@@ -8,9 +8,9 @@
            - left: title (series + episode line), synopsis, and the Cinemeta
              background artwork (no poster), all from the params;
            - right: one selectable stream card per candidate, collected from
-             every installed add-on that advertises the "stream" resource in
-             parallel â€” one StreamsLoaderTask per provider, so cards appear as
-             each provider resolves instead of after all of them finish.
+             eligible installed add-ons through a shared two-worker queue.
+             Provider cards appear progressively; automatic Play can use a
+             short comparison window or explicitly wait for all responses.
          OK on a card resolves playback and pushes the PlayerScreen; resolution
          failures (e.g. torrent streams without a streaming server) surface in
          the status line. -->
@@ -31,6 +31,7 @@
     <script type="text/brightscript" uri="pkg:/source/util/PlaybackPreferences.brs" />
 
     <children>
+        <Timer id="autoPlayGrace" duration="0.75" repeat="false" />
         <Rectangle id="streamBg" width="1920" height="1080" />
         <Poster id="bgPoster" width="1920" height="1080" loadDisplayMode="scaleToZoom" />
         <Rectangle id="bgScrim" width="1920" height="1080" />

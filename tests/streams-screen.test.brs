@@ -98,6 +98,8 @@ sub TestStreamsRemoteRefresh()
     m.autoPlayEnabled = false
     m.autoPlaySent = false
     m.selectionTask = invalid
+    m.sourcesSuspended = false
+    m.sourceQueue = []
     m.top = FocusNode()
     m.top.screenActive = true
     m.streamsList = FocusNode()
@@ -213,6 +215,8 @@ sub Main()
     m.autoPlayEnabled = false
     m.autoPlaySent = false
     m.selectionTask = invalid
+    m.sourcesSuspended = false
+    m.sourceQueue = []
     m.top = FocusNode()
     m.top.screenActive = true
     m.streamsList = FocusNode()
@@ -264,6 +268,7 @@ sub Main()
     Harness_Equal(m.streamsList.numRows, 1, "Single-source viewport")
     Harness_Ok(not onKeyEvent("options", false), "Key release does not toggle mode twice")
 
+    m.sourcesSuspended = false
     m.loadToken = "new-batch"
     live = {loadToken:"new-batch",providerIndex:0,result:invalid,reaped:false}
     m.loadTasks = [live]

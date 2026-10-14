@@ -1,4 +1,4 @@
-Crimson Cinema 0.5.14 (rokumio-4k-personal repository)
+Crimson Cinema 0.5.15 (rokumio-4k-personal repository)
 
 Based on gpratoe/rokumio-client, MIT licensed.
 Upstream: https://github.com/gpratoe/rokumio-client
@@ -10,7 +10,8 @@ voice search/playback wiring, native playback diagnostics, and addon protocol
 fixes, English audio recovery, cleaner source cards, projector/surround presets,
 source preloading, automatic next-episode playback, a red interface, add-on
 checks, equipment setup guidance, bounded cinematic Home previews, saved
-playback preferences and timer/position stability fixes. It is not an official
+playback preferences, timer/position stability fixes, early automatic source
+selection and a shared source-request budget. It is not an official
 Roku, Stremio, TorBox, or Hisense product.
 
 No movies, series, subscription accounts, or stream-provider credentials are

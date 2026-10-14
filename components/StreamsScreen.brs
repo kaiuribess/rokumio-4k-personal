@@ -5,17 +5,16 @@
 ' artwork (deliberately no poster). The pusher hands over what it knows — the
 ' movie plays its description and runtime, EpisodesScreen the episode name and
 ' overview it just fetched — so the panel is full the instant the screen
-' opens. The right side lists every stream candidate from the installed add-ons
-' that advertise the "stream" resource, one task per provider, one card per
-' stream. OK drops straight into the PlayerScreen: the torrent is resolved
+' opens. The right side lists ranked choices grouped by eligible stream add-on.
+' The shared coordinator queues providers within a two-worker budget.
+' OK drops straight into the PlayerScreen: the torrent is resolved
 ' there (logo pulse while its engine warms up), so the picker answers instantly
 ' and a resolution failure stays on the player with a message instead of
 ' bouncing back here.
 '
-' Nothing here blocks the render thread: each add-on's stream list loads through
-' its own StreamsLoaderTask, so providers resolve in parallel and their cards
-' appear the moment each one answers, with the status line counting down the
-' rest. The player owns playback resolution.
+' Source-list networking runs on worker tasks. Results appear progressively;
+' queued work pauses behind Player. Two occupied slots can delay later providers.
+' The player owns playback resolution, not the source-list scheduler.
 '
 ' Params: { addonAddress, metaType, metaId, videoId, season, episode, position,
 '           name, poster, logo, background }, plus the panel's data where the
@@ -75,6 +74,17 @@ sub init()
     m.prefetchNode = invalid
     m.prefetchContext = invalid
     m.prefetchWaiting = []
+    m.sourceQueue = []
+    m.sourcesSuspended = false
+    m.sourceRevision = 0
+    m.selectionRevision = -1
+    m.selectionSequence = 0
+    m.autoGraceTimer = m.top.FindNode("autoPlayGrace")
+    m.autoGraceTimer.ObserveField("fire","onAutomaticGrace")
+    m.autoClock = CreateObject("roTimespan")
+    m.autoClock.Mark()
+    m.autoGraceDeadline = invalid
+    m.autoGraceToken = ""
     UpdateQualityHint()
 end sub
 
@@ -82,6 +92,17 @@ function OnEnter(params as object) as void
     ' Re-entry after the player pops: params is invalid and the Group was given
     ' focus by the stack. The stream list must take it back.
     if params = invalid
+        m.sourcesSuspended = false
+        if m.reloadNeeded = true
+            m.reloadNeeded = false
+            LoadStreams(m.params,false)
+            ResetProviderNavigation()
+        end if
+        if m.prefetchNode <> invalid and m.prefetchContext <> invalid then m.prefetchNode.callFunc("Resume",m.prefetchContext.key)
+        onSourcePrefetchChanged()
+        PumpProviderSources()
+        RenderActiveProvider()
+        MaybeStartAutomaticPlayback()
         RestoreFocus()
         return
     end if
@@ -101,6 +122,11 @@ function OnEnter(params as object) as void
     currentContext = SourcePrefetch_Context(m.stores, params)
     sameContext = currentContext <> invalid and currentContext.key = m.loadContextKey
     if m.pendingCount > 0 and m.loadKey <> "" and EpisodeKey(params) = m.loadKey and sameContext
+        m.sourcesSuspended = false
+        if m.prefetchNode <> invalid and m.prefetchContext <> invalid then m.prefetchNode.callFunc("Resume",m.prefetchContext.key)
+        onSourcePrefetchChanged()
+        PumpProviderSources()
+        MaybeStartAutomaticPlayback()
         RestoreFocus()
         return
     end if
@@ -111,6 +137,7 @@ function OnEnter(params as object) as void
     m.fourKOnly = PlaybackPreferences(m.stores,params).fourKOnly
     m.autoPlayEnabled = params.autoPlay = true
     m.autoPlaySent = false
+    m.sourcesSuspended = false
     ApplyParamsChrome(params)
 
     m.streams = []
@@ -174,8 +201,8 @@ sub EmptyStreamsList()
     m.streamsList.numRows = 0
 end sub
 
-' Kick the stream-list fetches off the render thread. One StreamsLoaderTask per
-' provider resolves in parallel — each task answers with its own { streams,
+' Kick the stream-list fetches off the render thread. The coordinator owns up
+' to two source-list workers — each answers with its own { streams,
 ' error } the instant that address responds, and onStreamsLoaded routes it into
 ' the matching provider slot. The installed add-ons are read here (registry reads
 ' only, no network) so only the addresses that can actually serve a stream for
@@ -185,7 +212,7 @@ end sub
 ' stream, a movie/series add-on is never asked for a channel, and an add-on
 ' whose idPrefixes exclude this id (say "tt"/"kitsu" on a YouTube id) is never
 ' asked at all. Failure handling mirrors Home: on total failure the grid
-' stays empty, and a hung add-on only delays its own provider, never the others.
+' stays empty. Slow occupied slots can delay providers still in the queue.
 sub LoadStreams(params as object, allowPrefetch = true as boolean)
     if m.stores = invalid then return
     if m.loadTasks <> invalid and m.loadTasks.Count() > 0 then return
@@ -221,17 +248,22 @@ sub LoadStreams(params as object, allowPrefetch = true as boolean)
     m.loadToken = m.loadSeq.ToStr()
 
     m.prefetchWaiting = []
+    m.sourceQueue = []
+    m.sourceRevision = 0
+    m.selectionRevision = -1
+    CancelAutomaticGrace()
     for i = 0 to providers.Count() - 1
         m.loadTasks.Push(invalid)
         m.prefetchWaiting.Push(false)
     end for
     snapshot = invalid
-    if allowPrefetch
+    if requestContext <> invalid
         m.prefetchContext = requestContext
         m.prefetchNode = SourcePrefetch_Node(m.top)
         if m.prefetchNode <> invalid and m.prefetchContext <> invalid
             m.prefetchNode.ObserveField("revision", "onSourcePrefetchChanged")
-            snapshot = m.prefetchNode.callFunc("Snapshot", m.prefetchContext.key)
+            if not allowPrefetch then m.prefetchNode.callFunc("Cancel",m.prefetchContext.key)
+            snapshot = m.prefetchNode.callFunc("Adopt", m.prefetchContext)
         end if
     end if
 
@@ -242,12 +274,15 @@ sub LoadStreams(params as object, allowPrefetch = true as boolean)
         end if
         if Type(entry) = "roAssociativeArray" and entry.status = "ready"
             ApplyProviderSources(i, entry.result)
-        else if Type(entry) = "roAssociativeArray" and entry.status = "pending"
+        else if Type(entry) = "roAssociativeArray" and (entry.status = "pending" or entry.status = "queued")
             m.prefetchWaiting[i] = true
+        else if Type(entry) = "roAssociativeArray" and entry.status = "failed"
+            ApplyProviderSources(i, entry.result)
         else
-            LaunchProviderSources(i)
+            m.sourceQueue.Push(i)
         end if
     end for
+    PumpProviderSources()
 
     UpdateStreamsStatus()
     MaybeStartAutomaticPlayback()
@@ -256,6 +291,7 @@ end sub
 ' A Play action adopts the coordinator's already-running source-list request.
 ' It never adopts a movie decoder or starts a second copy of a pending lookup.
 sub LaunchProviderSources(index as integer)
+    if m.sourcesSuspended = true or not m.top.screenActive then return
     if m.loadTasks = invalid or m.providers = invalid then return
     if index < 0 or index >= m.providers.Count() or index >= m.loadTasks.Count() then return
     if m.loadTasks[index] <> invalid then return
@@ -266,6 +302,25 @@ sub LaunchProviderSources(index as integer)
         providerId:provider.id, loadToken:m.loadToken, audioMode:m.audioMode
     }, "streamsLoader" + m.loadToken + "_" + index.ToStr())
 end sub
+
+' Fallback for isolated screens with no Scene coordinator. Production requests
+' all use the coordinator, including warm adoption and abandoned transfers.
+sub PumpProviderSources()
+    if m.sourcesSuspended = true or not m.top.screenActive then return
+    if m.prefetchNode <> invalid or Type(m.sourceQueue) <> "roArray" then return
+    active = 0
+    if Type(m.loadTasks) = "roArray"
+        for each task in m.loadTasks
+            if task <> invalid then active = active + 1
+        end for
+    end if
+    while active < 2 and m.sourceQueue.Count() > 0
+        index = m.sourceQueue.Shift()
+        LaunchProviderSources(index)
+        active = active + 1
+    end while
+end sub
+
 
 sub ApplyProviderSources(index as integer, result as dynamic)
     if m.providers = invalid or index < 0 or index >= m.providers.Count() then return
@@ -278,6 +333,8 @@ sub ApplyProviderSources(index as integer, result as dynamic)
         if m.loadError = "" then m.loadError = result.error
     end if
     if m.pendingCount > 0 then m.pendingCount = m.pendingCount - 1
+    if m.sourceRevision = invalid then m.sourceRevision = 0
+    m.sourceRevision = m.sourceRevision + 1
 end sub
 
 sub onSourcePrefetchChanged()
@@ -286,6 +343,10 @@ sub onSourcePrefetchChanged()
     if context = invalid or context.key <> m.prefetchContext.key
         ' Settings/add-ons changed: never apply the former configuration.
         CancelStreamsLoad()
+        if m.sourcesSuspended = true or not m.top.screenActive
+            m.reloadNeeded = true
+            return
+        end if
         LoadStreams(m.params, false)
         ResetProviderNavigation()
         return
@@ -297,25 +358,41 @@ sub onSourcePrefetchChanged()
         if Type(snapshot) = "roAssociativeArray" and Type(snapshot.entries) = "roArray"
             if i < snapshot.entries.Count() then entry = snapshot.entries[i]
         end if
-        if Type(entry) = "roAssociativeArray" and entry.status = "pending" then continue for
+        if Type(entry) = "roAssociativeArray" and (entry.status = "pending" or entry.status = "queued") then continue for
         m.prefetchWaiting[i] = false
-        if Type(entry) = "roAssociativeArray" and entry.status = "ready"
+        if Type(entry) = "roAssociativeArray" and (entry.status = "ready" or entry.status = "failed")
             ApplyProviderSources(i, entry.result)
-            if i = m.activeIndex then RenderActiveProvider()
+            if i = m.activeIndex and m.top.screenActive and m.sourcesSuspended <> true then RenderActiveProvider()
         else
             ' Error/expiry/cancellation requires a fresh normal request on Play.
-            LaunchProviderSources(i)
+            m.sourceQueue.Push(i)
         end if
     end for
-    UpdateStreamsStatus()
+    PumpProviderSources()
+    if m.top.screenActive and m.sourcesSuspended <> true then UpdateStreamsStatus()
+    MaybeStartAutomaticPlayback()
+end sub
+
+sub CancelAutomaticGrace()
+    if m.autoGraceTimer <> invalid then m.autoGraceTimer.control = "stop"
+    m.autoGraceDeadline = invalid
+    m.autoGraceToken = ""
+end sub
+
+sub onAutomaticGrace()
+    if m.autoGraceToken <> m.loadToken or m.autoGraceDeadline = invalid then return
+    if m.sourcesSuspended = true or not m.top.screenActive then return
+    if not SourcePrefetch_DelayReady(m.autoGraceTimer,m.autoClock,m.autoGraceDeadline) then return
     MaybeStartAutomaticPlayback()
 end sub
 
 sub MaybeStartAutomaticPlayback()
-    if not m.top.screenActive then return
-    if m.autoPlayEnabled <> true or m.autoPlaySent = true or m.pendingCount <> 0 then return
+    if not m.top.screenActive or m.sourcesSuspended = true then return
+    if m.autoPlayEnabled <> true or m.autoPlaySent = true then return
     if m.selectionTask <> invalid then return
+    if m.selectionRevision = m.sourceRevision then return
     pool = []
+    readyCount = 0
     if m.providers <> invalid
         for each provider in m.providers
             if Type(provider.streams) = "roArray"
@@ -323,9 +400,28 @@ sub MaybeStartAutomaticPlayback()
                     pool.Push(stream)
                 end for
             end if
+            if Type(provider.readyStreams) = "roArray" then readyCount = readyCount + CinemaFilterReadyStreams(provider.readyStreams,m.fourKOnly).Count()
         end for
     end if
-    m.selectionTask = AsyncTask_Launch(m.top, "SourceSelectionTask", "onAutomaticSourcesReady", {streams:pool,videoId:ParamString(m.params.videoId),audioMode:CurrentAudioMode(),fourKOnly:m.fourKOnly,loadToken:m.loadToken}, "automaticSources" + m.loadToken)
+    prefs = PlaybackPreferences(m.stores,m.params)
+    if m.pendingCount > 0
+        if prefs.waitForProviders = true or readyCount = 0 then return
+        if m.autoGraceDeadline = invalid
+            if m.autoClock <> invalid then m.autoGraceDeadline = m.autoClock.TotalMilliseconds() + 750
+            m.autoGraceToken = m.loadToken
+            if m.autoGraceTimer <> invalid and m.autoClock <> invalid
+                m.autoGraceTimer.duration = 0.75
+                m.autoGraceTimer.control = "start"
+                return
+            end if
+        end if
+        if not SourcePrefetch_DelayReady(m.autoGraceTimer,m.autoClock,m.autoGraceDeadline) then return
+    end if
+    CancelAutomaticGrace()
+    m.selectionRevision = m.sourceRevision
+    if m.selectionSequence = invalid then m.selectionSequence = 0
+    m.selectionSequence = m.selectionSequence + 1
+    m.selectionTask = AsyncTask_Launch(m.top, "SourceSelectionTask", "onAutomaticSourcesReady", {streams:pool,videoId:ParamString(m.params.videoId),audioMode:CurrentAudioMode(),fourKOnly:m.fourKOnly,loadToken:m.loadToken}, "automaticSources" + m.loadToken + "_" + ParamString(m.selectionSequence))
 end sub
 
 sub onAutomaticSourcesReady(event as object)
@@ -336,12 +432,19 @@ sub onAutomaticSourcesReady(event as object)
     if Type(result) <> "roAssociativeArray" then return
     m.selectionTask = invalid
     AsyncTask_Reap(task, m.top, false)
-    if not m.top.screenActive then return
+    if not m.top.screenActive or m.sourcesSuspended = true or m.autoPlayEnabled <> true or m.autoPlaySent = true then return
+    if task.fourKOnly <> m.fourKOnly or task.audioMode <> CurrentAudioMode()
+        m.selectionRevision = -1
+        MaybeStartAutomaticPlayback()
+        return
+    end if
     if Type(result.streams) <> "roArray" or result.streams.Count() = 0
-        m.status.text = "No compatible source candidates found. Play/Pause checks fresh links; Back cancels."
+        if m.pendingCount = 0 then m.status.text = "No compatible source candidates found. Play/Pause checks fresh links; Back cancels."
+        MaybeStartAutomaticPlayback()
         return
     end if
     m.autoPlaySent = true
+    SuspendSourceLoading()
     PushAutomaticPlayer(result.streams[0], result.streams, result.rememberedSource = true)
 end sub
 
@@ -349,7 +452,7 @@ sub PushAutomaticPlayer(first as object, candidates as object, remembered = fals
     serverAddress = ""
     prefs = PlaybackPreferences(m.stores,m.params)
     if m.stores <> invalid then serverAddress = m.stores.settings.callFunc("SettingsGetServerAddress")
-    m.top.pushRequest = {screen:"playerScreen",params:{stream:first,candidates:candidates,rememberedSource:remembered,fourKOnly:m.fourKOnly = true,serverAddress:serverAddress,audioMode:CurrentAudioMode(),diagnostic:m.params.diagnostic = true,metaType:m.params.metaType,metaId:m.params.metaId,videoId:m.params.videoId,season:m.params.season,episode:m.params.episode,position:m.params.position,name:m.headTitle.text,poster:m.params.poster,posterShape:m.params.posterShape,logo:m.params.logo,background:m.params.background,addonAddress:m.params.addonAddress,seriesMeta:m.params.seriesMeta,autoNextEpisode:prefs.autoNextEpisode,autoSourceRetry:prefs.autoSourceRetry}}
+    m.top.pushRequest = {screen:"playerScreen",params:{stream:first,candidates:candidates,rememberedSource:remembered,fourKOnly:m.fourKOnly = true,serverAddress:serverAddress,audioMode:CurrentAudioMode(),diagnostic:m.params.diagnostic = true,metaType:m.params.metaType,metaId:m.params.metaId,videoId:m.params.videoId,season:m.params.season,episode:m.params.episode,position:m.params.position,name:m.headTitle.text,poster:m.params.poster,posterShape:m.params.posterShape,logo:m.params.logo,background:m.params.background,addonAddress:m.params.addonAddress,seriesMeta:m.params.seriesMeta,autoNextEpisode:prefs.autoNextEpisode,autoSourceRetry:prefs.autoSourceRetry,waitForProviders:prefs.waitForProviders}}
 end sub
 
 ' A single provider's stream list landed (or failed). The task reports which
@@ -399,8 +502,9 @@ sub onStreamsLoaded(event as object)
     end if
 
     ApplyProviderSources(index, result)
-    if index = m.activeIndex then RenderActiveProvider()
-    UpdateStreamsStatus()
+    if index = m.activeIndex and m.top.screenActive and m.sourcesSuspended <> true then RenderActiveProvider()
+    PumpProviderSources()
+    if m.top.screenActive and m.sourcesSuspended <> true then UpdateStreamsStatus()
     MaybeStartAutomaticPlayback()
 end sub
 
@@ -566,6 +670,9 @@ sub UpdateProviderStatus()
 end sub
 
 sub CancelStreamsLoad()
+    m.reloadNeeded = false
+    CancelAutomaticGrace()
+    m.sourceQueue = []
     if m.prefetchNode <> invalid then m.prefetchNode.UnobserveField("revision")
     SourcePrefetch_Cancel(m.top, m.prefetchContext)
     m.prefetchNode = invalid
@@ -765,6 +872,11 @@ end function
 function isTaskPending(index as integer) as boolean
     if m.loadTasks = invalid then return false
     if index < 0 or index >= m.loadTasks.Count() then return false
+    if Type(m.sourceQueue) = "roArray"
+        for each queued in m.sourceQueue
+            if queued = index then return true
+        end for
+    end if
     if m.prefetchWaiting <> invalid and index < m.prefetchWaiting.Count()
         if m.prefetchWaiting[index] = true then return true
     end if
@@ -885,6 +997,7 @@ sub onStreamSelected()
     if data = invalid or data.Count() < 2 then return
     index = data[0]
     if m.streams = invalid or index < 0 or index >= m.streams.Count() then return
+    CancelAutomaticGrace()
     ' A manual choice supersedes the automatic Play request, including a source
     ' ranking worker that was already in flight while this provider filled.
     m.autoPlayEnabled = false
@@ -894,6 +1007,7 @@ sub onStreamSelected()
         m.selectionTask = invalid
         AsyncTask_Reap(task, m.top, true)
     end if
+    SuspendSourceLoading()
     PushAutomaticPlayer(m.streams[index], m.streams)
 
 end sub
@@ -959,8 +1073,16 @@ function onKeyEvent(key as string, press as boolean) as boolean
     if key = "options"
         m.fourKOnly = not m.fourKOnly
         m.params.fourKOnly = m.fourKOnly
+        CancelAutomaticGrace()
+        if m.selectionTask <> invalid
+            selection = m.selectionTask
+            m.selectionTask = invalid
+            AsyncTask_Reap(selection,m.top,true)
+        end if
+        m.selectionRevision = -1
         m.listFilled = false
         RenderActiveProvider()
+        MaybeStartAutomaticPlayback()
         return true
     end if
     if key = "left"
@@ -986,5 +1108,12 @@ function OnBackPressed() as boolean
     return false
 end function
 
+sub SuspendSourceLoading()
+    m.sourcesSuspended = true
+    CancelAutomaticGrace()
+    if m.prefetchNode <> invalid and m.prefetchContext <> invalid then m.prefetchNode.callFunc("Suspend",m.prefetchContext.key)
+end sub
+
 sub BlurFocus()
+    SuspendSourceLoading()
 end sub

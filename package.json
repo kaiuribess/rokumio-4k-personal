@@ -1,6 +1,6 @@
 {
     "name": "rokumio-4k-personal",
-    "version": "0.5.14",
+    "version": "0.5.15",
     "private": true,
     "description": "Native Roku client for Stremio addons and debrid streams",
     "scripts": {
@@ -10,8 +10,8 @@
         "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true }); require('fs').rmSync('out', { recursive: true, force: true }); require('fs').rmSync('out-test', { recursive: true, force: true })\""
     },
     "devDependencies": {
-        "@rokucommunity/brs": "^0.47.4",
-        "brighterscript": "^0.73.1",
+        "@rokucommunity/brs": "^0.47.6",
+        "brighterscript": "^0.73.7",
         "sax": "1.6.1"
     }
 }

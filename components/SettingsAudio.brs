@@ -39,6 +39,8 @@ sub ShowPlaybackOption(kind as string)
         ShowSettingsAudioDialog("Next episode",["On starts the next known episode after a five-second countdown. Back cancels.","Off finishes the current episode and waits. Changes apply to new playback."],["On","Off","Cancel"],kind)
     else if kind = "recovery"
         ShowSettingsAudioDialog("Source recovery",["On automatically tries compatible alternatives when a source fails or stalls.","Off keeps playback on the selected source. English audio checks remain enabled. Changes apply to new playback."],["On","Off","Cancel"],kind)
+    else if kind = "autoStart"
+        ShowSettingsAudioDialog("Automatic Play",["Start sooner briefly compares available candidates, then starts without waiting for every provider. Later providers may have better choices.","Compare providers waits for all eligible add-ons before choosing. Your quality and English audio checks still apply."],["Start sooner","Compare providers","Cancel"],kind)
     end if
 end sub
 
@@ -53,6 +55,9 @@ sub ApplyPlaybackOption(kind as string, index as integer)
         key = "autoNextEpisode"
     else if kind = "recovery"
         key = "autoSourceRetry"
+    else if kind = "autoStart"
+        key = "waitForProviders"
+        value = index = 1
     end if
     if key = "" then return
     if m.stores.settings.callFunc("SettingsSetPlaybackOption",key,value) <> true then return
@@ -93,6 +98,6 @@ sub onSettingsAudioChoice(event as object)
         if index = 0 then ApplyAudioSetup("projector")
         if index = 1 then ApplyAudioSetup("surround")
     end if
-    if kind = "quality" or kind = "autoplay" or kind = "recovery" then ApplyPlaybackOption(kind,index)
+    if kind = "quality" or kind = "autoplay" or kind = "recovery" or kind = "autoStart" then ApplyPlaybackOption(kind,index)
     m.list.SetFocus(true)
 end sub

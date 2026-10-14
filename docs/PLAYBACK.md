@@ -17,7 +17,8 @@ Direct HTTPS sources do not require a PC during viewing. This code also retains 
 | Automatic next episode in 0.5.12 | 67 focused software assertions cover ordering, season rollover, stale events, cancellation, completion saving and fixed-depth navigation; physical-device transition not yet tested |
 | Add-on checks and audio setup in 0.5.13 | Production-policy/controller tests cover manifest categories, privacy, progressive updates, cancellation, stale deadlines and explicit audio choices; native screens/receiver path not physically tested in this release |
 | Home, preferences and playback stability in 0.5.14 | Production tests cover bounded preview work, complete-catalog routing, settings persistence, stale timer ownership, audio-repair delay and native terminal position resets; physical rendering/scheduling untested |
-| Surround output, HDR variants and full-length reliability | Not certified for 0.5.14 or every display/receiver/source |
+| Early automatic Play and source scheduling in 0.5.15 | Simulated callback tests cover grace/cancellation, provider queue ownership and shared worker budget; no physical latency or frame-rate measurement |
+| Surround output, HDR variants and full-length reliability | Not certified for 0.5.15 or every display/receiver/source |
 
 One earlier clear HEVC MP4 control failed despite plausible metadata. Multichannel AAC also failed on the tested Stick/projector path. Those counterexamples are why the project does not claim that labels or header inspection guarantee playback.
 
@@ -36,6 +37,8 @@ The player clears stale audio-track selectors between files and uses bounded nat
 Version 0.5.14 improves alternative ordering when multichannel AAC hints previously crowded out likely usable English MP3/PCM. Receiver mode penalizes Dolby alternatives explicitly rejected by current native capability. These remain selection hints; native English/audio/progress checks are still required. No audio is converted locally.
 
 Saved quality, autoplay and source-recovery choices apply to new playback. Disabling automatic recovery does not disable English track checks or allow a failed file to be accepted. Terminal native position/duration resets use the last source-scoped observation for same-title recovery, while intentional active seeks to zero are respected.
+
+Automatic Play now offers Start sooner or Compare providers. Early selection can start from available candidates while other add-ons are queued/pending, so its initial recovery pool can be smaller. Compare providers collects the wider pool before selecting. Queued source-list work pauses during playback and resumes on returning to the picker. Provider results arriving behind Player never replace the accepted source. An available URL/2160p label is still a candidate; native English/audio/decoded-progress checks follow before acceptance.
 
 ## Practical failure cases
 

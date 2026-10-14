@@ -2,9 +2,13 @@
 
 A native Roku client with a dark red interface for browsing Stremio-compatible catalogs, searching movies and shows, and playing compatible direct streams with the Roku remote. This community derivative adds English audio selection, projector/surround preferences, clearer source cards, automatic source recovery, next-episode playback, and add-on checks. The repository and ZIP filename remain `rokumio-4k-personal` so existing links and build instructions continue to work.
 
-**Version 0.5.14 is an experimental community release.** Software tests and package validation pass. The new screens have authoring previews, but this version has not been installed or tested on a physical Roku. It cannot guarantee that every provider file plays, has English audio, or is genuine 4K.
+**Version 0.5.15 is an experimental community release.** Software tests and package validation pass. The new screens have authoring previews, but this version has not been installed or tested on a physical Roku. It cannot guarantee that every provider file plays, has English audio, or is genuine 4K.
 
-[Download the install ZIP](https://github.com/kaiuribess/rokumio-4k-personal/releases/tag/v0.5.14) · [Installation](docs/INSTALL.md) · [Add-on checks](docs/ADDON_CHECKS.md) · [Playback and 4K](docs/PLAYBACK.md) · [Development](docs/DEVELOPMENT.md) · [Changes](CHANGELOG.md)
+**[Download the Roku install ZIP — 0.5.15](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.15/rokumio-4k-personal-0.5.15.zip)**
+
+Upload that ZIP without extracting it. GitHub's green Code button and “Source code” archives are for developers; they are not the Roku install package.
+
+[Release notes and checksum](https://github.com/kaiuribess/rokumio-4k-personal/releases/tag/v0.5.15) · [Installation](docs/INSTALL.md) · [Add-on checks](docs/ADDON_CHECKS.md) · [Playback and 4K](docs/PLAYBACK.md) · [Development](docs/DEVELOPMENT.md) · [Changes](CHANGELOG.md)
 
 ## What you can do
 
@@ -18,7 +22,7 @@ A native Roku client with a dark red interface for browsing Stremio-compatible c
 - Open **Add-ons → Check add-ons** to see which installed manifest is reachable or needs attention. The source picker also shows the selected provider's request status. An empty title response or a catalog-only add-on is not automatically labelled broken.
 - Continue shows automatically after an accepted episode ends: a **five-second countdown** names the next episode; **Back cancels**. The next episode gets fresh sources and retains the quality filter/audio mode. Regular seasons roll forward without jumping into specials.
 - Save resume positions locally; optional Stremio pairing provides account synchronization.
-- Save **Picture quality**, **Next episode** and **Source recovery** preferences under Settings. Defaults retain 1080p fallback, autoplay and bounded automatic recovery; English dialogue checks stay active.
+- Save **Picture quality**, **Automatic Play**, **Next episode** and **Source recovery** preferences under Settings. Start sooner is the automatic selection default; Compare providers keeps broader comparison available. Defaults retain 1080p fallback, autoplay and bounded automatic recovery; English dialogue checks stay active.
 
 The built-in Cinemeta catalog supplies title metadata. **Playable movies, shows, provider accounts and configured stream add-ons are not bundled.** Install your own compatible provider manifest and use content you are authorized to access. Searching a title does not establish that a playable 4K source exists.
 
@@ -36,6 +40,7 @@ These are our changes on top of the original client:
 - **Automatic source recovery:** bounded retries for failed starts, stalls and early endings, with memory of previously working file identities.
 - **Playback stability fixes:** current-operation timer guards, recovery when native terminal fields reset, a retained startup deadline until acceptance, and better ordering of usable English MP3/PCM and supported surround alternatives.
 - **Faster source browsing:** short-lived source preloading, fresh-link refresh, cleaner cards and protection against late results overriding a manual choice.
+- **Earlier automatic Play:** start from an available ranked pool after a short comparison window, or save Compare providers to wait for the wider pool. Shared source-list scheduling limits worker concurrency and pauses queued loading during playback.
 - **Automatic next episode:** a five-second countdown, Back cancellation, season rollover, fresh sources and preserved quality/audio preferences.
 - **Voice and playback information:** native voice-search/transport wiring and available codec/resolution facts that distinguish a source label from measured playback data.
 
@@ -43,7 +48,7 @@ These additions improve selection and recovery; they do not add a transcoder or 
 
 ## Quick start
 
-1. Download the release **`rokumio-4k-personal-0.5.14.zip`**; do not extract it before installing.
+1. Use the **Download the Roku install ZIP** link above; do not extract it before installing.
 2. Enable Roku developer mode and upload that ZIP through the local Development Application Installer. See the [full steps](docs/INSTALL.md).
 3. Choose **Browse movies & shows**, then **Add-ons**. Leave Add-ons open and use the local setup address displayed there to import your configured HTTPS `manifest.json` URL.
 4. Open **Settings → Audio mode** and choose your connected speakers. Use **Audio connection** to check the current path, then search for a title and press Play. Compatible direct providers play on Roku itself. If you enable 4K-only, the app will not silently fall back to a labelled HD source.
@@ -55,6 +60,10 @@ You need a computer/phone for installation or convenient initial configuration. 
 Home retains up to 12 catalog previews of 24 titles each, plus Continue Watching. The full catalogs remain available in Discover. Home makes at most eight base-catalog and eight genre requests, plus up to eight missing-manifest lookups, sequentially on a worker. Only one small featured texture is used; leaving Home releases it and prevents background results from building poster grids over playback.
 
 The app does not save movies. Source preloading is RAM-only for one title, expires after 60 seconds, and holds at most four providers with 256 unique candidates each, reserving up to 64 labelled UHD candidates. Persistent source memory is limited to 32 hashed file-outcome records; it contains no signed URLs. Working outcomes expire in 14 days, verified incompatibility in seven days and transient failures in ten minutes. Leaving the player releases its old queue. Watch history and saved titles remain separate.
+
+Preloading and explicit source requests share two worker slots. All eligible providers remain queued and browsable. Queued requests pause while Player is in front; returning resumes them. A lookup already in flight keeps its slot across title changes until it reports completion, so rapid navigation cannot create a new full batch on each visit. This can delay a new title behind previous requests. It limits owned source-list workers, not all HTTPS connections or provider response sizes. Explicit source results stay with the current source screen until it is canceled/reloaded; the 60-second TTL describes the warm cache.
+
+Start sooner may begin with fewer recovery alternatives than Compare providers. Both retain native quality/audio checks. Later providers do not switch a movie that is already playing.
 
 These limits protect memory and background work without disabling search, full browsing, 4K/1080p selection, voice controls, subtitles, resume, add-on checks or next-episode playback. Actual smoothness and network buffering still require device observation.
 
@@ -69,7 +78,7 @@ Pause to view available native playback facts. Adaptive HLS/DASH segments can ch
 ```sh
 git clone https://github.com/kaiuribess/rokumio-4k-personal.git
 cd rokumio-4k-personal
-npm ci
+npm ci --ignore-scripts
 npm test
 npm run build
 python scripts/verify-package.py

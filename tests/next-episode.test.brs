@@ -14,7 +14,7 @@ function EpisodeMeta() as object
 end function
 
 function EpisodeParams() as object
-    return {metaType:"series",metaId:"show",videoId:"one",season:1,episode:1,position:400,stream:{url:"https://private.invalid/previous"},candidates:[{}],addonAddress:"https://provider.invalid",name:"Test show",audioMode:"surround",fourKOnly:true,poster:"https://art.invalid/poster",diagnostic:false}
+    return {metaType:"series",metaId:"show",videoId:"one",season:1,episode:1,position:400,stream:{url:"https://private.invalid/previous"},candidates:[{}],addonAddress:"https://provider.invalid",name:"Test show",audioMode:"surround",fourKOnly:true,poster:"https://art.invalid/poster",diagnostic:false,waitForProviders:true}
 end function
 
 function EpisodeStore() as object
@@ -115,6 +115,7 @@ sub TestEpisodePolicy()
     Harness_Equal(nextParams.position,0,"next episode starts from zero")
     Harness_Equal(nextParams.fourKOnly,true,"explicit UHD mode preserved")
     Harness_Equal(nextParams.audioMode,"surround","speaker mode preserved")
+    Harness_Ok(nextParams.waitForProviders,"explicit full comparison is preserved for the next episode")
     Harness_Equal(nextParams.autoPlay,true,"new episode automatically selects sources")
     Harness_Equal(nextParams.stream,invalid,"previous signed source is never reused")
     Harness_Equal(nextParams.candidates,invalid,"previous source queue is never reused")

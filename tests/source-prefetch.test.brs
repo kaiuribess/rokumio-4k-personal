@@ -14,6 +14,9 @@ function PrefetchTest_Node() as object
     end sub, callFunc:function(name as string, value as dynamic) as dynamic
         if name = "Prepare" then return PrefetchTest_Prepare(value)
         if name = "Snapshot" then return PrefetchTest_Snapshot(value)
+        if name = "Adopt" then return PrefetchTest_Adopt(value)
+        if name = "Suspend" then PrefetchTest_Suspend(value)
+        if name = "Resume" then return PrefetchTest_Resume(value)
         if name = "Cancel" then PrefetchTest_Cancel(value)
         return invalid
     end function}
@@ -78,7 +81,7 @@ sub PrefetchTest_Setup(providerCount = 2 as integer)
             return m.coordinatorNode
         end function,coordinatorNode:m.coordinatorNode}
     end function,coordinatorNode:m.coordinatorNode}
-    m.prefetchState = {sequence:0,context:invalid,entries:[],tasks:[],deadline:0,top:{revision:0},expiry:{control:"stop",duration:60},clock:{now:0,TotalMilliseconds:function() as integer
+    m.prefetchState = {sequence:0,context:invalid,entries:[],tasks:[],activeTasks:[],fullLoad:false,suspended:false,deadline:0,top:{revision:0},expiry:{control:"stop",duration:60},clock:{now:0,TotalMilliseconds:function() as integer
         return m.now
     end function}}
     installed = []
@@ -108,6 +111,18 @@ sub PrefetchTest_Setup(providerCount = 2 as integer)
     m.activeIndex = -1
     m.pendingCount = 0
     m.status = {text:""}
+    m.sourceQueue = []
+    m.sourcesSuspended = false
+    m.sourceRevision = 0
+    m.selectionRevision = -1
+    m.autoGraceTimer = {control:"stop",duration:0.75}
+    m.autoClock = {now:0,TotalMilliseconds:function() as integer
+        return m.now
+    end function}
+    m.autoGraceDeadline = invalid
+    m.autoGraceToken = ""
+    m.fourKOnly = false
+    m.reloadNeeded = false
     m.streams = []
     m.streamsList = {rowItemSelected:[0,0]}
 end sub
@@ -152,120 +167,282 @@ m.params.episode = 2
 m.params.videoId = "tt123:1:2"
 Harness_Ok(SourcePrefetch_Context(m.stores,m.params).key <> episodeKey,"episode selection invalidates prior sources")
 Harness_Equal(SourcePrefetch_Context(m.stores,{metaType:"movie",videoId:""}),invalid,"missing media id never starts lookup")
+Harness_Ok(SourcePrefetch_Context(m.stores,{metaType:"channel",videoId:"channel:1"}) <> invalid,"live channel source requests share the coordinator budget")
 
-Harness_Suite("One bounded coordinator batch handles cancellation, freshness and stale events")
+Harness_Suite("Shared budget includes warm, queued, abandoned and fresh title lookups")
 PrefetchTest_Setup(6)
 context = SourcePrefetch_Context(m.stores,m.params)
 snapshot = SourcePrefetch_Prepare(m.top,context)
-Harness_Equal(m.launched.Count(),4,"prefetch limits one displayed title to four providers")
-Harness_Equal(snapshot.entries.Count(),4,"shared memory is limited to four provider entries")
-Harness_Equal(m.launched[0].kind,"SourcePrefetchTask","prefetch uses the source JSON worker")
-Harness_Equal(m.prefetchState.expiry.duration,60,"cache deadline is one minute")
-again = SourcePrefetch_Prepare(m.top,context)
-Harness_Equal(m.launched.Count(),4,"same pending context never starts duplicate lookups")
-oldTask = m.launched[0]
-oldTask.result = invalid
-PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(oldTask))
-Harness_Equal(m.prefetchState.entries[0].status,"pending","blank alwaysNotify completion leaves a real lookup pending")
-oldTask.result = PrefetchTest_Result("first")
-PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(oldTask))
-Harness_Equal(m.prefetchState.entries[0].status,"ready","successful provider JSON becomes reusable")
+Harness_Equal(m.launched.Count(),2,"warm browse starts only two source-list workers")
+Harness_Equal(snapshot.entries.Count(),4,"warm browse retains four provider entries")
+Harness_Equal(snapshot.entries[2].status,"queued","warm providers beyond slots remain queued")
+Harness_Equal(m.prefetchState.activeTasks.Count(),2,"shared budget owns exactly two transfers")
+SourcePrefetch_Prepare(m.top,context)
+Harness_Equal(m.launched.Count(),2,"same context cannot duplicate warm lookups")
+first = m.launched[0]
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(first))
+Harness_Equal(m.prefetchState.activeTasks.Count(),2,"blank alwaysNotify never frees an active slot")
+LoadStreams(m.params)
+Harness_Equal(m.launched.Count(),2,"Play adopts warm work instead of launching more than two")
+Harness_Equal(m.prefetchState.entries.Count(),6,"all matching providers survive explicit Play adoption")
+Harness_Equal(m.pendingCount,6,"running and queued providers are counted")
+Harness_Ok(isTaskPending(5),"queued provider shows truthful loading state")
+first.result = PrefetchTest_Result("fast")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(first))
+onSourcePrefetchChanged()
+Harness_Equal(m.providers[0].streams.Count(),1,"ready warm source reaches correct provider")
+Harness_Equal(m.pendingCount,5,"one completion counts down exactly once")
+Harness_Equal(m.launched.Count(),3,"one completion opens exactly one queued request")
+Harness_Equal(m.launched[2].kind,"StreamsLoaderTask","unstarted warm provider becomes full ordinary lookup")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(first))
+onSourcePrefetchChanged()
+Harness_Equal(m.launched.Count(),3,"duplicate notification never frees another slot")
+Harness_Equal(m.pendingCount,5,"duplicate notification never applies twice")
+oldSecond = m.launched[1]
+CancelStreamsLoad()
+Harness_Ok(not oldSecond.stopped,"abandoned running HTTP lookup keeps its observer and budget slot")
+Harness_Equal(m.prefetchState.activeTasks.Count(),2,"cancellation does not pretend to free network ownership")
+contextB = SourcePrefetch_Context(m.stores,{metaType:"movie",videoId:"ttB"})
+contextC = SourcePrefetch_Context(m.stores,{metaType:"movie",videoId:"ttC"})
+SourcePrefetch_Prepare(m.top,contextB)
+SourcePrefetch_Prepare(m.top,contextC)
+Harness_Equal(m.launched.Count(),3,"rapid A to B to C navigation never exceeds two owned lookups")
+oldSecond.result = PrefetchTest_Result("abandoned")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(oldSecond))
+Harness_Equal(m.launched.Count(),4,"completed abandoned transfer frees one current-title slot")
+Harness_Equal(m.launched[3].videoId,"ttC","only latest title is launched, never abandoned queued B")
+Harness_Equal(m.prefetchState.entries[0].status,"pending","old source result cannot populate new title")
+Harness_Equal(m.prefetchState.activeTasks.Count(),2,"old plus new owned lookup stay under shared cap")
 revision = m.prefetchState.top.revision
-PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(oldTask))
-Harness_Equal(m.prefetchState.top.revision,revision,"duplicate completion does not republish results")
-newParams = {metaType:"movie",metaId:"tt456",videoId:"tt456"}
-newContext = SourcePrefetch_Context(m.stores,newParams)
-SourcePrefetch_Prepare(m.top,newContext)
-Harness_Ok(m.launched[1].stopped,"navigation stops ownership of unfinished old provider workers")
-PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(oldTask))
-Harness_Equal(m.prefetchState.entries[0].status,"pending","prior title completion cannot populate the current title")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(oldSecond))
+Harness_Equal(m.prefetchState.top.revision,revision,"duplicate abandoned callback cannot release live slot")
 SourcePrefetch_Cancel(m.top,context)
-Harness_Ok(PrefetchTest_Snapshot(newContext.key) <> invalid,"cancel from prior context cannot cancel the new title")
+Harness_Ok(PrefetchTest_Snapshot(contextC.key) <> invalid,"old context cancel cannot cancel latest context")
 m.prefetchState.clock.now = 1000
 PrefetchTest_onPrefetchExpired()
-Harness_Ok(m.prefetchState.context <> invalid,"queued expiry from a prior context cannot expire fresh results")
+Harness_Ok(m.prefetchState.context <> invalid,"queued old expiry cannot bypass latest deadline")
 m.prefetchState.clock.now = 60000
-Harness_Equal(PrefetchTest_Snapshot(newContext.key),invalid,"snapshot refuses sources at or beyond the deadline")
-Harness_Equal(m.prefetchState.context,invalid,"expired URLs are removed from retained memory")
+Harness_Equal(PrefetchTest_Snapshot(contextC.key),invalid,"warm retained URLs expire after one minute")
+Harness_Equal(m.prefetchState.activeTasks.Count(),2,"expiry keeps unfinished lookups budgeted until result")
 
-Harness_Suite("Providers beyond the prefetch cap retain the normal Play path")
-PrefetchTest_Setup(6)
-context = SourcePrefetch_Context(m.stores,m.params)
-SourcePrefetch_Prepare(m.top,context)
+Harness_Suite("Suspended source queues preserve every provider and resume on Back")
+PrefetchTest_Setup(5)
 LoadStreams(m.params)
-Harness_Equal(m.launched.Count(),6,"Play starts only the two providers outside the four-worker prefetch cap")
-Harness_Equal(m.launched[4].kind,"StreamsLoaderTask","fifth provider is loaded normally at explicit Play")
-Harness_Equal(m.pendingCount,6,"all adopted and new providers remain counted")
-CancelStreamsLoad()
+Harness_Equal(m.launched.Count(),2,"ordinary Play is budgeted with no warm prefetch")
+Harness_Equal(m.launched[0].kind,"StreamsLoaderTask","cold explicit Play preserves full ordinary source response")
+SuspendSourceLoading()
+m.top.screenActive = false
+first = m.launched[0]
+second = m.launched[1]
+first.result = PrefetchTest_Result("ready")
+second.result = {streams:[],readyStreams:[],error:"deadline exceeded"}
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(first))
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(second))
+onSourcePrefetchChanged()
+Harness_Equal(m.launched.Count(),2,"hidden Player leaves remaining providers queued")
+Harness_Equal(m.renderCalls,0,"hidden result never rebuilds source UI")
+Harness_Equal(m.pendingCount,3,"hidden completed and error responses still count honestly")
+m.top.screenActive = true
+OnEnter(invalid)
+Harness_Equal(m.launched.Count(),4,"returning to Sources resumes two queued lookups")
+Harness_Equal(m.prefetchState.activeTasks.Count(),2,"return does not exceed the shared budget")
+third = m.launched[2]
+third.result = {streams:[],readyStreams:[],error:""}
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(third))
+onSourcePrefetchChanged()
+Harness_Equal(m.launched.Count(),5,"empty ordinary answer advances the next queued provider")
+Harness_Equal(m.pendingCount,2,"empty provider is completed once")
+RefreshStreams()
+Harness_Equal(m.launched.Count(),5,"refresh queues new requests behind unfinished old transfers")
+Harness_Equal(m.pendingCount,5,"refresh preserves all matching providers")
+Harness_Equal(m.providers[0].streams.Count(),0,"refresh removes formerly cached links")
+oldFourth = m.launched[3]
+oldFourth.result = PrefetchTest_Result("expired")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(oldFourth))
+onSourcePrefetchChanged()
+Harness_Equal(m.launched.Count(),6,"old refresh completion frees exactly one fresh lookup")
+Harness_Equal(m.launched[5].kind,"StreamsLoaderTask","explicit refresh never truncates new source responses via warm worker")
+Harness_Equal(m.pendingCount,5,"expired old response cannot satisfy refreshed provider")
+Harness_Equal(m.providers[1].streams.Count(),0,"expired old response cannot restore stale links")
 
-Harness_Suite("Play consumes completed and pending source JSON without duplicate requests")
+Harness_Suite("Warm failure retries once and explicit Play outlives warm expiry")
 PrefetchTest_Setup(3)
 context = SourcePrefetch_Context(m.stores,m.params)
 SourcePrefetch_Prepare(m.top,context)
+LoadStreams(m.params)
 first = m.launched[0]
-first.result = PrefetchTest_Result("ready")
+first.result = {ok:false}
 PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(first))
-LoadStreams(m.params)
-Harness_Equal(m.launched.Count(),3,"pressing Play during prefetch reuses the same requests")
-Harness_Equal(m.providers[0].streams.Count(),1,"completed provider is available immediately at Play")
-Harness_Equal(m.pendingCount,2,"only genuinely pending providers remain in the loading count")
-Harness_Ok(isTaskPending(1),"shared pending provider gets a truthful loading placeholder")
-second = m.launched[1]
-second.result = PrefetchTest_Result("second")
-PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(second))
 onSourcePrefetchChanged()
-Harness_Equal(m.pendingCount,1,"shared completion counts down exactly once")
-Harness_Equal(m.providers[1].streams.Count(),1,"shared result reaches the correct provider slot")
+Harness_Equal(m.launched.Count(),3,"one failed warm lookup becomes one fresh ordinary request")
+Harness_Equal(m.launched[2].kind,"StreamsLoaderTask","warm failure retries via ordinary worker")
+retry = m.launched[2]
+revision = m.prefetchState.top.revision
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(first))
+Harness_Equal(m.prefetchState.activeTasks.Count(),2,"duplicate failed warm callback cannot free the ordinary replacement slot")
+Harness_Equal(m.prefetchState.top.revision,revision,"failed warm callback cannot be republished under a reused worker ID")
+Harness_Ok(first.id <> retry.id,"every lookup launch has a unique ID even within the same provider and title")
+retry.result = {streams:[],readyStreams:[],error:"deadline exceeded"}
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(retry))
 onSourcePrefetchChanged()
-Harness_Equal(m.pendingCount,1,"repeated coordinator revision cannot apply twice")
-third = m.launched[2]
-third.result = {ok:false}
-PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(third))
-onSourcePrefetchChanged()
-Harness_Equal(m.launched.Count(),4,"failed provider is refreshed once by the normal Play loader")
-Harness_Equal(m.launched[3].kind,"StreamsLoaderTask","failure refresh stays in the ordinary source loading path")
-onSourcePrefetchChanged()
-Harness_Equal(m.launched.Count(),4,"repeated failure notification cannot duplicate the retry")
-retry = m.launched[3]
-retry.result = PrefetchTest_Result("retry")
-onStreamsLoaded(PrefetchTest_Event(retry))
-Harness_Equal(m.pendingCount,0,"normal retry completes the adopted batch")
-Harness_Equal(m.providers[2].streams.Count(),1,"fresh provider result replaces a failed prefetch")
-RefreshStreams()
-Harness_Equal(m.launched.Count(),7,"manual refresh always requests fresh sources from every provider")
-Harness_Equal(m.prefetchState.context,invalid,"manual refresh invalidates retained prefetch URLs")
-Harness_Equal(m.providers[0].streams.Count(),0,"manual refresh removes formerly cached links immediately")
-
-Harness_Suite("Expired pending requests fall back, with no stuck loading slots")
-PrefetchTest_Setup()
-context = SourcePrefetch_Context(m.stores,m.params)
-SourcePrefetch_Prepare(m.top,context)
-LoadStreams(m.params)
+Harness_Equal(m.pendingCount,2,"ordinary failure completes without looping warm retry")
+Harness_Equal(m.providers[0].error,"deadline exceeded","ordinary failure retains redacted UI diagnostics")
 m.prefetchState.clock.now = 60000
 PrefetchTest_onPrefetchExpired()
-onSourcePrefetchChanged()
-Harness_Equal(m.launched.Count(),4,"expired shared providers each get one fresh normal request")
-Harness_Equal(m.pendingCount,2,"fallback keeps the two outstanding slots counted")
-onSourcePrefetchChanged()
-Harness_Equal(m.launched.Count(),4,"repeated expiry notification cannot duplicate fallback")
+Harness_Ok(m.prefetchState.context <> invalid,"queued old warm expiry cannot expire an adopted Play batch")
 CancelStreamsLoad()
-Harness_Equal(m.loadToken,"","Back disowns the current source batch")
-Harness_Equal(m.pendingCount,0,"Back clears pending counts")
+Harness_Equal(m.loadToken,"","Back disowns current source batch")
+Harness_Equal(m.pendingCount,0,"Back clears pending count")
 Harness_Equal(m.prefetchWaiting.Count(),0,"Back clears shared waiting slots")
 
-Harness_Suite("Same episode can only reuse its pending batch under the same configuration")
-PrefetchTest_Setup()
+Harness_Suite("Hidden changed configuration defers reload until Sources returns")
+PrefetchTest_Setup(3)
 LoadStreams(m.params)
-OnEnter(m.params)
-Harness_Equal(m.launched.Count(),2,"same episode with identical current settings keeps the pending requests")
-Harness_Equal(m.focusCalls,1,"same batch only restores focus")
+first = m.launched[0]
+SuspendSourceLoading()
+m.top.screenActive = false
 m.stores.settings.mode = "surround"
-OnEnter(m.params)
-Harness_Equal(m.launched.Count(),4,"changed audio mode requires fresh requests even for the same episode")
-Harness_Ok(m.launched[0].stopped,"changed context disowns the old source batch")
-Harness_Equal(m.launched[2].audioMode,"surround","fresh batch uses the changed audio policy")
+first.result = PrefetchTest_Result("old-settings")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(first))
+onSourcePrefetchChanged()
+Harness_Ok(m.reloadNeeded,"late settings change marks source batch for reload")
+Harness_Equal(m.launched.Count(),2,"hidden changed configuration never launches new title work")
+Harness_Equal(m.renderCalls,0,"hidden changed configuration never touches source UI")
+m.top.screenActive = true
+OnEnter(invalid)
+Harness_Equal(m.launched.Count(),3,"returning starts only available budget slot for fresh configuration")
+Harness_Equal(m.launched[2].audioMode,"surround","return reload uses current audio policy")
+Harness_Equal(m.launched[2].kind,"StreamsLoaderTask","deferred cold reload uses full ordinary source worker")
+Harness_Equal(m.pendingCount,3,"fresh configuration retains all providers")
 
-Harness_Suite("Manual source choice cannot be superseded by automatic selection")
+Harness_Suite("Short automatic comparison grace escapes a slow provider safely")
+PrefetchTest_Setup(2)
+m.params.autoPlay = true
+m.autoPlayEnabled = true
+LoadStreams(m.params)
+fast = m.launched[0]
+fast.result = PrefetchTest_Result("fast")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(fast))
+onSourcePrefetchChanged()
+Harness_Equal(m.pendingCount,1,"slow provider remains outstanding")
+Harness_Equal(m.selectionTask,invalid,"first fast source begins comparison grace rather than instant playback")
+Harness_Equal(m.autoGraceTimer.control,"start","comparison grace timer is armed")
+m.autoClock.now = 100
+onAutomaticGrace()
+Harness_Equal(m.selectionTask,invalid,"queued stale timer cannot bypass comparison grace")
+m.autoClock.now = 750
+onAutomaticGrace()
+Harness_Ok(m.selectionTask <> invalid,"automatic selection starts after short grace despite slow provider")
+selection = m.selectionTask
+Harness_Equal(selection.streams.Count(),1,"early candidate pool contains only completed sources")
+selection.result = {streams:fast.result.streams}
+onAutomaticSourcesReady(PrefetchTest_Event(selection))
+Harness_Equal(m.pushCalls,1,"fast provider can start without waiting for every provider")
+Harness_Ok(m.sourcesSuspended and m.prefetchState.suspended,"automatic handoff suspends queued work before player push")
+Harness_Equal(m.autoGraceTimer.control,"stop","handoff cancels comparison timer")
+
+Harness_Suite("Compare providers, strict 4K, changed filter and empty early ranking")
+PrefetchTest_Setup(2)
+m.params.waitForProviders = true
+m.autoPlayEnabled = true
+LoadStreams(m.params)
+fast = m.launched[0]
+fast.result = PrefetchTest_Result("fast")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(fast))
+onSourcePrefetchChanged()
+m.autoClock.now = 10000
+onAutomaticGrace()
+Harness_Equal(m.selectionTask,invalid,"saved compare providers waits for all provider replies")
+m.params.waitForProviders = false
+m.fourKOnly = true
+MaybeStartAutomaticPlayback()
+Harness_Equal(m.autoGraceDeadline,invalid,"HD-only fast source cannot open a strict 4K grace")
+m.fourKOnly = false
+MaybeStartAutomaticPlayback()
+m.autoClock.now = 10750
+onAutomaticGrace()
+selection = m.selectionTask
+Harness_Ok(selection <> invalid,"explicit all-quality policy permits the available HD source")
+' Quality changed while ranking is pending; stale completion must not hand off.
+m.fourKOnly = true
+selection.result = {streams:fast.result.streams}
+onAutomaticSourcesReady(PrefetchTest_Event(selection))
+Harness_Equal(m.pushCalls,0,"ranking from old quality policy cannot bypass new 4K-only setting")
+Harness_Equal(m.selectionTask,invalid,"old ranking worker is reaped and disowned")
+slow = m.launched[1]
+slow.result = {streams:[{name:"2160p AAC 2.0",url:"https://media.example.test/4k.mkv"}],readyStreams:[{name:"2160p AAC 2.0",url:"https://media.example.test/4k.mkv"}],error:""}
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(slow))
+onSourcePrefetchChanged()
+Harness_Ok(m.selectionTask <> invalid,"final provider results rerank the new strict quality pool")
+Harness_Ok(m.selectionTask.fourKOnly,"new ranking carries strict 4K policy")
+
+PrefetchTest_Setup(2)
+m.autoPlayEnabled = true
+LoadStreams(m.params)
+fast = m.launched[0]
+fast.result = PrefetchTest_Result("fast")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(fast))
+onSourcePrefetchChanged()
+m.autoClock.now = 750
+onAutomaticGrace()
+selection = m.selectionTask
+slow = m.launched[1]
+slow.result = PrefetchTest_Result("later")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(slow))
+onSourcePrefetchChanged()
+selection.result = {streams:[]}
+onAutomaticSourcesReady(PrefetchTest_Event(selection))
+Harness_Ok(m.selectionTask <> invalid,"new results during empty early ranking are reranked rather than stranded")
+Harness_Equal(m.selectionTask.streams.Count(),2,"rerank includes the later provider")
+
+Harness_Suite("Unavailable optional comparison clock never strands automatic selection")
+PrefetchTest_Setup(2)
+m.autoPlayEnabled = true
+m.autoClock = invalid
+LoadStreams(m.params)
+fast = m.launched[0]
+fast.result = PrefetchTest_Result("fast")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(fast))
+onSourcePrefetchChanged()
+Harness_Ok(m.selectionTask <> invalid,"missing comparison clock falls back to immediate ready-candidate selection")
+Harness_Equal(m.autoGraceTimer.control,"stop","missing clock does not arm an unfinishable grace timer")
+
+Harness_Suite("Actual quality button cancels grace and stale ranking")
+PrefetchTest_Setup(2)
+m.autoPlayEnabled = true
+m.activeIndex = 0
+LoadStreams(m.params)
+fast = m.launched[0]
+fast.result = PrefetchTest_Result("fast")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(fast))
+onSourcePrefetchChanged()
+Harness_Ok(onKeyEvent("options",true),"native quality button is handled during grace")
+Harness_Ok(m.fourKOnly,"quality button enables strict 4K")
+Harness_Equal(m.autoGraceTimer.control,"stop","quality button stops old comparison grace")
+m.autoClock.now = 750
+onAutomaticGrace()
+Harness_Equal(m.selectionTask,invalid,"canceled old grace cannot select old HD policy")
+Harness_Ok(onKeyEvent("options",true),"quality button can restore all-quality policy")
+m.autoClock.now = 1500
+onAutomaticGrace()
+oldSelection = m.selectionTask
+Harness_Ok(oldSelection <> invalid,"restored quality schedules its own automatic ranking")
+onKeyEvent("options",true)
+Harness_Ok(oldSelection.stopped,"quality button cancels in-flight old ranking")
+onKeyEvent("options",true)
+m.autoClock.now = 2250
+onAutomaticGrace()
+newSelection = m.selectionTask
+Harness_Ok(newSelection <> invalid and newSelection.id <> oldSelection.id,"repeated policy changes always mint a unique ranking worker ID")
+oldSelection.result = {streams:fast.result.streams}
+onAutomaticSourcesReady(PrefetchTest_Event(oldSelection))
+Harness_Equal(m.pushCalls,0,"old ranking with matching restored quality still cannot claim a newer selection")
+Harness_Equal(m.selectionTask.id,newSelection.id,"old ranking never reaps current ranking slot")
+CancelStreamsLoad()
+onAutomaticGrace()
+Harness_Equal(m.pushCalls,0,"canceling current title disowns queued grace notification")
+
+Harness_Suite("Manual source choice always supersedes automatic selection")
 PrefetchTest_Setup()
 m.providers = [{streams:[{url:"https://media.example.test/selected.mkv"}]}]
 m.streams = m.providers[0].streams
@@ -274,29 +451,17 @@ m.pendingCount = 0
 m.loadToken = "live"
 MaybeStartAutomaticPlayback()
 selection = m.selectionTask
-Harness_Ok(selection <> invalid,"explicit Play may rank candidates while Streams is active")
+Harness_Ok(selection <> invalid,"explicit Play can rank completed sources")
 onStreamSelected()
-Harness_Equal(m.pushCalls,1,"manual OK pushes exactly the chosen source once")
-Harness_Ok(not m.autoPlayEnabled and m.autoPlaySent,"manual source choice disarms automatic playback")
-Harness_Ok(selection.stopped and m.selectionTask = invalid,"manual source choice cancels and disowns in-flight automatic ranking")
+Harness_Equal(m.pushCalls,1,"manual OK pushes the chosen source once")
+Harness_Ok(not m.autoPlayEnabled and m.autoPlaySent,"manual choice disarms automatic playback")
+Harness_Ok(selection.stopped and m.selectionTask = invalid,"manual choice cancels pending automatic ranking")
 selection.result = {streams:m.streams}
 onAutomaticSourcesReady(PrefetchTest_Event(selection))
-Harness_Equal(m.pushCalls,1,"late ranking result cannot replace the manual selection")
+Harness_Equal(m.pushCalls,1,"late ranking cannot replace manual choice")
+Harness_Ok(m.sourcesSuspended,"manual handoff suspends remaining lookup queue")
 MaybeStartAutomaticPlayback()
-Harness_Equal(m.launched.Count(),1,"returning to Streams cannot automatically rank another choice")
-m.autoPlayEnabled = true
-m.autoPlaySent = false
-m.top.screenActive = false
-MaybeStartAutomaticPlayback()
-Harness_Equal(m.launched.Count(),1,"hidden Streams never starts an automatic selection worker")
-m.top.screenActive = true
-MaybeStartAutomaticPlayback()
-selection = m.selectionTask
-selection.result = {streams:m.streams}
-m.top.screenActive = false
-onAutomaticSourcesReady(PrefetchTest_Event(selection))
-Harness_Ok(selection.reaped and m.selectionTask = invalid,"hidden completion is reaped instead of stranding the ranking slot")
-Harness_Equal(m.pushCalls,1,"hidden ranking completion cannot push a player")
+Harness_Equal(m.launched.Count(),1,"hidden or returned manual choice cannot trigger automatic repick")
 
 Harness_Suite("Focus debounce only preloads the displayed movie or focused episode")
 PrefetchTest_Setup()
@@ -324,6 +489,10 @@ Harness_Equal(m.launched.Count(),2,"hidden Details timer cannot start a request"
 m.prefetchHandOff = false
 DetailsTest_BlurFocus()
 Harness_Equal(m.prefetchState.context,invalid,"ordinary navigation cancels the displayed title's prefetch")
+for each abandoned in [m.launched[0],m.launched[1]]
+    abandoned.result = PrefetchTest_Result("done")
+    PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(abandoned))
+end for
 m.top.screenActive = true
 m.meta = {id:"tt123",type:"series"}
 ScheduleDetailsPrefetch()

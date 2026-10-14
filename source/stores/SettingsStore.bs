@@ -28,6 +28,7 @@ class SettingsStore
     fourKOnly as boolean
     autoNextEpisode as boolean
     autoSourceRetry as boolean
+    waitForProviders as boolean
     saveRefused as boolean
 
     sub new(registry = invalid as dynamic)
@@ -38,6 +39,7 @@ class SettingsStore
         m.fourKOnly = false
         m.autoNextEpisode = true
         m.autoSourceRetry = true
+        m.waitForProviders = false
         m.saveRefused = false
         m.Load()
     end sub
@@ -114,11 +116,11 @@ class SettingsStore
     end function
 
     function GetPlaybackOptions() as object
-        return {fourKOnly:m.fourKOnly,autoNextEpisode:m.autoNextEpisode,autoSourceRetry:m.autoSourceRetry}
+        return {fourKOnly:m.fourKOnly,autoNextEpisode:m.autoNextEpisode,autoSourceRetry:m.autoSourceRetry,waitForProviders:m.waitForProviders}
     end function
 
     function SetPlaybackOption(optionName as string, value as boolean) as boolean
-        if optionName <> "fourKOnly" and optionName <> "autoNextEpisode" and optionName <> "autoSourceRetry" then return false
+        if optionName <> "fourKOnly" and optionName <> "autoNextEpisode" and optionName <> "autoSourceRetry" and optionName <> "waitForProviders" then return false
         m[optionName] = value
         m.Save()
         return true
@@ -138,7 +140,7 @@ class SettingsStore
         ok = m.registry.Write("serverAddress", m.serverAddress)
         if not m.registry.Write("language", m.language) then ok = false
         if not m.registry.Write("audioMode", m.audioMode) then ok = false
-        for each optionName in ["fourKOnly","autoNextEpisode","autoSourceRetry"]
+        for each optionName in ["fourKOnly","autoNextEpisode","autoSourceRetry","waitForProviders"]
             value = "false"
             if m[optionName] then value = "true"
             if not m.registry.Write(optionName,value) then ok = false
@@ -164,7 +166,7 @@ class SettingsStore
         if language <> "" then m.language = language
         audioMode = m.registry.Read("audioMode")
         if audioMode = "projector" or audioMode = "surround" then m.audioMode = audioMode
-        for each optionName in ["fourKOnly","autoNextEpisode","autoSourceRetry"]
+        for each optionName in ["fourKOnly","autoNextEpisode","autoSourceRetry","waitForProviders"]
             value = m.registry.Read(optionName)
             if value = "true" then m[optionName] = true
             if value = "false" then m[optionName] = false

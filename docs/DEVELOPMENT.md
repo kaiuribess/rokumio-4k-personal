@@ -5,7 +5,7 @@
 Use Node.js 22 LTS, npm and Python 3.12+ for the package verifier. The lockfile records development dependencies. On a clean checkout:
 
 ```sh
-npm ci
+npm ci --ignore-scripts
 npm test
 npm run build
 python scripts/verify-package.py
@@ -27,6 +27,7 @@ The verifier checks ZIP integrity, manifest fields, component inheritance, every
 - `PlayerAudioRecovery` / `EnglishAudio` / `AudioCapabilities`: bounded English track recovery and native compatibility observations.
 - `PlayerSourceMemory` / `SourceMemory`: hashed identities of working sources; private signed URLs are not persisted as cache identities.
 - `SourcePrefetch`: short-lived source-list preloading tied to provider/audio context.
+- `SourcePrefetchCoordinator`: sole production owner of warm and explicit source-list workers, shared two-slot budget, abandoned-transfer ownership and suspended queues. StreamsScreen adopts its results instead of launching another provider batch.
 - `NextEpisode` / `PlayerNextEpisode`: provider-id-preserving episode order, future-date gate and cancellable timer transition.
 - `AddonDiagnostics` / `AddonHealthTask` / `AddonHealthScreen`: sequential manifest reachability checks, sanitized categories, progressive status and cancellation. Source-provider failures also appear in `StreamsScreen`; successful manifests do not certify account entitlement or playback.
 - `AudioSetup` / `SettingsAudio`: explicit equipment selection, wiring instructions and fresh native capability reports. They do not change system settings or transcode audio.
@@ -55,7 +56,11 @@ Native image sizes and off-thread requests follow Roku's [Poster](https://develo
 
 SourcePrefetch retains one title for 60 seconds, at most four providers and 256 unique candidates per provider, reserving up to 64 labelled UHD candidates. SourceMemory persists only 32 hashed outcomes with expiry. Player exit clears the old queue and handoff metadata after saving resume state. Do not replace these caps with full provider arrays or remove full browsing to optimize the preview.
 
-No Roku frame-rate, texture-memory or sustained-decoder profiling was performed for 0.5.14. Use physical-device resource measurements before making performance claims. Computer tests verify bounds, callback ownership and cleanup, rather than real rendering speed.
+Warm preload and explicit lookup share at most two owned source-list workers. Explicit loading queues every matching provider; ordinary provider responses remain available without a new source-count cap. A canceled title loses its queued work and UI ownership, but already-running workers remain observed by the coordinator until their result releases the slot. Never free a live slot just because its screen was removed or STOP was sent. Tokens keep that result out of a later title. The transport has bounded request waits; this is not proof of a hard socket/response-byte or sustained-media limit.
+
+Automatic Play defaults to Start sooner. A guarded 750 ms interval from ready candidates allows brief comparison, then ranks the currently available pool on a Task without waiting for every provider. Complete responses may start immediately; 4K-only waits for eligible UHD hints. An empty early selection can be reconsidered after the source revision changes. Compare providers preserves the all-response behavior as a saved boolean preference. Manual selection, cancellation and quality changes disown stale selection workers/timers. The initial retry pool may be smaller with early selection; pending results remain for return to the picker and are never injected into accepted playback.
+
+No Roku frame-rate, texture-memory or sustained-decoder profiling was performed for 0.5.15. Use physical-device resource measurements before making performance claims. Computer tests verify bounds, callback ownership and cleanup, rather than real rendering speed.
 
 ## Source inspector
 
@@ -69,4 +74,8 @@ For a playback issue, report the app version, Roku model/OS, container, video/au
 
 ## Development dependency audit
 
-On 2026-10-14, `npm audit` reported 11 advisories in the locked development dependency tree (3 moderate, 7 high, 1 critical), including archive extraction in transitive `decompress` and pattern parsing in `braces`. These Node dependencies are not bundled in the Roku ZIP. The tests/build here do not use the interpreter to extract user-supplied ZIPs. Do not use affected development helpers to unpack untrusted archives. Dependency migration remains separate work; a passing app test does not mean the toolchain has no advisories. Re-run `npm audit` for current details. CI installs with lifecycle scripts disabled.
+On 2026-10-14, the locked development toolchain was updated from `@rokucommunity/brs` 0.47.4 to 0.47.6 and `brighterscript` 0.73.1 to 0.73.7, using `npm install --ignore-scripts`. The interpreter's [supported patch release](https://github.com/rokucommunity/brs/releases/tag/v0.47.6) removes the abandoned `decompress` dependency and updates `uuid` from 8.3.2 to 11.1.1. The dependency tree shrank from 267 to 208 packages. `npm audit` changed from 11 affected dependency entries (3 moderate, 7 high, 1 critical) to 9 (2 moderate, 7 high, 0 critical). These counts include packages affected transitively; they do not represent nine distinct underlying advisories.
+
+Two underlying advisories remain: [deeply nested patterns in `braces` through 3.0.3](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm), for which no patched version is published, and [malformed input decoding in `decode-uri-component` through 0.4.2](https://github.com/advisories/GHSA-vcc3-ghjq-m6fr), reached in the dependency tree through `nanomatch` / `snapdragon` / `source-map-resolve`. The latter's patched 0.5.0 is ESM, while its existing caller uses CommonJS `require()`. Forcing that override would change the caller's API contract; no unsafe override or compiler downgrade is used to hide the findings. Replacing these upstream dependencies requires separately validated maintenance. Keep development globs and source-map inputs trusted and re-run `npm audit` for current details.
+
+These Node development dependencies are not bundled in the Roku ZIP, so these findings are not equivalent vulnerabilities in the installed Roku app. They still matter to contributors who run the tools. Use `npm ci --ignore-scripts`; CI disables dependency lifecycle scripts too. The upgraded compiler/interpreter is checked with the production store harness and the release's full test/build/package validation. A passing app test does not establish that the toolchain is advisory-free.
