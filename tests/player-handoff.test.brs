@@ -290,20 +290,42 @@ sub Test_PlayerLoadingFeedback()
 end sub
 
 sub Test_PlayerResolutionAndFormatError()
-    Harness_Suite("Progressive files cannot inherit stale adaptive 4K facts")
+    Harness_Suite("Only fresh segment events can establish adaptive resolution")
     SetupPlayerFixture()
     m.video.state = "playing"
     m.video.streamingSegment = { width: 3840, height: 2160 }
     m.resolvedPlayback.streamFormat = "mp4"
     m.playingSegment = invalid
     onPlaybackFactsChanged()
+    onStreamingSegmentChanged(PlayerTest_Event(m.video,{width:3840,height:2160}))
     Harness_Equal(m.playingSegment, invalid, "MP4 never treats an old HLS segment as its own resolution")
     m.resolvedPlayback.streamFormat = "hls"
     onPlaybackFactsChanged()
-    Harness_Equal(m.playingSegment.height, 2160, "adaptive playback records the actual reported video segment")
-    m.video.streamingSegment = { width: 1920, height: 1080 }
-    onPlaybackFactsChanged()
+    Harness_Equal(m.playingSegment, invalid, "a new HLS file cannot inherit cached 4K facts through a codec notification")
+    onStreamingSegmentChanged(PlayerTest_Event(m.video,{width:3840,height:2160,hdrModeStr:"hdr10"}))
+    Harness_Equal(m.playingSegment.height, 2160, "a fresh adaptive segment establishes UHD")
+    Harness_Equal(m.playingSegment.hdrModeStr, "hdr10", "HDR belongs to the fresh segment")
+    onStreamingSegmentChanged(PlayerTest_Event(m.video,{width:1920,height:1080}))
     Harness_Equal(m.playingSegment.height, 1080, "an adaptive downgrade is recorded as 1080p")
+    onPlaybackFactsChanged()
+    Harness_Equal(m.playingSegment.height, 1080, "codec notifications cannot replace fresh HD with the cached native UHD field")
+    onStreamingSegmentChanged(PlayerTest_Event(m.video,invalid))
+    Harness_Equal(m.playingSegment, invalid, "a segment without dimensions clears the current resolution claim")
+    m.video.state = "stopped"
+    onStreamingSegmentChanged(PlayerTest_Event(m.video,{width:3840,height:2160}))
+    Harness_Equal(m.playingSegment, invalid, "late stopped-playback segment events are ignored")
+    m.video.state = "playing"
+    m.playbackActive = false
+    onStreamingSegmentChanged(PlayerTest_Event(m.video,{width:3840,height:2160}))
+    Harness_Equal(m.playingSegment, invalid, "an exited player cannot acquire segment evidence")
+    m.playbackActive = true
+    m.playArmed = true
+    onStreamingSegmentChanged(PlayerTest_Event(m.video,{width:3840,height:2160}))
+    Harness_Equal(m.playingSegment, invalid, "old notifications before the deferred handoff cannot establish UHD")
+    m.playArmed = false
+    m.resolvedPlayback.streamFormat = "dash"
+    onStreamingSegmentChanged(PlayerTest_Event(m.video,{width:1280,height:720}))
+    Harness_Equal(m.playingSegment.height, 720, "fresh DASH video events remain supported")
     m.video.errorStr = "No playable tracks"
     Harness_Ok(NotPlayableOnDevice(), "format failure at the beginning of a native message is recognized")
 end sub

@@ -24,4 +24,6 @@ assert.ok(resumeCalls >= 2, 'Both player checkpoint and account replay boundarie
 assert.match(fs.readFileSync(path.join(root,'components/StoreHost.brs'),'utf8'), /function LibrarySetPosition\(packet as dynamic\)/);
 const player = fs.readFileSync(path.join(root,'components/PlayerScreen.brs'),'utf8');
 assert.match(player, /subtitlePrefs\.onlineSubtitles = true then StartSubtitles/);
+assert.match(player, /ObserveField\("streamingSegment", "onStreamingSegmentChanged"\)/);
+assert.doesNotMatch(player, /\bm\.video\.streamingSegment\b/, 'Do not poll a cached previous-file segment in codec/state callbacks');
 console.log(`Native component contract: ${calls} calls checked; ${resumeCalls} resume boundaries use one record; online captions require opt-in.`);

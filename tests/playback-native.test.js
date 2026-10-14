@@ -24,7 +24,7 @@ async function main() {
         'ResetVideoNode', 'ClearSubtitleTrack', 'ApplySubtitleIndex', 'SelectedSubtitleTrack',
         'CurrentContent', 'SelectSubtitleTrack', 'BuildSubtitleTracks',
         'TrackDisplayName', 'onResolveResult', 'onSubtitleResult', 'ClearSubtitles',
-        'onPlaybackFactsChanged', 'NotPlayableOnDevice', 'NextPlayerWorkerId',
+        'onPlaybackFactsChanged', 'onStreamingSegmentChanged', 'NotPlayableOnDevice', 'NextPlayerWorkerId',
         'StartResolve', 'CancelResolve', 'LaunchSubtitleFetch', 'CancelSubtitles',
         'OnEnter', 'OnExit', 'SavePosition', 'ResolveOrdinal', 'onVideoStateChanged', 'onBufferingStatusChanged', 'HasLogo',
         'CurrentEnglishAudioFacts', 'CurrentEnglishAudioCheck', 'onEnglishAudioFactsChanged', 'onEnglishAudioTimeout',

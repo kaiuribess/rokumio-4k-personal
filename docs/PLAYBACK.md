@@ -78,3 +78,8 @@ Roku resume/history and the outbox use seconds. The Stremio API uses millisecond
 Online subtitle downloads are off by default. Enable Settings → Online subtitles to add those tracks to native Options; they are matched by title/episode and may not match the exact release or timing. Embedded captions follow Roku caption preferences. Press * while playing to change caption mode/track. The app does not silently change Roku global caption settings.
 
 The source status now displays elapsed time and cancellation guidance. Each source-list HTTP request has a shared 45-second acquisition/retry budget; the two-worker queue, JSON processing, file inspection and native buffering are separate stages. This is a bounded wait policy, not an instant-start promise.
+
+
+## 0.5.20 resolution evidence
+
+The native Video node can retain read-only segment facts after a file ends. Codec/state changes must not reuse those facts to label the next file 4K. The player now accepts dimensions/HDR only from a fresh segment event during active HLS/DASH playback, and clears claims when the event has no valid dimensions. Progressive file headers and HDMI output remain separate evidence. The on-device switch check that exposed this defect used a genuine UHD control followed by a lower-resolution HLS control; details are in [Validation](VALIDATION.md).

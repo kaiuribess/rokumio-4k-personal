@@ -1,5 +1,13 @@
 # Changes
 
+## 0.5.20 — 2026-10-14
+
+- Fix stale adaptive resolution evidence after switching files. Native Video can retain its previous streamingSegment; codec changes no longer poll that field. Only a fresh segment notification during an active HLS/DASH handoff can establish displayed dimensions/HDR. Missing or rejected evidence stays unknown.
+- Add regression coverage for HLS-to-HLS switches, HD downgrades, DASH, stopped/exited/deferred playback and missing segment dimensions.
+- Retain the 0.5.19 Back/checkpoint, shared source-request deadline, UHD-first and online-subtitle opt-in fixes. Controlled physical tests of that core passed native component saves, durable periodic/Back checkpoints, repeated screen exits, source-request cancellation, 3840×2160 HEVC/AAC HLS decoding and seek/pause. They exposed this additional resolution-display defect.
+
+These checks do not certify every movie, acoustic language, surround, full-film endurance or a memory leak threshold. The tested route reported Stereo, not Dolby passthrough. See [Validation](docs/VALIDATION.md) for the exact evidence and limits.
+
 ## 0.5.19 — 2026-10-14
 
 Hotfix for a physical Roku failure found immediately after installing 0.5.18. This remains experimental.

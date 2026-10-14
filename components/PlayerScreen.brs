@@ -69,9 +69,10 @@ sub init()
     m.video.ObserveField("state", "onVideoStateChanged")
     if m.video.HasField("position") then m.video.ObserveField("position", "onPlaybackPositionChanged")
     m.video.ObserveField("bufferingStatus", "onBufferingStatusChanged")
-    for each field in ["videoFormat", "audioFormat", "streamingSegment"]
+    for each field in ["videoFormat", "audioFormat"]
         if m.video.HasField(field) then m.video.ObserveField(field, "onPlaybackFactsChanged")
     end for
+    if m.video.HasField("streamingSegment") then m.video.ObserveField("streamingSegment", "onStreamingSegmentChanged")
     for each field in ["availableAudioTracks", "currentAudioTrack"]
         if m.video.HasField(field) then m.video.ObserveField(field, "onEnglishAudioFactsChanged")
     end for
@@ -1227,16 +1228,26 @@ sub LogVideoError()
     end if
 end sub
 
-sub onPlaybackFactsChanged()
-    if m.video = invalid then return
-    segmented = false
-    if m.resolvedPlayback <> invalid then segmented = m.resolvedPlayback.streamFormat = "hls" or m.resolvedPlayback.streamFormat = "dash"
-    if segmented and m.video.HasField("streamingSegment") then
-        segment = m.video.streamingSegment
-        if Type(segment) = "roAssociativeArray" then
-            if PlaybackInfo_PositiveDimension(segment.width) and PlaybackInfo_PositiveDimension(segment.height) then m.playingSegment = segment
+sub onStreamingSegmentChanged(event as object)
+    ' A reused Video keeps the previous file's read-only streamingSegment.
+    ' Only a segment notification may supply dimensions for this handoff;
+    ' codec/state changes must never poll that cached native field.
+    if m.video = invalid or m.playbackActive <> true or m.playArmed = true then return
+    if m.video.state <> "playing" and m.video.state <> "buffering" and m.video.state <> "paused" then return
+    if m.resolvedPlayback = invalid then return
+    if m.resolvedPlayback.streamFormat <> "hls" and m.resolvedPlayback.streamFormat <> "dash" then return
+    segment = event.GetData()
+    m.playingSegment = invalid
+    if Type(segment) = "roAssociativeArray"
+        if PlaybackInfo_PositiveDimension(segment.width) and PlaybackInfo_PositiveDimension(segment.height)
+            m.playingSegment = {width:segment.width,height:segment.height,hdrModeStr:segment.hdrModeStr}
         end if
     end if
+    if m.video.state = "paused" then ShowPlaybackInfo()
+end sub
+
+sub onPlaybackFactsChanged()
+    if m.video = invalid then return
     if m.video.state = "paused" then ShowPlaybackInfo()
     onEnglishAudioFactsChanged()
 end sub

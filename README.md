@@ -2,13 +2,13 @@
 
 A native Roku client with a dark red interface for browsing Stremio-compatible catalogs, searching movies and shows, and playing compatible direct streams with the Roku remote. This community derivative adds English audio selection, projector/surround preferences, clearer source cards, automatic source recovery, next-episode playback, and add-on checks. The repository and ZIP filename remain `rokumio-4k-personal` so existing links and build instructions continue to work.
 
-**Version 0.5.19 is an experimental hotfix.** Physical use of 0.5.18 exposed a Back/checkpoint crash that the desktop tests missed. This update repairs that native interface call and improves source waiting, UHD-first selection and optional online subtitles. It cannot guarantee every provider file, English audio or sustained genuine 4K.
+**Version 0.5.20 is an experimental hotfix.** Physical use of 0.5.18 exposed a Back/checkpoint crash that the desktop tests missed. This update retains the native interface, source waiting, UHD-first and caption fixes, and prevents a reused player from reporting the previous clip’s 4K resolution. Controlled on-device checks now cover Back, checkpoints, seek/pause and a genuine UHD HLS control. It cannot guarantee every provider file, English audio or sustained genuine 4K.
 
-**[Download the Roku install ZIP — 0.5.19](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.19/rokumio-4k-personal-0.5.19.zip)**
+**[Download the Roku install ZIP — 0.5.20](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.20/rokumio-4k-personal-0.5.20.zip)**
 
 Upload that ZIP without extracting it. GitHub's green Code button and “Source code” archives are for developers; they are not the Roku install package.
 
-[Release notes and checksum](https://github.com/kaiuribess/rokumio-4k-personal/releases/tag/v0.5.19) · [Installation](docs/INSTALL.md) · [Add-on checks](docs/ADDON_CHECKS.md) · [Playback and 4K](docs/PLAYBACK.md) · [Development](docs/DEVELOPMENT.md) · [Changes](CHANGELOG.md)
+[Release notes and checksum](https://github.com/kaiuribess/rokumio-4k-personal/releases/tag/v0.5.20) · [Installation](docs/INSTALL.md) · [Add-on checks](docs/ADDON_CHECKS.md) · [Playback and 4K](docs/PLAYBACK.md) · [Development](docs/DEVELOPMENT.md) · [Changes](CHANGELOG.md)
 
 ## What you can do
 
