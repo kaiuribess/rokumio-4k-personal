@@ -19,6 +19,20 @@ A native Roku client for browsing Stremio-compatible catalogs, searching movies 
 
 The built-in Cinemeta catalog supplies title metadata. **Playable movies, shows, provider accounts and configured stream add-ons are not bundled.** Install your own compatible provider manifest and use content you are authorized to access. Searching a title does not establish that a playable 4K source exists.
 
+## What we added
+
+These are our changes on top of the original client:
+
+- **4K-first source selection:** clearer 2160p/1080p choices, a 4K-only filter, and rejection of inspected MKV video known to be below UHD in that mode.
+- **English audio handling:** dialogue-track selection, commentary/audio-description filtering, stale track-selection fixes, and bounded native audio recovery.
+- **Projector and surround presets:** source ranking and compatibility checks for stereo speakers or a connected soundbar/receiver.
+- **Automatic source recovery:** bounded retries for failed starts, stalls and early endings, with memory of previously working file identities.
+- **Faster source browsing:** short-lived source preloading, fresh-link refresh, cleaner cards and protection against late results overriding a manual choice.
+- **Automatic next episode:** a five-second countdown, Back cancellation, season rollover, fresh sources and preserved quality/audio preferences.
+- **Voice and playback information:** native voice-search/transport wiring and available codec/resolution facts that distinguish a source label from measured playback data.
+
+These additions improve selection and recovery; they do not add a transcoder or guarantee compatibility with every provider file.
+
 ## Quick start
 
 1. Download the release **`rokumio-4k-personal-0.5.12.zip`**; do not extract it before installing.
@@ -51,4 +65,3 @@ The installable output is **`dist/rokumio-4k-personal.zip`**. GitHub's automatic
 
 Based on [gpratoe/rokumio-client](https://github.com/gpratoe/rokumio-client), base commit `24d3e74bb29bdd94223710e25cd77ab40fca2b36`. The original copyright and [MIT license](LICENSE) are preserved. Open Sans is distributed under its [SIL Open Font License](fonts/OFL.txt). EmojiOnRoku, emoji-regex and Twemoji-derived code retain their notices and [MIT licenses](licenses/). See [NOTICE.txt](NOTICE.txt).
 
-This is a separately maintained derivative, not the Skz/wesleyfreii Discord ZIP, and is not affiliated with Roku, Stremio, TorBox or Hisense.

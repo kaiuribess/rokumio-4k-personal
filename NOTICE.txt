@@ -7,8 +7,9 @@ The upstream copyright and MIT license are included in LICENSE.
 
 This personal fork adds 4K-first direct HTTPS stream selection, 1080p choices,
 voice search/playback wiring, native playback diagnostics, and addon protocol
-fixes. It is not the Skz/wesleyfreii Discord build and is not an official Roku,
-Stremio, TorBox, or Hisense product.
+fixes, English audio recovery, cleaner source cards, projector/surround presets,
+source preloading and automatic next-episode playback. It is not an official
+Roku, Stremio, TorBox, or Hisense product.
 
 No movies, series, subscription accounts, or stream-provider credentials are
 bundled. Cinemeta provides metadata; installed providers supply playable URLs.
