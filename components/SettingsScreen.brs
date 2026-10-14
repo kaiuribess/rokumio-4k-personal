@@ -21,6 +21,8 @@ sub init()
     m.sub = m.top.FindNode("settingsSub")
     m.status = m.top.FindNode("settingsStatus")
     m.list = m.top.FindNode("settingsList")
+    m.guide = m.top.FindNode("settingsGuide")
+    m.settingsAudioDialog = invalid
 
     t = Theme()
     m.title.color = t.accent
@@ -85,6 +87,9 @@ sub BuildRows(preserveFocus = false as boolean)
             value: "Optional sync"
         })
     end if
+    m.rows.Push({ action: "audio", title: "Audio mode", value: AudioSetupValue() })
+    m.rows.Push({ action: "audioConnection", title: "Audio connection", value: "Check speakers" })
+    m.rows.Push({ action: "addonChecks", title: "Add-on checks", value: "Find problems" })
     m.rows.Push({
         action: "server"
         title: "Optional server"
@@ -95,7 +100,7 @@ sub BuildRows(preserveFocus = false as boolean)
         title: "Check optional server"
         value: "Connection check"
     })
-    m.rows.Push({ action: "audio", title: "Audio setup (OK to switch)", value: AudioSetupValue() })
+    m.rows.Push({action:"about",title:"About",value:"Crimson Cinema"})
     ' Advanced diagnostics fit the fourth visible row without covering status.
     if m.showNetDiag
         m.rows.Push({
@@ -115,6 +120,7 @@ sub BuildRows(preserveFocus = false as boolean)
     m.list.content = content
     if focusedRow < 0 or focusedRow >= m.rows.Count() then focusedRow = 0
     m.list.jumpToRowItem = [focusedRow, 0]
+    UpdateAudioGuide()
 end sub
 
 ' Account state fits the row without displaying the profile's private email.
@@ -134,24 +140,16 @@ end function
 
 function AudioSetupValue() as string
     if m.stores <> invalid
-        if m.stores.settings.callFunc("SettingsGetAudioMode") = "surround" then return "AX700 surround"
+        if m.stores.settings.callFunc("SettingsGetAudioMode") = "surround" then return "HDMI surround"
     end if
-    return "Projector speakers"
+    return "TV / projector"
 end function
 
 sub ToggleAudioSetup()
     if m.stores = invalid then return
     value = "surround"
     if m.stores.settings.callFunc("SettingsGetAudioMode") = "surround" then value = "projector"
-    m.stores.settings.callFunc("SettingsSetAudioMode", value)
-    if value = "projector"
-        m.status.text = "Projector: prefer AAC stereo sources. Set Roku Audio > Digital output format to Stereo."
-    else
-        m.status.text = "AX700: prefer DD/DD+ sources. Connect Roku to soundbar HDMI IN. Use Roku Auto audio; volume modes Off."
-    end if
-    if m.stores.settings.callFunc("SettingsSaveFailed") then m.status.text = m.status.text + " — not saved"
-    ReportSaveFault()
-    BuildRows(true)
+    ApplyAudioSetup(value)
 end sub
 
 sub onRowSelected()
@@ -167,7 +165,13 @@ sub onRowSelected()
     else if action = "server"
         EditServer()
     else if action = "audio"
-        ToggleAudioSetup()
+        ShowAudioSetup()
+    else if action = "audioConnection"
+        ShowAudioConnection()
+    else if action = "addonChecks"
+        m.top.pushRequest = {screen:"addonHealthScreen",params:{}}
+    else if action = "about"
+        m.top.pushRequest = {screen:"aboutScreen",params:{}}
     else if action = "testServer"
         ' Counted here rather than inside TestServer so every press is counted,
         ' including the presses that TestServer itself declines to act on —

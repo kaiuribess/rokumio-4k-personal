@@ -20,11 +20,19 @@ Configured manifests may contain account secrets. Enter them privately; do not p
 
 ## Picture and audio
 
-For built-in projector/TV speakers, select **Projector speakers** in the app. English AAC stereo, MP3 or usable PCM tracks are the conservative native path. If needed, choose Stereo in Roku's system audio settings. The app does not change system settings for you.
+Open **Settings → Audio mode**. Choose **TV / projector speakers** for built-in display speakers. English AAC stereo, MP3 or usable PCM tracks are the conservative native path. If needed, choose Stereo in Roku's system audio settings. The app does not change system settings for you.
 
-For a compatible soundbar/receiver with HDMI input, connect **Roku → soundbar/receiver HDMI IN → display** and select the receiver preset (**AX700 surround**) in the app. The preset changes ranking/compatibility preference; it cannot create discrete surround or certify every receiver. Use equipment-specific HDMI/passthrough instructions and check the receiver's reported input format.
+For a compatible soundbar/receiver with HDMI input, choose **HDMI soundbar / receiver**. Connect **Roku → soundbar/receiver HDMI IN → HDMI OUT / eARC → display**, select the bar's HDMI input, set Roku digital audio to **Auto**, and keep Roku volume modes **Off**. Use the soundbar remote for volume while setting it up. The app's preference changes source ranking/compatibility checks; it cannot create discrete surround or certify every receiver.
+
+Open **Settings → Audio connection** after connecting or changing equipment. It queries current Roku-reported output and codec capability, and warns if Stereo is still reported while HDMI surround is selected. A supported codec report is not an acoustic test. During an English Dolby Digital / DD+ 5.1 stream, check the receiver's input display; an AAC stereo source remains two channels.
+
+For **Hisense AX700 + Optoma UHD50X**, plug the Stick into the AX700's **HDMI IN**, then run the AX700's **HDMI OUT / eARC** to the projector's 4K-capable HDMI input. AX700 specifications list a separate HDMI input, 4K60 passthrough, and Dolby Atmos support. This route carries audio to the bar directly; it does not require the projector to return audio over eARC. Check the Roku display setup after changing the HDMI chain. [Official AX700 specifications](https://cdn.bfldr.com/U447IH35/as/x9qfsw9scxvcvw2p9kxz6tsp/1959005_Specifications).
 
 AAC stereo is two channels. Dolby/DTS/TrueHD or multichannel AAC support varies. A silent/unsupported original file cannot be universally converted to stereo by this BrightScript app. See [playback limitations](PLAYBACK.md).
+
+## Check an add-on problem
+
+Open **Add-ons → Check add-ons**, or **Settings → Add-on checks**. Select a row to read its safe error explanation; Play/Pause checks again and Back cancels/returns. The check requests manifests only. Source availability is reported separately for the selected title/provider, and playback compatibility is checked when a source is selected. See [what each result means](ADDON_CHECKS.md).
 
 ## Remote controls and shows
 
@@ -36,6 +44,7 @@ AAC stereo is two channels. Dolby/DTS/TrueHD or multichannel AAC support varies.
 | \* on sources | Toggle 4K-only / all qualities |
 | Play/Pause on sources | Request fresh links |
 | Play/Pause on Home | Refresh catalog rows |
+| Play/Pause on Add-on checks | Repeat manifest checks |
 | Play/Pause, seek, FF/Rewind in playback | Native playback controls |
 | \* in playback | Native options/captions |
 | Back | Return; cancel pending lookup/countdown |

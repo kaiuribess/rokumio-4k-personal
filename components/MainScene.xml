@@ -73,6 +73,8 @@
             <StreamsScreen id="streamsScreen" visible="false" />
             <SettingsScreen id="settingsScreen" visible="false" />
             <AddonsScreen id="addonsScreen" visible="false" />
+            <AddonHealthScreen id="addonHealthScreen" visible="false" />
+            <AboutScreen id="aboutScreen" visible="false" />
             <SearchScreen id="searchScreen" visible="false" />
             <DiscoverScreen id="discoverScreen" visible="false" />
             <LibraryScreen id="libraryScreen" visible="false" />

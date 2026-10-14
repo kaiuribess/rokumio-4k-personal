@@ -17,6 +17,7 @@
         <field id="rowItemFocused" type="array" />
         <field id="rowItemSelected" type="array" />
         <function name="SetListFocus" />
+        <function name="FocusRow" />
     </interface>
 
     <script type="text/brightscript" uri="pkg:/components/ChevronList.brs" />

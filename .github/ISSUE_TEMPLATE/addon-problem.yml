@@ -1,0 +1,51 @@
+name: Add-on problem
+description: Report import, catalog, source or playback trouble without private links.
+title: "[Add-on] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        First open Add-ons → Check add-ons and read the selected provider's source status.
+        A catalog/subtitle add-on or an empty result for one title is not automatically broken.
+        Never include configured manifests, stream URLs, API keys, passwords or private logs.
+  - type: input
+    id: addon
+    attributes:
+      label: Public add-on name
+      description: Name only. Do not paste its configured URL or account identifier.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version, Roku model and Roku OS
+      description: The app version is on About; Roku details are in system settings.
+    validations:
+      required: true
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Where does it fail?
+      options:
+        - Manifest import
+        - Catalog or search
+        - Sources for a selected title
+        - Playback or audio
+        - Subtitles
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: observation
+    attributes:
+      label: What happens and what do Add-on checks report?
+      description: Include safe category/code, steps, expected behavior and whether another provider plays. For playback, add known codecs, container, language and Roku → speakers → display route. Avoid private addresses or identifiers.
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I reviewed this report and any screenshots for private URLs, API keys, passwords and account information.
+          required: true

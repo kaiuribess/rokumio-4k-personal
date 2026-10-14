@@ -9,7 +9,7 @@ sub init()
     m.list = m.top.FindNode("authList")
 
     t = Theme()
-    m.top.FindNode("authTitle").color = t.accent
+    m.top.FindNode("authTitle").color = t.textPrimary
     m.top.FindNode("authSub").color = t.textSecondary
     m.top.FindNode("authHint").color = t.textSecondary
     m.list.focusBitmapBlendColor = t.accentFocus

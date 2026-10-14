@@ -6,12 +6,15 @@
         <function name="OnEnter" />
         <function name="OnExit" />
         <function name="OnBackPressed" />
-        <field id="pushRequest" type="assocarray" />
+        <field id="pushRequest" type="assocarray" alwaysNotify="true" />
     </interface>
 
     <script type="text/brightscript" uri="pkg:/components/SettingsScreen.brs" />
     <script type="text/brightscript" uri="pkg:/source/core/AsyncTask.bs" />
     <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
+    <script type="text/brightscript" uri="pkg:/source/util/AudioCapabilities.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/AudioSetup.brs" />
+    <script type="text/brightscript" uri="pkg:/components/SettingsAudio.brs" />
 
     <children>
         <Rectangle id="settingsBg" width="1920" height="1080" color="0x0" />
@@ -28,7 +31,7 @@
             translation="[80, 128]"
             width="1760"
             height="40"
-            text="OK opens an option · Back returns to Home"
+            text="OK opens an option Â· Back returns to Home"
             font="font:SmallSystemFont" />
 
         <RowList
@@ -44,23 +47,24 @@
             vertFocusAnimationStyle="floatingFocus"/>
 
         <Group translation="[1140, 210]">
-            <Rectangle id="settingsPlate" width="700" height="620" />
+            <Rectangle id="settingsPlate" width="700" height="680" />
             <Label
                 id="settingsGuideTitle"
                 translation="[36, 34]"
                 width="628"
                 height="90"
                 wrap="true"
-                text="Simple daily playback"
+                text="Audio, made simple"
                 font="font:MediumBoldSystemFont" />
             <Label
                 id="settingsGuide"
                 translation="[36, 150]"
                 width="628"
-                height="420"
+                height="468"
                 wrap="true"
-                text="English audio only. Untagged or foreign-only tracks are rejected. Your source stays saved.&#10;&#10;Projector: AAC/PCM/MP3 audio. Known Dolby/DTS-only source labels are hidden. Keep Roku Audio output on Stereo.&#10;&#10;AX700: English DD/DD+ permitted. Roku to soundbar HDMI IN; HDMI OUT to projector.&#10;&#10;The app cannot convert audio. Source labels are hints; playback checks Roku track metadata."
-                font="font:SmallSystemFont" />
+                text="Choose TV / projector speakers or HDMI surround. Use Audio connection to see what Roku currently reports.">
+                <Font role="font" uri="pkg:/fonts/OpenSans-Regular.ttf" size="24" />
+            </Label>
         </Group>
 
         <Label

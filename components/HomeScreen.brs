@@ -33,7 +33,9 @@ sub init()
     m.workerSequence = 0
 
     t = Theme()
-    m.top.FindNode("homeTitle").color = t.accent
+    m.top.FindNode("homeTitle").color = t.textPrimary
+    m.top.FindNode("homeQualityPlate").color = t.accentFaint
+    m.top.FindNode("homeQualityLabel").color = t.accentFocus
     m.homeSub.color = t.textSecondary
     m.catalogStatus.color = t.accent
     m.top.FindNode("homeHelp").color = t.textPrimary
@@ -538,7 +540,7 @@ sub BuildRail()
         { glyph: "pkg:/images/library.png", label: "My list", screen: "libraryScreen" }
         { glyph: "pkg:/images/puzzle.png", label: "Add-ons", screen: "addonsScreen" }
         { glyph: "pkg:/images/settings.png", label: "Settings", screen: "settingsScreen" }
-        { glyph: "pkg:/images/support.png", label: "Help", screen: "supportDialog", dialog: true }
+        { glyph: "pkg:/images/support.png", label: "About", screen: "aboutScreen" }
     ]
     m.railEntries = entries
     content = CreateObject("roSGNode", "ContentNode")

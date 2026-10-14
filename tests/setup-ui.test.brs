@@ -116,19 +116,19 @@ sub Main()
         end function }
     }
     OnEnter(invalid)
-    Harness_Equal(m.rows.Count(), 4, "Guest sees four working setup choices including audio")
-    Harness_Equal(m.rows[3].value, "Projector speakers", "default preset is clearly named")
+    Harness_Equal(m.rows.Count(), 7, "Guest sees audio mode, connection, add-on checks and About before advanced server setup")
+    Harness_Equal(m.rows[1].value, "TV / projector", "default preset is clearly named")
     m.top = { getScene: function() as dynamic
         return invalid
     end function }
     ToggleAudioSetup()
-    Harness_Equal(m.rows[3].value, "AX700 surround", "one OK changes to future surround setup")
+    Harness_Equal(m.rows[1].value, "HDMI surround", "one OK changes to future surround setup")
     Harness_Ok(m.status.text.InStr("HDMI IN") >= 0, "surround choice explains correct soundbar wiring")
     ToggleAudioSetup()
-    Harness_Equal(m.rows[3].value, "Projector speakers", "second OK returns to projector setup")
+    Harness_Equal(m.rows[1].value, "TV / projector", "second OK returns to projector setup")
     Harness_Ok(m.status.text.InStr("Stereo") >= 0, "projector choice explains required Roku stereo setting")
     Harness_Equal(m.rows[0].action, "login", "Optional Stremio sync is accessible")
-    Harness_Equal(m.rows[1].value, "Not needed", "Server row explains direct playback needs no server")
+    Harness_Equal(m.rows[4].value, "Not needed", "Server row explains direct playback needs no server")
     Harness_Ok(m.list.focused, "Setup list receives remote focus")
     Harness_Equal(m.list.jumpToRowItem[0], 0, "First setup entry begins at first row")
     m.list.rowItemFocused = [1, 0]
@@ -141,7 +141,7 @@ sub Main()
     Harness_Equal(m.status.text, "Server address updated.", "Modal restore keeps operation feedback")
     Harness_Equal(m.heartbeatTask.id, "still-pending", "Modal restore leaves heartbeat active")
     Harness_Equal(m.netDiagTask.id, "also-pending", "Modal restore leaves diagnostics active")
-    Harness_Equal(m.rows[1].value, "Configured", "Configured server row hides its private URL")
+    Harness_Equal(m.rows[4].value, "Configured", "Configured server row hides its private URL")
     m.stores.auth.session = "stremio"
     BuildRows(true)
     Harness_Equal(m.rows[0].action, "logout", "Signed-in profile exposes disconnect")
@@ -149,7 +149,7 @@ sub Main()
     m.showNetDiag = true
     m.list.rowItemFocused = [2, 0]
     BuildRows(true)
-    Harness_Equal(m.rows.Count(), 5, "Advanced diagnostics remain available after audio row")
+    Harness_Equal(m.rows.Count(), 8, "Advanced diagnostics remain available after normal setup rows")
     Harness_Equal(m.list.jumpToRowItem[0], 2, "Revealing diagnostics preserves selected connection check")
     m.list.rowItemFocused = [99, 0]
     BuildRows(true)

@@ -20,19 +20,20 @@
 
     <children>
         <Rectangle id="authBg" width="1920" height="1080" color="0x0" />
+        <Poster uri="pkg:/images/crimson-mark.png" translation="[80, 216]" width="88" height="88" />
         <Label
             id="authTitle"
-            translation="[80, 300]"
-            width="1760"
+            translation="[196, 224]"
+            width="1644"
             height="70"
-            text="Rokumio 4K Personal"
+            text="Crimson Cinema"
             font="font:LargeBoldSystemFont" />
         <Label
             id="authSub"
             translation="[80, 390]"
             width="1760"
             height="60"
-            text="Browse with your Roku remote. Connect a stream source once to start playback."
+            text="Movies and shows. Your remote."
             font="font:MediumSystemFont" />
 
         <RowList
@@ -52,7 +53,7 @@
             width="1760"
             height="80"
             wrap="true"
-            text="Stremio sign-in is optional. Your configured add-on supplies playable sources; Cinemeta supplies title search."
+            text="Add your stream source once in Add-ons. Connect Stremio only if you want to sync your library."
             font="font:SmallSystemFont" />
     </children>
 </component>

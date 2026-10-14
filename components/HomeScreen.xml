@@ -29,24 +29,25 @@
             translation="[260, 48]"
             width="1580"
             height="70"
-            text="Rokumio 4K Personal"
+            text="Crimson Cinema"
             font="font:LargeBoldSystemFont" />
         <Label
             id="homeSub"
             translation="[260, 128]"
             width="1580"
             height="40"
-            text="Movies and shows | Voice search | 4K first, with 1080p choices"
+            text="Find your next movie or show"
             font="font:SmallSystemFont" />
 
         <Label id="homeCatalogStatus" translation="[260, 182]" width="1580" height="32"
             font="font:SmallSystemFont" />
 
         <!-- Left rail: the vertical icon menu (Search, Discover, Library,
-             Add-ons, Settings, Support). A one-column RowList of RailTiles; OK
+             Add-ons, Settings, About). A one-column RowList of RailTiles; OK
              on an icon publishes a pushRequest the Scene routes. Focus reaches
              it from the grid via Left/Right. -->
         <Rectangle id="railBg" translation="[60, 0]" width="170" height="1080"/>
+        <Poster uri="pkg:/images/crimson-mark.png" translation="[100, 76]" width="90" height="90" />
         <RowList
             id="rail"
             translation="[80, 300]"
@@ -76,9 +77,9 @@
             rowLabelFont="font:MediumBoldSystemFont"
             drawFocusFeedback="true"
             itemComponentName="PosterTile" />
-        <Rectangle translation="[1400, 58]" width="420" height="48" color="0x173525FF">
-            <Label text="4K FIRST  +  1080p" translation="[10, 6]" width="400" height="36"
-                horizAlign="center" color="0x5BEF95FF" font="font:MediumBoldSystemFont" />
+        <Rectangle id="homeQualityPlate" translation="[1510, 60]" width="310" height="44">
+            <Label id="homeQualityLabel" text="4K  /  1080p" translation="[10, 6]" width="290" height="32"
+                horizAlign="center" font="font:SmallBoldSystemFont" />
         </Rectangle>
         <Label id="homeHelp" translation="[260, 1004]" width="1580" height="44"
             text="OK  Open     Left / Right  Menu     *  Switch focus     Play/Pause  Refresh"

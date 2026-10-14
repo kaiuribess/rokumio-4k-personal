@@ -1,4 +1,4 @@
-Rokumio 4K Personal 0.5.12
+Crimson Cinema 0.5.13 (rokumio-4k-personal repository)
 
 Based on gpratoe/rokumio-client, MIT licensed.
 Upstream: https://github.com/gpratoe/rokumio-client
@@ -8,7 +8,8 @@ The upstream copyright and MIT license are included in LICENSE.
 This personal fork adds 4K-first direct HTTPS stream selection, 1080p choices,
 voice search/playback wiring, native playback diagnostics, and addon protocol
 fixes, English audio recovery, cleaner source cards, projector/surround presets,
-source preloading and automatic next-episode playback. It is not an official
+source preloading, automatic next-episode playback, a red interface, add-on
+checks and equipment setup guidance. It is not an official
 Roku, Stremio, TorBox, or Hisense product.
 
 No movies, series, subscription accounts, or stream-provider credentials are

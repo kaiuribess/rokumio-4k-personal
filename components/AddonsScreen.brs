@@ -83,6 +83,7 @@ sub BuildRows()
         title: "Add add-on"
         value: "Connect a source"
     })
+    m.rows.Push({action:"check",title:"Check add-ons",value:"Find problems"})
     if m.stores <> invalid
         for each addon in m.stores.addons.callFunc("AddonsGetAll")
             ' Configured addresses can carry provider keys in either their path
@@ -109,11 +110,11 @@ sub BuildRows()
     end for
     m.list.content = content
 
-    installed = m.rows.Count() - 1
+    installed = m.rows.Count() - 2
     if installed < 0 then installed = 0
     quantity = installed.ToStr() + " add-ons"
     if installed = 1 then quantity = "1 add-on"
-    m.sub.text = "OK adds or removes an add-on, Back returns to Home · " + quantity
+    m.sub.text = quantity + " · Select Check add-ons for a connection report"
     if not hasStreamSource and m.status.text = "" then m.status.text = "Catalogs are ready. Add a configured stream source to play movies and shows."
 end sub
 
@@ -148,6 +149,8 @@ sub onRowSelected()
     row = m.rows[index]
     if row.action = "add"
         ShowAddDialog()
+    else if row.action = "check"
+        m.top.pushRequest = {screen:"addonHealthScreen",params:{}}
     else
         ShowRemoveConfirm(row)
     end if

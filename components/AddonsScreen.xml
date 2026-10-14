@@ -13,6 +13,7 @@
              the address lands here through the Scene's ShowSetupAddress. -->
         <function name="SetSetupAddress" />
         <function name="RefreshInstalledRows" />
+        <field id="pushRequest" type="assocarray" alwaysNotify="true" />
     </interface>
 
     <script type="text/brightscript" uri="pkg:/components/AddonsScreen.brs" />

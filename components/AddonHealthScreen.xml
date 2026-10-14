@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="AddonHealthScreen" extends="Screen">
+    <interface>
+        <function name="OnEnter" />
+        <function name="OnExit" />
+        <function name="OnBackPressed" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/AddonHealthScreen.brs" />
+    <script type="text/brightscript" uri="pkg:/source/core/AsyncTask.bs" />
+    <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
+    <script type="text/brightscript" uri="pkg:/source/util/AddonDiagnostics.brs" />
+    <children>
+        <Label id="healthTitle" text="Add-on checks" translation="[80, 54]" width="1760" height="70" font="font:LargeBoldSystemFont" />
+        <Label id="healthSubtitle" text="See which add-on needs attention. No movie is played during this check." translation="[80, 138]" width="1760" height="50" font="font:SmallSystemFont" />
+        <ChevronList id="healthList" translation="[80, 260]" numRows="5" itemWidth="1000" rowHeight="108" />
+        <Group translation="[1140, 232]">
+            <Rectangle id="healthPlate" width="700" height="650" />
+            <Label id="healthName" translation="[36, 30]" width="628" height="80" wrap="true" font="font:MediumBoldSystemFont" />
+            <Label id="healthDetail" translation="[36, 138]" width="628" height="438" wrap="true" font="font:SmallSystemFont" />
+        </Group>
+        <Label id="healthStatus" translation="[80, 928]" width="1760" height="52" font="font:SmallSystemFont" />
+        <Label id="healthHelp" translation="[80, 996]" width="1760" height="42" text="Up / Down  Details     Play/Pause  Check again     Back  Cancel / return" font="font:SmallSystemFont" />
+        <Timer id="healthLimit" duration="120" repeat="false" />
+    </children>
+</component>

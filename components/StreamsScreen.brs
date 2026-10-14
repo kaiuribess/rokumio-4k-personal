@@ -26,6 +26,7 @@
 '           right-side stream list never waits on it.
 
 sub init()
+    m.providerStatus = m.top.FindNode("providerStatus")
     m.headTitle = m.top.FindNode("headTitle")
     m.headSub = m.top.FindNode("headSub")
     m.synopsis = m.top.FindNode("synopsis")
@@ -197,8 +198,7 @@ sub LoadStreams(params as object, allowPrefetch = true as boolean)
     for each addon in m.stores.addons.callFunc("AddonsGetAll")
         if m.stores.addons.callFunc("AddonsSupportsResource", addon.resources, addon.types, addon.idPrefixes, "stream", ParamString(params.metaType), ParamString(params.videoId))
             if addon.address <> invalid and addon.address <> ""
-                name = addon.name
-                if name = invalid or name = "" then name = "Source provider"
+                name = AddonDiagnostics_Name(addon)
                 providers.Push({ name: name, id: ParamString(addon.id), address: addon.address, streams: [], error: "" })
             end if
         end if
@@ -518,9 +518,12 @@ end sub
 ' m.streams now holds only the active provider's cards.
 sub UpdateStreamsStatus()
     if m.status = invalid then return
+    UpdateProviderStatus()
     total = 0
+    failedNames = []
     if m.providers <> invalid
         for each provider in m.providers
+            if AddonDiagnostics_Text(provider.error) <> "" then failedNames.Push(AddonDiagnostics_Name(provider))
             if Type(provider.readyStreams) = "roArray"
                 total = total + provider.readyStreams.Count()
             else
@@ -539,8 +542,26 @@ sub UpdateStreamsStatus()
             end if
         else
             m.status.text = ""
+            if failedNames.Count() > 0 then m.status.text = failedNames.Count().ToStr() + " provider(s) need attention: " + failedNames[0].Left(40) + ". Other sources are available."
         end if
     end if
+end sub
+
+sub UpdateProviderStatus()
+    label = m.providerStatus
+    if label = invalid then return
+    label.color = Theme().textSecondary
+    if m.providers = invalid or m.activeIndex < 0 or m.activeIndex >= m.providers.Count()
+        label.text = "Connect a source in Add-ons"
+        return
+    end if
+    count = 0
+    if Type(m.streams) = "roArray" then count = m.streams.Count()
+    provider = m.providers[m.activeIndex]
+    skipped = invalid
+    if count = 0 then skipped = CinemaSkippedSources(provider.streams)
+    label.text = AddonDiagnostics_ProviderLabel(provider,isTaskPending(m.activeIndex),count,skipped)
+    if AddonDiagnostics_Text(provider.error) <> "" then label.color = Theme().accentWarm
 end sub
 
 sub CancelStreamsLoad()
@@ -654,6 +675,7 @@ sub RenderActiveProvider()
     UpdateQualityHint()
 
     if m.streams.Count() = 0
+        UpdateProviderStatus()
         EmptyStreamsList()
         label = ProviderEmptyLabel()
         if provider.streams.Count() > 0
@@ -698,6 +720,7 @@ sub RenderActiveProvider()
         end if
     end for
     m.streamsList.content = content
+    UpdateProviderStatus()
     ' numRows describes the viewport, NOT the amount of content. Every source
     ' remains in content and can be reached by scrolling on the remote.
     m.streamsList.numRows = 3
@@ -733,7 +756,7 @@ end function
 ' -> loading; its error -> failure; otherwise nothing found from it.
 function ProviderEmptyLabel() as string
     provider = m.providers[m.activeIndex]
-    if provider.error <> "" then return "This provider could not load sources. Try another provider, or check Add-ons."
+    if provider.error <> "" then return AddonDiagnostics_Error(provider.error).detail
     if isTaskPending(m.activeIndex) then return "Checking available sources… This can take up to 45 seconds."
     return "No streams found for this provider."
 end function

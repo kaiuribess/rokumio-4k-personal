@@ -36,6 +36,7 @@ sub init()
     m.top.ObserveField("rowComponent", "onGeometry")
 
     m.firstVisible = 0
+    m.desiredRow = 0
     m.lastVisible = m.top.numRows - 1
     RecomputeGeometry()
     UpdateWindow()
@@ -47,10 +48,18 @@ end sub
 
 sub onContent()
     m.rowList.content = m.top.content
-    m.rowList.jumpToRowItem = [0, 0]
+    m.rowList.jumpToRowItem = [m.desiredRow, 0]
     m.firstVisible = 0
     m.lastVisible = m.top.numRows - 1
     UpdateWindow()
+end sub
+
+sub FocusRow(index as integer)
+    count = 0
+    if m.top.content <> invalid then count = m.top.content.GetChildCount()
+    if index < 0 or index >= count then index = 0
+    m.desiredRow = index
+    m.rowList.jumpToRowItem = [index, 0]
 end sub
 
 sub onGeometry()

@@ -15,7 +15,8 @@ Direct HTTPS sources do not require a PC during viewing. This code also retains 
 | Native UHD decoding on a Streaming Stick+ 3830RW | An earlier 0.5.8 public Apple HLS control produced native 3840×2160 HEVC/AAC-stereo segment and advancing audio/video timestamp observations on an Optoma UHD50X path |
 | Arbitrary 4K films and sound | Not established by that control; the original tests were source-specific, and native field progression is not an acoustic listening test |
 | Automatic next episode in 0.5.12 | 67 focused software assertions cover ordering, season rollover, stale events, cancellation, completion saving and fixed-depth navigation; physical-device transition not yet tested |
-| Surround output, HDR variants and full-length reliability | Not certified for 0.5.12 or every display/receiver/source |
+| Add-on checks and audio setup in 0.5.13 | Production-policy/controller tests cover manifest categories, privacy, progressive updates, cancellation, stale deadlines and explicit audio choices; native screens/receiver path not physically tested in this release |
+| Surround output, HDR variants and full-length reliability | Not certified for 0.5.13 or every display/receiver/source |
 
 One earlier clear HEVC MP4 control failed despite plausible metadata. Multichannel AAC also failed on the tested Stick/projector path. Those counterexamples are why the project does not claim that labels or header inspection guarantee playback.
 

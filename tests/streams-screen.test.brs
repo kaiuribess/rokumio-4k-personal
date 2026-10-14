@@ -197,7 +197,7 @@ sub TestWorkerPreparedSources()
     m.loadTasks = [task]
     onStreamsLoaded(TestEvent(task))
     Harness_Equal(m.pendingCount, 0, "Provider timeout leaves loading state")
-    Harness_Ok(m.streamsPlaceholder.text.InStr("could not load sources") >= 0, "Empty worker result still surfaces its transport failure")
+    Harness_Ok(m.streamsPlaceholder.text.InStr("deadline") >= 0, "Empty worker result still surfaces its transport failure")
     Harness_Ok(m.status.text.InStr("Sources could not load") >= 0, "Timeout is not misreported as a title with no sources")
     Harness_Ok(m.status.text.InStr("PRIVATE_KEY") < 0, "Transport failure remains redacted")
     m.providers = [{name:"Provider",streams:[{name:"2160p Dolby DTS",url:"https://media.example/mixed-tracks.mkv"}],error:""}]

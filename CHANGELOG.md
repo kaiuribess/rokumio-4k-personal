@@ -1,5 +1,16 @@
 # Changes
 
+## 0.5.13 — 2026-10-14
+
+- Rename the visible app to Crimson Cinema with a dark red palette, original icon/splash, clearer menu contrast and a small Rokumio/upstream credit on the separate About page. Preserve existing deep-link, DIAL and registry identifiers.
+- Add **Check add-ons** in Add-ons and Settings: sequential 8-second manifest requests, progressive named results, a 120-second overall deadline, Play/Pause retry and Back cancellation. Reject stale results and old deadline events, preserving the selected row during updates.
+- Distinguish access denied, missing endpoint, rate limiting, provider outages, timeout/network errors, changed/invalid manifests and incomplete checks. Keep private addresses and raw provider errors out of results. Catalog/subtitle-only add-ons and empty title responses are not falsely marked broken.
+- Show the selected provider's source request status and flag partial provider failures while other sources remain available. Identify filtered choices, provider-account status clips and pending downloads separately.
+- Replace a blind audio toggle with explicit **TV / projector speakers** or **HDMI soundbar / receiver** choices. Add **Audio connection**, fresh native output/codec reports, Stereo-setting guidance, generic HDMI wiring and documented AX700 setup.
+- Add 81 production diagnostic/controller/audio assertions and a public add-on issue template and troubleshooting guide.
+
+The complete software suite and compiled package checks pass. Authoring previews were reviewed; 0.5.13 has not been installed or physically tested. This update does not add transcoding or guarantee that every provider, file or receiver works.
+
 ## 0.5.12 — 2026-10-14
 
 - Automatically continue to the next episode after an accepted natural finish, with a five-second countdown and Back cancellation.

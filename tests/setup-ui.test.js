@@ -18,7 +18,7 @@ const addonCallbacks = removeConfirm[0]
 const isolated = path.join(root, 'out-test', 'setup-ui');
 fs.mkdirSync(isolated, { recursive: true });
 const file = path.join(isolated, 'setup-tests.brs');
-fs.writeFileSync(file, [read('tests/harness.brs'), callbacks, addonCallbacks, read('tests/setup-ui.test.brs')].join('\n'));
+fs.writeFileSync(file, [read('tests/harness.brs'), read('source/util/AudioSetup.brs'), read('components/SettingsAudio.brs'), callbacks, addonCallbacks, read('tests/setup-ui.test.brs')].join('\n'));
 const result = spawnSync(process.execPath, [path.join(root, 'node_modules/@rokucommunity/brs/bin/cli.js'), '--root', isolated, file], { cwd: isolated, encoding: 'utf8' });
 process.stdout.write(result.stdout || ''); process.stderr.write(result.stderr || '');
 process.exit(result.status === 0 && !(result.stderr || '').trim() && /RESULT: PASS/.test(result.stdout || '') ? 0 : 1);

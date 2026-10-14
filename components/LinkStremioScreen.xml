@@ -44,7 +44,7 @@
             visible="false">
             <Label
                 id="pairTitle"
-                text="Link Rokumio to your Stremio account"
+                text="Connect your Stremio account"
                 font="font:LargeBoldSystemFont" />
             <Poster
                 id="pairQr"

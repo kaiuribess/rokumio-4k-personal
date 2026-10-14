@@ -30,7 +30,7 @@ sub UpdateLook()
         m.face.color = t.tileFace
         m.value.color = t.textSecondary
     end if
-    if m.top.rowHasFocus then m.top.opacity = 1.0 else m.top.opacity = 0.55
+    if m.top.rowHasFocus then m.top.opacity = 1.0 else m.top.opacity = 0.82
 end sub
 
 sub onItemContentChanged()

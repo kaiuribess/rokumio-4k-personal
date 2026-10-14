@@ -27,6 +27,7 @@
     <script type="text/brightscript" uri="pkg:/source/core/AsyncTask.bs" />
     <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
     <script type="text/brightscript" uri="pkg:/source/util/CinemaStreams.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/AddonDiagnostics.brs" />
 
     <children>
         <Rectangle id="streamBg" width="1920" height="1080" />
@@ -96,10 +97,12 @@
             visible="false" />
         <Group
             id="providerSegments"
-            translation="[760, 156]" />
+            translation="[760, 208]" />
+        <Label id="providerStatus" translation="[760, 148]" width="1080" height="54"
+            wrap="true" font="font:SmallSystemFont" />
         <RowList
             id="streamsList"
-            translation="[760, 180]"
+            translation="[760, 232]"
             numRows="3"
             itemSize="[1080, 222]"
             itemSpacing="[0, 12]"

@@ -4,7 +4,7 @@
     <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
 
     <children>
-        <StdDlgTitleArea primaryTitle="Exit Rokumio?" />
+        <StdDlgTitleArea primaryTitle="Exit Crimson Cinema?" />
         <StdDlgContentArea>
             <StdDlgTextItem text="Are you sure you want to exit? Your Continue Watching progress is saved." />
         </StdDlgContentArea>

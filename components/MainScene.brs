@@ -60,6 +60,9 @@ sub init()
     m.settingsScreen = m.top.FindNode("settingsScreen")
     m.settingsScreen.ObserveField("pushRequest", "onSettingsAction")
     m.addonsScreen = m.top.FindNode("addonsScreen")
+    m.addonsScreen.ObserveField("pushRequest","onAddonsAction")
+    m.addonHealthScreen = m.top.FindNode("addonHealthScreen")
+    m.aboutScreen = m.top.FindNode("aboutScreen")
     m.searchScreen = m.top.FindNode("searchScreen")
     m.searchScreen.ObserveField("pushRequest", "onSearchAction")
     m.discoverScreen = m.top.FindNode("discoverScreen")
@@ -193,6 +196,8 @@ sub init()
     m.streamsScreen.callFunc("SetStores", m.storeHost, m.top)
     m.settingsScreen.callFunc("SetStores", m.storeHost, m.top)
     m.addonsScreen.callFunc("SetStores", m.storeHost, m.top)
+    m.addonHealthScreen.callFunc("SetStores", m.storeHost, m.top)
+    m.aboutScreen.callFunc("SetStores", m.storeHost, m.top)
     m.searchScreen.callFunc("SetStores", m.storeHost, m.top)
     m.discoverScreen.callFunc("SetStores", m.storeHost, m.top)
     m.libraryScreen.callFunc("SetStores", m.storeHost, m.top)
@@ -291,6 +296,12 @@ sub onSearchAction()
     m.stack.push(request.screen, request.params)
 end sub
 
+sub onAddonsAction()
+    request = m.addonsScreen.pushRequest
+    if Type(request) <> "roAssociativeArray" then return
+    if request.screen = "addonHealthScreen" then m.stack.push("addonHealthScreen",request.params)
+end sub
+
 ' DiscoverScreen's action channel; same one-action routing.
 sub onDiscoverAction()
     request = m.discoverScreen.pushRequest
@@ -311,6 +322,12 @@ end sub
 ' thin orchestrator.
 sub onSettingsAction()
     request = m.settingsScreen.pushRequest
+    if Type(request) = "roAssociativeArray"
+        if request.screen = "addonHealthScreen" or request.screen = "aboutScreen"
+            m.stack.push(request.screen,request.params)
+            return
+        end if
+    end if
     if request = invalid or request.action = invalid then return
     if request.action = "login"
         m.loginFromSettings = true
@@ -1118,11 +1135,11 @@ sub HandleDeepLink(args as object)
         return
     end if
     if parse.kind = "unknown"
-        ShowImportDialog("Rokumio import", ["Unsupported request: " + parse.error + "."])
+        ShowImportDialog("Add-on import", ["Unsupported request: " + parse.error + "."])
         return
     end if
     if not parse.ok
-        ShowImportDialog("Rokumio import", ["Could not import: " + parse.error + "."])
+        ShowImportDialog("Add-on import", ["Could not import: " + parse.error + "."])
         return
     end if
 
@@ -1290,7 +1307,7 @@ sub FinishImport()
 
     if blocks.Count() = 0 then blocks.Push("No changes requested.")
 
-    ShowImportDialog("Rokumio import", blocks, bullets)
+    ShowImportDialog("Add-on import", blocks, bullets)
     if m.addonsScreen <> invalid then m.addonsScreen.callFunc("RefreshInstalledRows")
 
     ' New add-ons may have landed: Home's grid was built from the pre-import
