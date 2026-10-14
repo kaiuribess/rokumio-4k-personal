@@ -1,11 +1,11 @@
 {
     "name": "rokumio-4k-personal",
-    "version": "0.5.16",
+    "version": "0.5.17",
     "private": true,
     "description": "Native Roku client for Stremio addons and debrid streams",
     "scripts": {
         "build": "bsc",
-        "test": "node tests/run.js && node tests/cinema-streams.test.js && node tests/voice.test.js && node tests/search-ui.test.js && node tests/home-refresh.test.js && node tests/tiles-ui.test.js && node tests/meta-ui.test.js && node tests/discover-ui.test.js && node tests/streams-screen.test.js && node tests/nativeaddons-screen.test.js && node tests/setup-ui.test.js && node tests/playback-native.test.js && node tests/audio-recovery.test.js && node tests/audio-capabilities.test.js && node tests/native-media.test.js && node tests/preflight.test.js && node tests/media-mp4.test.js && node tests/media-mkv.test.js && node tests/media-playlists.test.js && node tests/media-probe.test.js && node tools/mock-addon-server/server.test.js && node tests/watchdog-improve.test.js && node tests/source-memory.test.js && node tests/source-prefetch.test.js && node tests/next-episode.test.js && node tests/addon-health.test.js && node tests/playback-stability.test.js && node tests/playback-options.test.js && node tests/cinematic-home.test.js",
+        "test": "node tests/run.js && node tests/cinema-streams.test.js && node tests/voice.test.js && node tests/search-ui.test.js && node tests/home-refresh.test.js && node tests/tiles-ui.test.js && node tests/meta-ui.test.js && node tests/discover-ui.test.js && node tests/streams-screen.test.js && node tests/nativeaddons-screen.test.js && node tests/setup-ui.test.js && node tests/playback-native.test.js && node tests/audio-recovery.test.js && node tests/audio-capabilities.test.js && node tests/native-media.test.js && node tests/preflight.test.js && node tests/media-mp4.test.js && node tests/media-mkv.test.js && node tests/media-playlists.test.js && node tests/media-probe.test.js && node tools/mock-addon-server/server.test.js && node tests/watchdog-improve.test.js && node tests/source-memory.test.js && node tests/source-prefetch.test.js && node tests/next-episode.test.js && node tests/addon-health.test.js && node tests/playback-stability.test.js && node tests/playback-options.test.js && node tests/cinematic-home.test.js && node tests/catalog-integration.test.js && node tests/library-origin.test.js && node tests/setup-server.test.js",
         "check-source": "node scripts/preflight-server.js",
         "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true }); require('fs').rmSync('out', { recursive: true, force: true }); require('fs').rmSync('out-test', { recursive: true, force: true })\""
     },

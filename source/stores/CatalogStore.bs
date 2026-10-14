@@ -115,6 +115,7 @@ class CatalogStore
             validMetas.Push(meta)
         end for
         result.metas = validMetas
+        result.rawCount = metas.Count()
         ' Explicit boolean read of the server's flag — the chained
         ' `result.hasMore = response.json.hasMore = true` idiom is unambiguous
         ' to mishandle (it IS a comparison), so state it plainly.

@@ -1,3 +1,23 @@
+# Release validation — 0.5.17
+
+Validated on 2026-10-14:
+
+- Full test chain passed: **4,703 BrightScript assertions plus 69 cinema policy assertions, totaling 4,772**. Separate Node media/transport/mock suites also passed; their counts are separate.
+- New complete-flow regressions reproduce and verify repairs for catalog re-entry, short-page loading, raw-versus-usable offsets, custom-series save/restore routing, accepted progress during recovery, proof resumption, manual provider precedence, warm diagnostics and public setup controls.
+- The source picker still uses 48-card pages, the shared two-worker budget, stable provider priority and the existing warm-cache limits. Both automatic Play modes, quality/audio preferences, next episode, subtitles, voice, search and full catalog browsing remain available.
+- Native scene/socket/network boundaries are simulated. Tests include actual production callbacks and compiled stores; they do not establish audible English, physical surround/HDR, full-film throughput or native rendering performance.
+- Compiler and package checks passed: 52 XML components and 259 package-root script references. Extended inspection also resolves the three relative script references and all declared component methods.
+- Public source, reachable Git history and compiled package receive secret-pattern/content review before publication. Synthetic fixtures are classified separately; this is not credential validation.
+- Development dependencies are unchanged. The two previously documented underlying toolchain advisories remain; Node dependencies are not shipped in the Roku package.
+
+**0.5.17 has not been installed or physically tested.** The last confirmed device installation remains 0.5.12. This update does not certify universal English audio, genuine UHD or AX700 surround output. Source labels remain hints, native progress is not acoustic recognition, two occupied workers can delay later providers, and ordinary provider response bytes remain unbounded.
+
+The optional-server audit item was resolved by correcting its public claim and setup wording: this build admits direct HTTPS sources and does not enable raw torrent/hash-only playback. The app has no native transcoder or torrent engine. The public local setup route rejects commands that trigger diagnostic playback; normal add-on imports retain their Add-ons-screen gate.
+
+Install the compiled release ZIP, not GitHub's source archive. The release includes a SHA-256 checksum.
+
+---
+
 # Release validation — 0.5.16
 
 Validated on 2026-10-14:

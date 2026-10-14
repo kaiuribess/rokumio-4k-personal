@@ -1,3 +1,6 @@
+sub SavePosition()
+    m.positionSaves = 1
+end sub
 function StabilityClock() as dynamic
     if m.noClock = true then return invalid
     return {elapsed:0,Mark:sub()

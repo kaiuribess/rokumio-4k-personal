@@ -4,7 +4,7 @@
 
 The metadata/catalog add-on supplies title and episode information. A stream add-on supplies candidate URLs. Source selection ranks candidates using explicit quality/audio hints, device checks and prior working file identities. A background task resolves/preflights a candidate; Roku's native Video node fetches and decodes the media. The English audio guard and rendered-progress checks determine whether that candidate is accepted. A bounded recovery queue tries alternatives when startup fails.
 
-Direct HTTPS sources do not require a PC during viewing. This code also retains upstream streaming-server support for torrent/hash-only sources; that separate mode requires an external server. The project does not implement a local torrent engine or a general native audio/video transcoder.
+Direct HTTPS sources do not require a PC during viewing. The source picker supports direct HTTPS sources only. Upstream resolver code is retained, but raw torrent/hash-only playback is not enabled by the legacy server connectivity settings. The project does not implement a local torrent engine or a general native audio/video transcoder.
 
 ## What is established
 

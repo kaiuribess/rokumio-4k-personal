@@ -24,6 +24,7 @@ sub discover()
             result.ok = answer.ok
             result.error = answer.error
             result.hasMore = answer.hasMore
+            result.rawCount = answer.rawCount
             if answer.ok and answer.metas <> invalid then result.metas = answer.metas
         else
             result.error = "missing discover filters"

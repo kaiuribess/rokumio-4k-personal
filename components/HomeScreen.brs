@@ -384,6 +384,7 @@ function LibraryRow() as dynamic
             name: entry.name
             poster: entry.poster
             posterShape: entry.posterShape
+            metadataProviderKey: entry.metadataProviderKey
             videoId: entry.videoId
             season: entry.season
             episode: entry.episode
@@ -685,7 +686,7 @@ end sub
 ' navigation away cancels the pending open (CancelOpen); when the meta lands
 ' Details is pushed with the full hero, or the slim record on failure.
 sub OpenContinueWatching(item as object)
-    address = MetaAddress()
+    address = MetadataOrigin_Address(m.stores,item.metadataProviderKey,item.type,item.id,MetaAddress())
     CancelOpen()
     m.pendingOpen = {
         address: address

@@ -252,6 +252,11 @@ end sub
 sub Test_Setup_HtmlPages()
     Harness_Suite("Setup page HTML content")
 
+    Harness_Ok(not SetupConnectionExpired({startedAt:0,lastActivity:0},9999),"fresh setup connection remains admitted")
+    Harness_Ok(SetupConnectionExpired({startedAt:0,lastActivity:0},10000),"idle setup connection expires")
+    Harness_Ok(SetupConnectionExpired({startedAt:0,lastActivity:29999},30000),"drip-fed connection reaches absolute deadline")
+    Harness_Ok(not SetupConnectionExpired({startedAt:50000,lastActivity:59000},59999),"newer connection has independent deadline")
+    Harness_Ok(SetupConnectionExpired({},0),"malformed connection cannot occupy capacity forever")
     page = SetupHtmlPage()
     Harness_Ok(page.InStr("name='manifest'") >= 0, "the form field is named manifest")
     Harness_Ok(page.InStr("method='POST'") >= 0, "the form posts")

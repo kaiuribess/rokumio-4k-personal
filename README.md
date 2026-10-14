@@ -2,13 +2,13 @@
 
 A native Roku client with a dark red interface for browsing Stremio-compatible catalogs, searching movies and shows, and playing compatible direct streams with the Roku remote. This community derivative adds English audio selection, projector/surround preferences, clearer source cards, automatic source recovery, next-episode playback, and add-on checks. The repository and ZIP filename remain `rokumio-4k-personal` so existing links and build instructions continue to work.
 
-**Version 0.5.16 is an experimental community release.** Software tests and package validation pass. The new screens have authoring previews, but this version has not been installed or tested on a physical Roku. It cannot guarantee that every provider file plays, has English audio, or is genuine 4K.
+**Version 0.5.17 is an experimental community release.** Software tests and package validation pass. The new screens have authoring previews, but this version has not been installed or tested on a physical Roku. It cannot guarantee that every provider file plays, has English audio, or is genuine 4K.
 
-**[Download the Roku install ZIP — 0.5.16](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.16/rokumio-4k-personal-0.5.16.zip)**
+**[Download the Roku install ZIP — 0.5.17](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.17/rokumio-4k-personal-0.5.17.zip)**
 
 Upload that ZIP without extracting it. GitHub's green Code button and “Source code” archives are for developers; they are not the Roku install package.
 
-[Release notes and checksum](https://github.com/kaiuribess/rokumio-4k-personal/releases/tag/v0.5.16) · [Installation](docs/INSTALL.md) · [Add-on checks](docs/ADDON_CHECKS.md) · [Playback and 4K](docs/PLAYBACK.md) · [Development](docs/DEVELOPMENT.md) · [Changes](CHANGELOG.md)
+[Release notes and checksum](https://github.com/kaiuribess/rokumio-4k-personal/releases/tag/v0.5.17) · [Installation](docs/INSTALL.md) · [Add-on checks](docs/ADDON_CHECKS.md) · [Playback and 4K](docs/PLAYBACK.md) · [Development](docs/DEVELOPMENT.md) · [Changes](CHANGELOG.md)
 
 ## What you can do
 
@@ -55,7 +55,7 @@ These additions improve selection and recovery; they do not add a transcoder or 
 3. Choose **Browse movies & shows**, then **Add-ons**. Leave Add-ons open and use the local setup address displayed there to import your configured HTTPS `manifest.json` URL.
 4. Open **Settings → Audio mode** and choose your connected speakers. Use **Audio connection** to check the current path, then search for a title and press Play. Compatible direct providers play on Roku itself. If you enable 4K-only, the app will not silently fall back to a labelled HD source.
 
-You need a computer/phone for installation or convenient initial configuration. It does not need to remain running for compatible direct-stream playback. Raw torrent/hash-only streams require a separate streaming server; this app is not a torrent engine or audio transcoder.
+You need a computer/phone for installation or convenient initial configuration. It does not need to remain running for compatible direct-stream playback. This build selects direct HTTPS sources only. Raw torrent/hash-only playback is not enabled; legacy server settings only check connectivity. The app is not a torrent engine or audio transcoder.
 
 ## Memory and performance
 

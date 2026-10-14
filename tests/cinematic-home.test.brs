@@ -1,3 +1,5 @@
+sub CancelLoad()
+end sub
 function CinemaContent() as object
     return {children:[],CreateChild:function(kind as string) as object
         node=CinemaContent():m.children.Push(node):return node

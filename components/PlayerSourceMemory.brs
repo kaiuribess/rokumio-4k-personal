@@ -52,6 +52,16 @@ sub RememberSourceFailure()
     QueueSourceOutcome(outcome)
 end sub
 
+sub ArmSourceProof()
+    if m.playbackActive <> true or m.retryPending = true or m.sourceAccepted <> true or m.video = invalid then return
+    if m.video.state <> "playing" or m.video.mute = true then return
+    if m.sourceProofTimer = invalid or m.sourceProofWritten = true or m.sourceProofArmed = true then return
+    m.sourceProofSamples = invalid
+    m.sourceProofSeconds = 0
+    m.sourceProofArmed = true
+    m.sourceProofTimer.control = "start"
+end sub
+
 sub onSourceProofTick()
     if m.playbackActive <> true or m.retryPending = true or m.sourceAccepted <> true or m.video = invalid then return
     if m.sourceProofWritten = true then return

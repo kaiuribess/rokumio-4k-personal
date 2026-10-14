@@ -14,7 +14,7 @@ try {
     'onEnglishAudioFactsChanged','onEnglishAudioTimeout','ScheduleNextSource',
     'ShowEnglishAudioChoice','onEnglishAudioChoice','CloseEnglishAudioChoice',
     'onVideoStateChanged','onPlaybackFactsChanged','HasLogo','ArmSourceStartupLimit',
-    'StopSourceStartupLimit','NotPlayableOnDevice','SavePosition','PublishWatchState'];
+    'StopSourceStartupLimit','NotPlayableOnDevice','SavePosition','PublishWatchState','onAutoSourceRetry','StartResolve','CancelResolve','ResolveOrdinal','NextPlayerWorkerId'];
   const selected = names.map(name => {
     const match = new RegExp(`^(?:sub|function) ${name}\\([^]*?^end (?:sub|function)`, 'mi').exec(player);
     if (!match) throw new Error(`Missing production audio handler: ${name}`);
@@ -344,10 +344,48 @@ Harness_Equal(choices[1].id,"aac","stereo fallback stays ahead of explicitly rej
 m.devicePlaybackInfo={audioCapabilities:{codecs:{}}}
 Harness_Equal(AudioRecovery_Alternatives()[0].id,"plus","unknown receiver facts retain DD+ preference without claiming support")
 
+
+Harness_Suite("Regression: accepted playback must resume its working proof after a pause")
+RecoverySetup()
+m.saved = false
+RecoveryAccept()
+Harness_Ok(m.sourceProofArmed,"accepted source starts proof")
+m.video.positionInfo={audio:125,video:125}
+onSourceProofTick()
+m.video.state="paused"
+onVideoStateChanged()
+onSourceProofTick()
+m.video.state="playing"
+onVideoStateChanged()
+Harness_Ok(m.sourceProofArmed and m.sourceProofTimer.control="start"," resume should rearm incomplete working-source proof")
+
+Harness_Suite("Regression: an interrupted accepted source must preserve resume if replacement fails")
+RecoverySetup()
+m.saved=false
+m.playParams.serverAddress=""
+m.playParams.season=0
+m.playParams.episode=0
+m.playParams.stream=m.sourceQueue[0]
+RecoveryAccept()
+m.video.position=1800
+onPlaybackPositionChanged()
+m.video.state="error"
+m.video.position=0
+ScheduleNextSource("native-playback-error")
+Harness_Equal(m.playParams.position,1800,"handoff retains position in volatile params")
+onAutoSourceRetry()
+Harness_Ok(not m.sourceAccepted,"replacement has not passed startup")
+SavePosition()
+savedResume=false
+for each call in m.stores.library.calls
+ if call="LibrarySetPosition" then savedResume=true
+end for
+Harness_Ok(savedResume," accepted 30-minute progress should survive exiting a failed replacement")
+
 Harness_Finish()
 `;
   const code = ['tests/harness.brs','tests/mocks.brs','tests/player-handoff.test.brs',
-    'source/util/PlaybackInfo.brs','source/util/EnglishAudio.brs','source/util/NativeMedia.brs','source/util/AudioCapabilities.brs']
+    'source/util/PlaybackInfo.brs','source/util/ProviderPriority.brs','source/util/MetadataOrigin.brs','source/util/AutoPlayback.brs','source/util/CinemaStreams.brs','source/util/EnglishAudio.brs','source/util/NativeMedia.brs','source/util/AudioCapabilities.brs']
     .map(name => name.endsWith('player-handoff.test.brs') ? read(name).replace(/^sub PublishWatchState\([^]*?^end sub\s*/mi,'') : read(name)).join('\n') + '\n' + selected + '\n' + memory + '\n' +
     read('source/util/TimerGuard.brs').replace(/CreateObject\(/gi,'MockNativeObject(') + '\n' + read('components/PlayerPosition.brs') + '\n' + read('components/PlayerAudioRecovery.brs') + '\n' + read('source/util/NextEpisode.brs') + '\n' + read('components/PlayerNextEpisode.brs') + '\n' + fixtures;
   const file = path.join(staging,'audio-tests.brs');

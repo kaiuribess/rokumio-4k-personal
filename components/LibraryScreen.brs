@@ -256,7 +256,7 @@ end function
 ' --- selection --------------------------------------------------------------
 
 ' A result opens DetailsScreen through the same one-action channel Home, Search
-' and Discover use: the slim saved record + the Cinemeta address. The full hero
+' and Discover use: the slim saved record + its restored metadata provider. The full hero
 ' is top-filled by DetailsScreen.MaybeRefreshMeta exactly as a Search/Discover
 ' slim tile would be, so a record missing its original addon still opens.
 sub onResultSelected()
@@ -268,20 +268,21 @@ sub onResultSelected()
     m.top.pushRequest = {
         screen: "detailsScreen"
         params: {
-            addonAddress: m.cinemetaAddress
+            addonAddress: MetadataOrigin_Address(m.stores,item.metadataProviderKey,item.metaType,item.metaId,m.cinemetaAddress)
             meta: {
                 id: item.metaId
                 type: item.metaType
                 name: item.name
                 poster: item.poster
+                posterShape: item.posterShape
             }
         }
     }
 end sub
 
 ' Where the meta for a saved tile comes from. The library records no addon
-' origin, so the Cinemeta built-in (the meta authority) is the default,
-' mirroring Home's MetaAddress.
+' origin on older entries; compatible provider matching handles custom IDs,
+' while the Cinemeta built-in remains the IMDb fallback.
 function CinemetaAddress() as string
     if m.stores = invalid then return ""
     addon = m.stores.addons.callFunc("AddonsGet", "com.linvo.cinemeta")

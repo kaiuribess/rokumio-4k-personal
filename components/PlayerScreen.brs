@@ -1345,6 +1345,7 @@ sub onEnglishAudioFactsChanged()
         StopAudioRecoveryTimers()
         if facts.verified = true and m.video.state = "playing"
             StopSourceStartupLimit()
+            ArmSourceProof()
             m.status.text = ""
         end if
         return
@@ -1355,10 +1356,7 @@ sub onEnglishAudioFactsChanged()
         m.hasPlayed = true
         m.lastEnglishCodec = AudioRecovery_Codec()
         StopAudioRecoveryTimers()
-        if m.video.state = "playing" and m.sourceProofTimer <> invalid and m.sourceProofWritten <> true and m.sourceProofArmed <> true
-            m.sourceProofArmed = true
-            m.sourceProofTimer.control = "start"
-        end if
+        ArmSourceProof()
         if m.video.HasField("currentAudioTrack") and m.video.currentAudioTrack <> "" then m.lastEnglishTrack = m.video.currentAudioTrack
         if m.audioGuardTimer <> invalid then m.audioGuardTimer.control = "stop"
         m.audioGuardArmed = false
@@ -1502,6 +1500,10 @@ sub onAutoSourceRetry()
     if not TimerGuard_Ready(m.retryTimer,m.retryGuard) then return
     if m.sourceQueue = invalid or m.sourceIndex + 1 >= m.sourceQueue.Count() then return
     m.retryPending = false
+    ' Save the accepted session on this timer boundary before clearing the
+    ' decoder. An unaccepted replacement must not erase watched progress.
+    if m.sourceAccepted = true then SavePosition()
+    m.saved = false
     CancelResolve()
     ResetVideoNode()
     m.sourceIndex = m.sourceIndex + 1
@@ -1837,7 +1839,8 @@ sub SavePosition()
     posterShape = ""
     if params.posterShape <> invalid then posterShape = params.posterShape
 
-    m.stores.library.callFunc("LibrarySetPosition", params.videoId, params.metaId, params.metaType, season, episode, name, poster, Int(position), Int(duration), posterShape)
+    key = MetadataOrigin_Key(m.stores,params.addonAddress)
+    m.stores.library.callFunc("LibrarySetPosition", params.videoId, params.metaId, params.metaType, season, episode, name, poster, Int(position), Int(duration), posterShape, key)
     mid = ""
     if params.metaId <> invalid then mid = params.metaId
     m.stores.library.callFunc("LibraryMarkWatchedIfFinished", mid, params.videoId, Int(position), Int(duration))

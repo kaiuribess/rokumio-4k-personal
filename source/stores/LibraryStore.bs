@@ -121,7 +121,7 @@ class LibraryStore
     ' added and then removed re-enters CW the moment it is added back. A guest
     ' session has no account item, so nothing is re-seeded and a re-add stays out
     ' of CW.
-    function AddSaved(metaId as string, metaType as string, name as string, poster = "" as string, posterShape = "" as string) as boolean
+    function AddSaved(metaId as string, metaType as string, name as string, poster = "" as string, posterShape = "" as string, metadataProviderKey = "" as string) as boolean
         if metaId = "" then return false
         if m.HasKey(m.saved, metaId) then return false
         if m.sessionType <> "stremio"
@@ -136,6 +136,7 @@ class LibraryStore
             name: name
             poster: poster
             posterShape: posterShape
+            metadataProviderKey: m.SafeProviderKey(metadataProviderKey)
         }
         m.savedOrder.Unshift(metaId)
         m.ReSeedPositionFromAccount(metaId)
@@ -336,9 +337,11 @@ class LibraryStore
     ' capped stack, and pops anything beyond MAX_CONTINUE_WATCHING. Blank
     ' positions are ignored so a fresh screen never clears stored progress.
     ' Channel/tv playback records nothing — see IsChannelType.
-    sub SetPosition(videoId as string, metaId as string, metaType as string, season as integer, episode as integer, name as string, poster = "" as string, position = 0 as integer, duration = 0 as integer, posterShape = "" as string)
+    sub SetPosition(videoId as string, metaId as string, metaType as string, season as integer, episode as integer, name as string, poster = "" as string, position = 0 as integer, duration = 0 as integer, posterShape = "" as string, metadataProviderKey = "" as string)
         if videoId = "" or metaId = "" then return
         if m.IsChannelType(metaType) then return
+        metadataProviderKey = m.SafeProviderKey(metadataProviderKey)
+        if metadataProviderKey = "" then metadataProviderKey = m.MetadataKeyFor(metaId)
         for i = m.positions.Count() - 1 to 0 step -1
             if m.positions[i].videoId = videoId or m.positions[i].metaId = metaId
                 m.positions.Delete(i)
@@ -355,6 +358,7 @@ class LibraryStore
             posterShape: posterShape
             position: position
             duration: duration
+            metadataProviderKey: m.SafeProviderKey(metadataProviderKey)
         })
         while m.positions.Count() > MAX_CONTINUE_WATCHING
             m.positions.Pop()
@@ -786,6 +790,7 @@ class LibraryStore
                     name: parsed.name
                     poster: parsed.poster
                     posterShape: parsed.posterShape
+                    metadataProviderKey: m.MetadataKeyFor(parsed.metaId)
                 }
                 savedOrder.Push(parsed.metaId)
             end if
@@ -816,6 +821,7 @@ class LibraryStore
                     posterShape: entry.posterShape
                     position: entry.position
                     duration: entry.duration
+                    metadataProviderKey: m.MetadataKeyFor(entry.metaId)
                 })
             end if
         end for
@@ -929,6 +935,26 @@ class LibraryStore
         m.unwatched = {}
         m.Load()
     end sub
+
+    function MetadataKeyFor(metaId as string) as string
+        if m.HasKey(m.saved,metaId)
+            key = m.SafeProviderKey(m.saved[metaId].metadataProviderKey)
+            if key <> "" then return key
+        end if
+        for each entry in m.positions
+            if entry.metaId = metaId
+                key = m.SafeProviderKey(entry.metadataProviderKey)
+                if key <> "" then return key
+            end if
+        end for
+        return ""
+    end function
+
+    function SafeProviderKey(value as dynamic) as string
+        if GetInterface(value,"ifString") = invalid then return ""
+        if not CreateObject("roRegex","^[0-9a-f]{64}$", "").IsMatch(value) then return ""
+        return value
+    end function
 
     sub Save()
         if m.registry = invalid then return

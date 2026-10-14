@@ -1,5 +1,20 @@
 # Changes
 
+## 0.5.17 — 2026-10-14
+
+- Fixed Home catalog re-entry: switching Movies/Shows/See all resets the prior page offset and results, so valid new pages replace the old titles.
+- Fixed Discover pagination for short pages and malformed metadata. The store/task/screen carry the consumed raw count separately from usable tiles; near-end loading also works with fewer than four rows.
+- Save accepted watched progress on the recovery timer before clearing the decoder. Exiting an unsuccessful replacement keeps the checkpoint; successful replacements can save later progress normally.
+- Manual Left/Right provider changes cancel both the automatic grace timer and pending ranking worker, matching manual source-page navigation.
+- Saved titles and Continue Watching retain a validated opaque metadata-provider key. Restoration uses current installed configuration; older/account entries use compatible type/id-prefix matching instead of sending custom identifiers to Cinemeta. No configured URL is added to history.
+- Warm results preserve bounded account/pending-download counts through adoption. Both status and empty-source explanations retain errors without keeping the unlimited raw response.
+- Working-source proof restarts after accepted playback resumes, using fresh samples and retaining diagnostic exclusions.
+- Public setup rejects `/playback-test` mutations. Normal imports retain their Add-ons-screen gate. Connections have 10-second idle and 30-second absolute deadlines swept from the nonblocking main loop.
+- Repaired punctuation in Add-on checks. Clarified legacy server settings as connectivity checks: this build selects direct HTTPS sources and does not enable raw torrent/hash-only playback.
+- Added complete-flow regressions for catalog/store/task transitions, custom saved-series routing, recovery/proof resumption, manual provider precedence, warm diagnostics and setup controls.
+
+Software/package validation does not certify audible English, surround/HDR, sustained UHD decoding or native rendering. This experimental prerelease has not been installed or physically tested.
+
 ## 0.5.16 — 2026-10-14
 
 - Replace the inaccessible 48-source cutoff with true pages of 48 real source cards, fixed More/Previous controls and global source/count information. Preserve the full retained candidate array for playback fallback. Provider/filter/refresh changes reset or clamp pages; returning from Player restores the page and focus.

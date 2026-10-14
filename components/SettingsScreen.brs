@@ -112,7 +112,7 @@ sub BuildRows(preserveFocus = false as boolean)
     m.rows.Push({ action: "addonChecks", title: "Add-on checks", value: "Find problems" })
     m.rows.Push({
         action: "server"
-        title: "Optional server"
+        title: "Legacy server checks"
         value: ServerValue()
     })
     m.rows.Push({
@@ -238,8 +238,8 @@ sub EditServer()
         m.status.text = "Keyboard unavailable. Direct HTTPS sources still work without a server."
         return
     end if
-    dialog.title = "Optional server"
-    message = "For an external torrent server only. Leave empty for direct HTTPS movie sources."
+    dialog.title = "Legacy server checks"
+    message = "Connection checks only. This build selects direct HTTPS sources; raw torrent playback is not enabled. Leave empty for normal viewing."
     if dialog.HasField("keyboardDomain")
         dialog.message = [message]
     else

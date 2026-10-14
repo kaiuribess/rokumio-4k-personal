@@ -108,6 +108,13 @@ function AddonDiagnostics_ProviderLabel(provider as object, pending as dynamic, 
     if AddonDiagnostics_Text(provider.error) <> "" then return AddonDiagnostics_Error(provider.error).label + " · Open Add-ons > Check add-ons"
     rawCount = 0
     if Type(provider.streams) = "roArray" then rawCount = provider.streams.Count()
+    if Type(provider.sourceDiagnostics) = "roAssociativeArray"
+        diagnostics = provider.sourceDiagnostics
+        if Type(diagnostics.rawCount) = "Integer" or Type(diagnostics.rawCount) = "roInteger"
+            if diagnostics.rawCount >= rawCount then rawCount = diagnostics.rawCount
+        end if
+        if Type(diagnostics.status) = "Integer" and Type(diagnostics.uncached) = "Integer" then skipped = diagnostics
+    end if
     if rawCount = 0 then return "No sources returned for this title · This alone does not mean the add-on is broken"
     if visibleCount = 0 and Type(skipped) = "roAssociativeArray"
         if skipped.status > 0 then return "Provider reports an account / service problem · Check your private configuration"

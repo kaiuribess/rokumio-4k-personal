@@ -343,6 +343,7 @@ sub ApplyProviderSources(index as integer, result as dynamic)
     if Type(result) <> "roAssociativeArray" then return
     provider = m.providers[index]
     provider.readyStreams = result.readyStreams
+    provider.sourceDiagnostics = result.sourceDiagnostics
     if Type(result.streams) = "roArray" then provider.streams = result.streams
     if result.error <> invalid and result.error <> ""
         provider.error = result.error
@@ -551,6 +552,7 @@ sub SelectProvider(index as integer)
     if m.providers = invalid or m.activeIndex < 0 then return
     if index < 0 or index >= m.providers.Count() then return
     if index = m.activeIndex then return
+    DisableAutomaticForManualBrowse()
     m.activeIndex = index
     ResetSourcePagination()
     UpdateHeader()
@@ -817,8 +819,12 @@ sub RenderActiveProvider()
         UpdateProviderStatus()
         EmptyStreamsList()
         label = ProviderEmptyLabel()
-        if provider.streams.Count() > 0
+        if provider.streams.Count() > 0 or Type(provider.sourceDiagnostics) = "roAssociativeArray"
             skipped = CinemaSkippedSources(provider.streams)
+            if Type(provider.sourceDiagnostics) = "roAssociativeArray"
+                facts = provider.sourceDiagnostics
+                if Type(facts.status) = "Integer" and Type(facts.uncached) = "Integer" then skipped = facts
+            end if
             if m.fourKOnly
                 label = "No HTTPS stream labelled 4K. Press * to check other qualities."
             else

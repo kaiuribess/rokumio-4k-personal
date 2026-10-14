@@ -17,6 +17,8 @@
         <function name="RefreshContinueWatching" />
     </interface>
 
+    <script type="text/brightscript" uri="pkg:/source/util/MetadataOrigin.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/ProviderPriority.brs" />
     <script type="text/brightscript" uri="pkg:/components/HomeScreen.brs" />
     <script type="text/brightscript" uri="pkg:/components/HomeCinema.brs" />
     <script type="text/brightscript" uri="pkg:/source/util/HomeCatalogPolicy.brs" />

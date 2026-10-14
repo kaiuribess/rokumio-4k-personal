@@ -3,6 +3,7 @@
 ' turns that runtime error into exit code 1).
 
 sub Harness_RunAll()
+    Test_Library_MetadataOrigin()
     Test_NativeAddons_All()
     Test_Stack_Introspection()
     Test_Push_ShowsAndEnters()

@@ -205,7 +205,9 @@ sub ReadySources()
     if Type(request) = "roAssociativeArray" and request.focusGenres = true
         if GenreOptions().Count() = 0 then SelectGenreCatalog()
     end if
-    m.loaded = false
+    ' A new preset owns a fresh page-zero response. Results retained from a
+    ' Details round trip are only reused by OnEnter without a preset.
+    ResetDiscover()
     FetchDiscover()
     SetChips()
     m.filterBar.callFunc("FocusChips")
@@ -639,7 +641,7 @@ end sub
 sub onGridFocused()
     row = m.grid.itemFocused
     rows = Int((m.metas.Count() + m.chunk - 1) / m.chunk)
-    if rows >= 4 and row >= rows - 3 then LoadMore()
+    if rows > 0 and row >= rows - 3 then LoadMore()
 end sub
 
 ' A landing may grab chips focus only when the dropdown is closed — an open
@@ -678,12 +680,16 @@ sub onDiscoverLoaded(event as object)
     end if
 
     usable = DiscoverUsableMetas(result.metas)
-    m.nextPageOffset = wantedOffset + result.metas.Count()
+    consumed = result.metas.Count()
+    if Type(result.rawCount) = "Integer" or Type(result.rawCount) = "roInteger"
+        if result.rawCount >= consumed then consumed = result.rawCount
+    end if
+    m.nextPageOffset = wantedOffset + consumed
     if wantedOffset = 0
         m.metas = usable
         m.loaded = true
         m.header.text = label
-        m.allLoaded = result.hasMore <> true or result.metas.Count() = 0
+        m.allLoaded = result.hasMore <> true or consumed = 0
         if m.metas.Count() = 0
             m.grid.content = CreateObject("roSGNode", "ContentNode")
             m.grid.numRows = 0
@@ -698,7 +704,7 @@ sub onDiscoverLoaded(event as object)
         for each meta in usable
             m.metas.Push(meta)
         end for
-        m.allLoaded = result.hasMore <> true or result.metas.Count() = 0
+        m.allLoaded = result.hasMore <> true or consumed = 0
         UpdateGrid(AppendRestorePosition())
     end if
 end sub

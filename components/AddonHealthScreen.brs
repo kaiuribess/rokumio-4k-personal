@@ -39,7 +39,7 @@ sub StartHealthCheck()
         m.status.text = "No add-ons installed. Return to Add-ons to connect one."
         return
     end if
-    m.status.text = "Checking manifestsâ€¦ 0/" + addons.Count().ToStr()
+    m.status.text = "Checking manifests… 0/" + addons.Count().ToStr()
     m.sequence = m.sequence + 1
     m.checkClock = CreateObject("roTimespan")
     m.checkClock.Mark()
@@ -64,12 +64,12 @@ sub onHealthResult(event as object)
         if row.state = "failed" then failed = failed + 1
     end for
     RenderHealthRows()
-    m.status.text = "Checked " + packet.results.Count().ToStr() + "/" + m.rows.Count().ToStr() + " Â· " + failed.ToStr() + " need attention"
+    m.status.text = "Checked " + packet.results.Count().ToStr() + "/" + m.rows.Count().ToStr() + " · " + failed.ToStr() + " need attention"
     if packet.done = true
         m.task = invalid
         m.limit.control = "stop"
         AsyncTask_Reap(task,m.top,false)
-        m.status.text = m.status.text + " Â· Manifest checks only"
+        m.status.text = m.status.text + " · Manifest checks only"
     end if
 end sub
 
@@ -119,7 +119,7 @@ sub onHealthTimeout()
         end if
     end for
     RenderHealthRows()
-    m.status.text = "Check deadline reached Â· Play/Pause retries; Back returns"
+    m.status.text = "Check deadline reached · Play/Pause retries; Back returns"
 end sub
 
 sub CancelHealthCheck()

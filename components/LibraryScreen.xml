@@ -22,6 +22,8 @@
         <function name="RefreshRows" />
     </interface>
 
+    <script type="text/brightscript" uri="pkg:/source/util/MetadataOrigin.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/ProviderPriority.brs" />
     <script type="text/brightscript" uri="pkg:/components/LibraryScreen.brs" />
     <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
     <script type="text/brightscript" uri="pkg:/source/core/TileSize.bs" />

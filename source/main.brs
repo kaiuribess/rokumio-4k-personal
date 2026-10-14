@@ -37,6 +37,7 @@ sub Main(args as object)
 
     while true
         message = Wait(300, port)
+        SetupServerSweep(setup)
         if message = invalid
             ' Poll fallback: field polling does not depend on port delivery, so
             ' the exit dialog always closes the channel even if the event path

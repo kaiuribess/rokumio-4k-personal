@@ -18,7 +18,7 @@ function EpisodeParams() as object
 end function
 
 function EpisodeStore() as object
-    return {calls:[], callFunc:function(name as string,a=invalid as dynamic,b=invalid as dynamic,c=invalid as dynamic,d=invalid as dynamic,e=invalid as dynamic,f=invalid as dynamic,g=invalid as dynamic,h=invalid as dynamic,i=invalid as dynamic,j=invalid as dynamic) as dynamic
+    return {calls:[], callFunc:function(name as string,a=invalid as dynamic,b=invalid as dynamic,c=invalid as dynamic,d=invalid as dynamic,e=invalid as dynamic,f=invalid as dynamic,g=invalid as dynamic,h=invalid as dynamic,i=invalid as dynamic,j=invalid as dynamic,k=invalid as dynamic) as dynamic
         m.calls.Push({name:name,a:a,b:b,c:c,h:h,i:i})
         if name = "TimeNowIso" then return "2026-10-14T12:00:00Z"
         if name = "LibraryIsChannelType" then return false

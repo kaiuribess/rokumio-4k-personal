@@ -53,6 +53,26 @@ function SetupMaxRequestBytes() as integer
     return 65536
 end function
 
+' Both idle and absolute deadlines are monotonic. Drip-fed requests cannot
+' occupy a slot forever just by sending one byte before the idle limit.
+function SetupConnectionExpired(conn as dynamic, now as integer) as boolean
+    if Type(conn) <> "roAssociativeArray" then return true
+    if conn.startedAt = invalid or conn.lastActivity = invalid then return true
+    return now - conn.lastActivity >= 10000 or now - conn.startedAt >= 30000
+end function
+
+sub SetupServerSweep(setup as dynamic)
+    if setup = invalid or setup.clock = invalid then return
+    expired = []
+    now = setup.clock.TotalMilliseconds()
+    for each key in setup.connections
+        if SetupConnectionExpired(setup.connections[key],now) then expired.Push(key)
+    end for
+    for each key in expired
+        SetupServerDrop(setup,key,setup.connections[key])
+    end for
+end sub
+
 function CrLf() as string
     return Chr(13) + Chr(10)
 end function
@@ -458,12 +478,15 @@ function SetupServerStart(port as dynamic, scene as dynamic) as dynamic
         return invalid
     end if
 
+    clock = CreateObject("roTimespan")
+    clock.Mark()
     return {
         listen: listener
         port: port
         scene: scene
         address: address
         connections: {}
+        clock: clock
     }
 end function
 
@@ -512,6 +535,8 @@ sub SetupServerAccept(setup as dynamic)
         inbound: ""
         outbox: ""
         sent: 0
+        startedAt: setup.clock.TotalMilliseconds()
+        lastActivity: setup.clock.TotalMilliseconds()
     }
     setup.connections[StrI(sock.GetID())] = conn
 end sub
@@ -532,6 +557,7 @@ sub SetupServerRead(setup as dynamic, key as string, conn as dynamic)
     end if
 
     conn.inbound = conn.inbound + chunk.ToAsciiString()
+    conn.lastActivity = setup.clock.TotalMilliseconds()
     if conn.inbound.Len() > SetupMaxRequestBytes()
         SetupServerRespond(setup, key, conn, "400", SetupHtmlStatus("400"))
         return
@@ -571,10 +597,8 @@ sub SetupServerHandle(setup as dynamic, key as string, conn as dynamic, state as
         return
     end if
     if path = "/playback-test" and SetupRequestMethod(conn.inbound) = "POST"
-        body = SetupBody(conn.inbound)
-        accepted = setup.scene.callFunc("RunPlaybackDiagnostic", SetupFormValue(body, "mode"), SetupFormValue(body, "movieId"))
-        if accepted = true then code = "200" else code = "400"
-        SetupServerRespond(setup, key, conn, code, SetupHtml("Playback test", "<p>" + code + "</p>"))
+        ' Public packages expose setup, not LAN-triggered playback controls.
+        SetupServerRespond(setup, key, conn, "403", SetupHtmlStatus("403"))
         return
     end if
 
@@ -624,7 +648,10 @@ sub SetupServerFlush(setup as dynamic, key as string, conn as dynamic)
 
     if conn.sent < total
         wrote = conn.socket.Send(bytes, conn.sent, total - conn.sent)
-        if wrote > 0 then conn.sent = conn.sent + wrote
+        if wrote > 0
+            conn.sent = conn.sent + wrote
+            conn.lastActivity = setup.clock.TotalMilliseconds()
+        end if
     end if
 
     if conn.sent >= total

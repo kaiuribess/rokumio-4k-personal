@@ -428,7 +428,8 @@ sub ToggleLibrary()
     if m.stores.library.callFunc("LibraryIsSaved", m.meta.id)
         m.stores.library.callFunc("LibraryRemoveSaved", m.meta.id)
     else
-        m.stores.library.callFunc("LibraryAddSaved", m.meta.id, m.meta.type, m.meta.name, poster, posterShape)
+        key = MetadataOrigin_Key(m.stores,m.addonAddress)
+        m.stores.library.callFunc("LibraryAddSaved", m.meta.id, m.meta.type, m.meta.name, poster, posterShape, key)
         added = true
     end if
     label = LibraryActionLabel()

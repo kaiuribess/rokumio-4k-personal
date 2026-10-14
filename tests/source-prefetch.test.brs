@@ -804,4 +804,19 @@ Harness_Equal(m.top.result.readyStreams[0].url,"https://media.example.test/stere
 StreamsTest_Load()
 Harness_Equal(m.top.result.readyStreams.Count(),2,"ordinary source worker uses the same non-destructive audio hint policy")
 Harness_Equal(m.top.result.readyStreams[0].url,"https://media.example.test/stereo.mkv","ordinary source worker keeps projector preference while retaining alternatives")
+Harness_Suite("Warm provider diagnostics survive candidate filtering")
+for each statusSource in [
+    {name:"Torrentio [TB Error]",url:"https://torrentio.strem.fun/videos/failed_access_v3.mp4"},
+    {name:"Torrentio [TB Download] 2160p",url:"https://torrentio.strem.fun/videos/downloading_v3.mp4"}
+]
+    m.testProviderStreams = [statusSource]
+    PrefetchTest_Load()
+    warmResult = m.top.result
+    warmLabel = AddonDiagnostics_ProviderLabel(warmResult, false, 0, CinemaSkippedSources(warmResult.streams))
+    StreamsTest_Load()
+    ordinaryResult = m.top.result
+    ordinaryLabel = AddonDiagnostics_ProviderLabel(ordinaryResult, false, 0, CinemaSkippedSources(ordinaryResult.streams))
+    Harness_Equal(warmLabel,ordinaryLabel,"warm path retains account and pending-download explanations")
+    Harness_Equal(warmResult.streams.Count(),0,"diagnostic records do not become playable candidates")
+end for
 Harness_Finish()

@@ -641,5 +641,33 @@ sub Main()
     TestStreamsRemoteRefresh()
     TestStreamTileRecycling()
     TestSourcePagination()
+        Harness_Suite("Manual provider browsing supersedes automatic ranking")
+    TestPaginationSetup(2)
+    m.autoPlayEnabled = true
+    ranking = {id:"regression-ranking",loadToken:m.loadToken,fourKOnly:false,audioMode:"projector",reaped:false,result:{streams:m.streams}}
+    m.selectionTask = ranking
+    Harness_Ok(onKeyEvent("right",true),"remote Right switches providers")
+    Harness_Equal(m.activeIndex,1,"second provider is displayed")
+    Harness_Ok(not m.autoPlayEnabled,"manual provider change cancels automatic playback")
+    onAutomaticSourcesReady(TestEvent(ranking))
+    Harness_Equal(m.top.pushRequest,invalid,"old automatic ranking cannot interrupt browsing")
+    Harness_Ok(ranking.reaped,"manual provider switch reaps ranking worker")
+    TestPaginationSetup(2)
+    m.autoPlayEnabled = true
+    m.autoGraceToken = m.loadToken
+    m.autoGraceDeadline = 750
+    m.autoGraceTimer = {control:"start"}
+    onKeyEvent("right",true)
+    Harness_Equal(m.autoGraceDeadline,invalid,"provider browsing cancels pending grace")
+    Harness_Equal(m.autoGraceTimer.control,"stop","pending automatic timer is stopped")
+
+    Harness_Suite("Warm diagnostic facts reach the empty source screen")
+    TestPaginationSetup(0)
+    m.providers[0].sourceDiagnostics={rawCount:1,status:1,uncached:0}
+    RenderActiveProvider()
+    Harness_Ok(m.streamsPlaceholder.text.InStr("account or service error")>=0,"warm error has a readable full-screen explanation")
+    m.providers[0].sourceDiagnostics={rawCount:1,status:0,uncached:1}
+    RenderActiveProvider()
+    Harness_Ok(m.streamsPlaceholder.text.InStr("uncached downloads")>=0,"warm uncached response has a readable full-screen explanation")
     Harness_Finish()
 end sub

@@ -223,8 +223,8 @@ function EpisodesSeasons(meta as object) as object
 end function
 
 ' library.AddSaved
-function LibraryAddSaved(metaId as string, metaType as string, name as string, poster = "" as string, posterShape = "" as string) as boolean
-    return m.stores.library.AddSaved(metaId, metaType, name, poster, posterShape)
+function LibraryAddSaved(metaId as string, metaType as string, name as string, poster = "" as string, posterShape = "" as string, metadataProviderKey = "" as string) as boolean
+    return m.stores.library.AddSaved(metaId, metaType, name, poster, posterShape, metadataProviderKey)
 end function
 
 ' library.BuildLibraryChangeItem
@@ -313,8 +313,8 @@ function LibraryIsChannelType(metaType as string) as boolean
 end function
 
 ' library.SetPosition
-function LibrarySetPosition(videoId as string, metaId as string, metaType as string, season as integer, episode as integer, name as string, poster = "" as string, position = 0 as integer, duration = 0 as integer, posterShape = "" as string) as void
-    m.stores.library.SetPosition(videoId, metaId, metaType, season, episode, name, poster, position, duration, posterShape)
+function LibrarySetPosition(videoId as string, metaId as string, metaType as string, season as integer, episode as integer, name as string, poster = "" as string, position = 0 as integer, duration = 0 as integer, posterShape = "" as string, metadataProviderKey = "" as string) as void
+    m.stores.library.SetPosition(videoId, metaId, metaType, season, episode, name, poster, position, duration, posterShape, metadataProviderKey)
 end function
 
 ' library.SyncFromStremio

@@ -85,7 +85,10 @@ sub load()
             ' No writes or history during prefetch, even when memory is absent.
         end try
         streams = SourcePrefetch_LimitStreams(raw, m.top.audioMode, m.top.videoId, memory, now)
-        m.top.result = {ok:true, streams:streams, readyStreams:CinemaChooseStreams(streams, false, m.top.audioMode, false), error:""}
+        ' Preserve bounded diagnostic facts, not an unlimited private response.
+        diagnostics = CinemaSkippedSources(raw)
+        diagnostics.rawCount = raw.Count()
+        m.top.result = {ok:true, streams:streams, readyStreams:CinemaChooseStreams(streams, false, m.top.audioMode, false), sourceDiagnostics:diagnostics, error:""}
     catch e
         m.top.result = {ok:false}
     end try

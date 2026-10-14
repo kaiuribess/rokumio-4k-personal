@@ -69,6 +69,16 @@ The Preferred source section uses a fresh native RowList with the same layout/st
 
 No Roku frame-rate, texture-memory or sustained-decoder profiling was performed for 0.5.16. Use physical-device resource measurements before making performance claims. Computer tests verify bounds, callback ownership and cleanup, rather than real rendering speed.
 
+## Audit regression repairs in 0.5.17
+
+Complete flow tests supplement the isolated screen tests. `catalog-integration` uses the compiled CatalogStore, actual DiscoverLoaderTask and current Discover callbacks, starting with a previously loaded catalog. Raw consumed records cross both boundaries independently of usable tiles. `library-origin` follows Details save, actual LibraryStore serialization, My list selection and episode request routing. It substitutes native/store-host/network boundaries and digest output. Older custom IDs favor compatible metadata providers with specific prefixes; Cinemeta restoration is limited to IMDb identifiers.
+
+Accepted progress is saved on the recovery timer before decoder teardown through the existing store/watch-state path; replacement probes cannot overwrite it. Working-source proof rearms with fresh samples after resumed accepted playback. Tests exercise both combinations that earlier isolated callbacks missed. Native functions execute in their owning component through [callFunc](https://developer.roku.com/dev/docs/ifsgnodedict); StoreHost interface/type/count checks include the extended optional metadata-key arguments.
+
+Warm results carry diagnostic counts alongside capped candidates. Public setup no longer dispatches diagnostic playback mutations; its normal import gate remains. Connection sweeps use monotonic elapsed time with 10-second idle and 30-second absolute deadlines, including stalled writes. They run every main-loop iteration without blocking sockets.
+
+Legacy server settings do not alter source admission. Raw torrent/hash-only playback is unsupported in this build; the retained upstream resolver must not be advertised as an enabled public mode.
+
 ## Source inspector
 
 `npm run check-source` runs an optional local PC diagnostic interface. It performs bounded metadata inspection and does not download a whole film or prove Roku decoding. The app does not depend on it during playback. Do not expose the inspector or Roku local setup/diagnostic ports to the internet. Avoid sharing configured manifests, signed URLs or keys in reports.
