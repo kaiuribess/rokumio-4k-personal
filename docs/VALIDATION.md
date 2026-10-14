@@ -1,6 +1,6 @@
 # Release validation — 0.5.20
 
-Validated on 2026-10-14. This remains an experimental prerelease without physical Roku sign-off.
+Validated on 2026-10-14. This remains an experimental prerelease. Controlled native checks passed; full-workflow hardware sign-off remains incomplete.
 
 - The full test chain passed **4,876 BrightScript assertions plus 71 cinema policy assertions: 4,947 total**. Separate Node media, transport, mock-provider and setup-server suites also passed; their counts are separate.
 - New tests execute production store and controller code against native boundary doubles: held A results/publishers/imports after switching to B; A in flight with distinct B/C edits; failed writes and restart outbox recovery; fresh baseline before explicit retry; independent Write/Flush refusals; cross-section registry budgeting; account add-on configuration/removal/order; public HTTP rejection; oversized decoded response files, long fields, deep JSON and subtitle floods; early-pool discovery recovery; periodic durable checkpoints, seek to zero and old-screen exit isolation.
@@ -35,3 +35,22 @@ The exact 0.5.19 CI ZIP was installed successfully, then a private instrumented 
 The current route reported Stereo with two-channel AAC/MP3/PCM support and no AC3/EAC3 passthrough. Capability flags and timestamp progression do not prove audible output or test an AX700 receiver path. Full-film/endurance, consecutive real episodes, live multi-account switching, clean install without retained configuration, surround/HDR listening/viewing and repeated long navigation remain outside these controlled checks.
 
 The configured movie provider was tested separately in an isolated diagnostic session (no user history/account writes). A 120-second 4K-only window did not produce accepted English/stereo playback: several UHD MKV headers were present, but inspected audio incompatibility or unconfirmed native audio rejected candidates. A normal quality/fallback window reached an English AAC/AVC MKV with **1920×1080 header dimensions**, unmuted state and advancing audio/video samples on attempt 21. This demonstrates a compatible HD fallback for that title, not reliable instant UHD movie playback. Untagged language stays blocked rather than being declared English from a filename. Diagnostic mode suppressed further discovery after the initial candidate pool; these windows were bounded observations, not proof that every provider candidate was exhausted.
+
+## Final 0.5.20 native repeat
+
+The CI core at commit `82e4d301557f749c9c0853e15e71332307d7de8f` (run `38640266683`) passed a controlled instrumented repeat on the same Stick. The final release ZIP is 871,486 bytes, SHA-256 `7b188eb0d9717e2ac58bdcd3d5bc2a6d1226a9c0d0013c2fcb97b1f9eecce2a8`.
+
+| Check | Observed result |
+| --- | --- |
+| Native resume record/context/persistence | Acknowledged; fresh-store reload recovered position 7 |
+| UHD control | Fresh native 3840×2160 SDR segment; HEVC and AAC; advancing A/V samples |
+| Seek and pause | Position 20.362; paused position remained 20.362 |
+| Actual resume command | Continued to 60.416, rather than restarting at zero |
+| Periodic checkpoint and Back | Fresh-store positions 38 and 60; Back returned Home |
+| Subsequent fixed HD control | Fresh 1920×1080 SDR; AVC/AAC, unmuted and advancing A/V; no inherited UHD claim |
+| Navigation/source cancellation | Twelve enter/exit transitions and Back during a live provider request passed in the companion native run |
+| Teardown | Both playback exits returned Home; original library restored and isolated fixture data removed; no native runtime error in the final run log |
+
+The first pause test incorrectly used `play`, which restarts the control; it was corrected to Roku's documented `resume` command and repeated before the continuation claim above ([Video control](https://developer.roku.com/dev/docs/video)). An older Bip Bop stereo fixture did not establish advancing video/audio acceptance in a repeat, so the final switch used fixed UHD and HD renditions from the same [public Apple advanced HLS example](https://developer.apple.com/streaming/examples/). Those are control observations, not a guarantee for arbitrary movies or audible English.
+
+A later native resource sample reached 184.5 MiB during UHD playback (about 17.9 MiB anonymous and 166.4 MiB file-backed); after both controls exited it fell to 51.3 MiB (18.4 MiB anonymous, 32.8 MiB file-backed). This records the larger measured peak as well as cleanup. It is not a memory-limit or long-session leak certification. No private URLs, account configuration, identifiers or raw logs are published.
