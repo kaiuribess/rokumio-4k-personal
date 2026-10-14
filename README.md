@@ -4,7 +4,7 @@ A native Roku client for browsing Stremio-compatible catalogs, searching movies 
 
 **Version 0.5.12 is an experimental community release.** Software tests and package validation pass; its next-episode behavior has not yet been tested on a physical Roku. It cannot guarantee that every provider file plays, has English audio, or is genuine 4K.
 
-[Download the install ZIP](https://github.com/kaiuribess/rokumio-4k-personal/releases/latest) · [Installation](docs/INSTALL.md) · [Playback and 4K](docs/PLAYBACK.md) · [Development](docs/DEVELOPMENT.md) · [Changes](CHANGELOG.md)
+[Download the install ZIP](https://github.com/kaiuribess/rokumio-4k-personal/releases/tag/v0.5.12) · [Installation](docs/INSTALL.md) · [Playback and 4K](docs/PLAYBACK.md) · [Development](docs/DEVELOPMENT.md) · [Changes](CHANGELOG.md)
 
 ## What you can do
 
