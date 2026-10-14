@@ -1,0 +1,99 @@
+' TimeUtil — shared calendar/clock helpers, extracted from LibraryStore so a
+' screen can mint an ISO timestamp or gate an episode's airdate without reaching
+' into a data store. Pure date logic (the only platform API is roDateTime inside
+' NowIso), so it behaves identically in the interpreter test harness and on a
+' device. Constructed once under MainScene scope and handed out through the
+' stores map, like WatchedCodec — never built inside a method, or the
+' per-component scope of user-defined globals would make the constructor resolve
+' to invalid when invoked from a screen.
+
+class TimeUtil
+    ' Current UTC time in ISO-8601 transport format. "" when the platform clock
+    ' is unavailable.
+    function NowIso() as string
+        try
+            dt = CreateObject("roDateTime")
+            if dt = invalid then return ""
+            iso = dt.ToISOString()
+            if iso = invalid then return ""
+            return iso
+        catch e
+            return ""
+        end try
+    end function
+
+    ' Whether an episode has aired: its release date (released, falling back to
+    ' firstAired) must exist and not be after today. Dates compare on their
+    ' leading YYYY-MM-DD (both UTC), so no platform date arithmetic is needed
+    ' and the interpreter cannot diverge from a device. Missing/malformed dates
+    ' or an unavailable clock (nowIso = "", or no roDateTime) are treated as
+    ' aired — the goal is never to hide a claimable episode, only to block ones
+    ' that demonstrably have not aired. That matters because an account bitfield
+    ' for a series marked fully watched runs across the whole known episode
+    ' list, including not-yet-aired placeholders; literally replaying those bits
+    ' would paint a check on episodes that cannot have been watched.
+    function EpisodeAired(ep as object, nowIso = invalid as dynamic) as boolean
+        if ep = invalid then return true
+        dateStr = ""
+        if ep.released <> invalid and ep.released <> "" then
+            dateStr = ep.released
+        else if ep.firstAired <> invalid and ep.firstAired <> "" then
+            dateStr = ep.firstAired
+        end if
+        if dateStr = "" then return true
+        if nowIso = invalid or nowIso = "" then nowIso = m.NowIso()
+        if nowIso = "" then return true
+        day = dateStr.Mid(0, 10)
+        if not m.IsCalendarDate(day) then return true
+        if day > nowIso.Mid(0, 10) then return false
+        return true
+    end function
+
+    ' YYYY-MM-DD shape check (the first ten characters of a date string), so a
+    ' clearly non-date value can't accidentally compare greater than today.
+    function IsCalendarDate(value as string) as boolean
+        if value = invalid or value.Len() < 10 then return false
+        digits = "0123456789"
+        for i = 0 to 9
+            c = value.Mid(i, 1)
+            if i = 4 or i = 7
+                if c <> "-" then return false
+            else if digits.InStr(c) < 0
+                return false
+            end if
+        end for
+        return true
+    end function
+
+    ' One label line for an episode's air date: "Aired Aug 5, 2026" for dates up
+    ' to today, "Premieres Sep 30, 2026" for the future. Reads released, falling
+    ' back to firstAired, formats the leading YYYY-MM-DD through a month table —
+    ' no roDateTime, so the interpreter cannot diverge from a device. Missing or
+    ' malformed dates come back "" (no date line), and with no usable clock the
+    ' prefix is dropped (just "Sep 30, 2026"). nowIso is injectable for tests;
+    ' production passes the store's stamp.
+    function AirDateLabel(ep as object, nowIso = invalid as dynamic) as string
+        if ep = invalid then return ""
+        dateStr = ""
+        if ep.released <> invalid and ep.released <> "" then
+            dateStr = ep.released
+        else if ep.firstAired <> invalid and ep.firstAired <> "" then
+            dateStr = ep.firstAired
+        end if
+        if dateStr = "" then return ""
+        day = dateStr.Mid(0, 10)
+        if not m.IsCalendarDate(day) then return ""
+        if nowIso = invalid or nowIso = "" then nowIso = m.NowIso()
+
+        monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        year = day.Mid(0, 4)
+        monthVal = day.Mid(5, 2).ToInt()
+        dayVal = day.Mid(8, 2).ToInt()
+        if monthVal < 1 or monthVal > 12 or dayVal < 1 or dayVal > 31 then return ""
+        label = monthNames[monthVal - 1] + " " + dayVal.ToStr() + ", " + year
+
+        if nowIso = "" then return label
+        if day > nowIso.Mid(0, 10) then return "Premieres " + label
+        return "Aired " + label
+    end function
+end class

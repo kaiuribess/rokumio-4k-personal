@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="HomeScreen" extends="Screen">
+    <interface>
+        <!-- The one action Home reports upward: a push request. The Scene
+             observes it and calls ScreenStack.push with a target + params. -->
+        <field id="pushRequest" type="assocarray" alwaysNotify="true" />
+
+        <!-- Screen contract: called by ScreenStack for show/hide/focus/back.
+             callFunc only runs for functions declared in the interface. Stores
+             are class instances and cannot cross components through a field,
+             so they arrive via callFunc. -->
+        <function name="OnEnter" />
+        <function name="OnExit" />
+        <function name="OnBackPressed" />
+        <function name="RebuildRows" />
+        <function name="EnsureCurrentRows" />
+        <function name="RefreshContinueWatching" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/components/HomeScreen.brs" />
+    <script type="text/brightscript" uri="pkg:/source/core/AsyncTask.bs" />
+    <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
+    <script type="text/brightscript" uri="pkg:/source/core/TileSize.bs" />
+
+    <children>
+        <Rectangle id="homeBg" width="1920" height="1080" color="0x0" />
+        <Label
+            id="homeTitle"
+            translation="[260, 48]"
+            width="1580"
+            height="70"
+            text="Rokumio 4K Personal"
+            font="font:LargeBoldSystemFont" />
+        <Label
+            id="homeSub"
+            translation="[260, 128]"
+            width="1580"
+            height="40"
+            text="Movies and shows | Voice search | 4K first, with 1080p choices"
+            font="font:SmallSystemFont" />
+
+        <Label id="homeCatalogStatus" translation="[260, 182]" width="1580" height="32"
+            font="font:SmallSystemFont" />
+
+        <!-- Left rail: the vertical icon menu (Search, Discover, Library,
+             Add-ons, Settings, Support). A one-column RowList of RailTiles; OK
+             on an icon publishes a pushRequest the Scene routes. Focus reaches
+             it from the grid via Left/Right. -->
+        <Rectangle id="railBg" translation="[60, 0]" width="170" height="1080"/>
+        <RowList
+            id="rail"
+            translation="[80, 300]"
+            numRows="6"
+            itemSize="[140, 100]"
+            itemSpacing="[0, 12]"
+            rowItemSize="[[140, 100]]"
+            focusXOffset="[0]"
+            rowItemSpacing="[[0, 0]]"
+            showRowLabel="[false]"
+            drawFocusFeedback="false"
+            itemComponentName="RailTile"
+            vertFocusAnimationStyle="floatingFocus"/>
+
+        <!-- Poster rows: a single RowList owns the whole grid physics (vertical
+             row scrolling/clipping, horizontal per-row tiles, row labels). Each
+             item renders as a PosterTile component. Content is set in code. -->
+        <RowList
+            id="catalog"
+            translation="[260, 270]"
+            numRows="2"
+            itemSize="[1580, 324]"
+            itemSpacing="[0, 64]"
+            rowItemSize="[[216, 324]]"
+            rowItemSpacing="[[18, 0]]"
+            showRowLabel="[true]"
+            rowLabelFont="font:MediumBoldSystemFont"
+            drawFocusFeedback="true"
+            itemComponentName="PosterTile" />
+        <Rectangle translation="[1400, 58]" width="420" height="48" color="0x173525FF">
+            <Label text="4K FIRST  +  1080p" translation="[10, 6]" width="400" height="36"
+                horizAlign="center" color="0x5BEF95FF" font="font:MediumBoldSystemFont" />
+        </Rectangle>
+        <Label id="homeHelp" translation="[260, 1004]" width="1580" height="44"
+            text="OK  Open     Left / Right  Menu     *  Switch focus     Play/Pause  Refresh"
+            font="font:SmallSystemFont" />
+    </children>
+</component>

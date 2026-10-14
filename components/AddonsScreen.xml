@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="AddonsScreen" extends="Screen">
+    <!-- Installed add-on manager. An "Add add-on" row installs by fetching a
+         manifest URL (system KeyboardDialog), and every installed add-on below
+         it can be removed through a confirmation dialog. The list is rebuilt
+         from AddonsStore on every entry
+         and after each install/remove. -->
+    <interface>
+        <function name="OnEnter" />
+        <function name="OnExit" />
+        <function name="OnBackPressed" />
+        <!-- main() starts the local setup page before this screen ever opens;
+             the address lands here through the Scene's ShowSetupAddress. -->
+        <function name="SetSetupAddress" />
+        <function name="RefreshInstalledRows" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/components/AddonsScreen.brs" />
+    <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
+
+    <children>
+        <Rectangle id="addonsBg" width="1920" height="1080" color="0x0" />
+
+        <Label
+            id="addonsTitle"
+            translation="[80, 48]"
+            width="1760"
+            height="70"
+            text="Add-ons"
+            font="font:LargeBoldSystemFont" />
+        <Label
+            id="addonsSub"
+            translation="[80, 128]"
+            width="1760"
+            height="40"
+            text="OK adds or removes an add-on, Back returns to Home"
+            font="font:SmallSystemFont" />
+
+        <ChevronList
+            id="addonsList"
+            translation="[80, 240]"
+            numRows="5"
+            itemWidth="1000"
+            rowHeight="110" />
+
+       <Group id="companionPanel" translation="[1140, 140]">
+            <Rectangle id="companionPlate" width="700" height="720" />
+            <Label
+                id="companionTitle"
+                translation="[40, 36]"
+                width="620"
+                height="80"
+                text="Add your stream source"
+                horizAlign="center"
+                font="font:MediumBoldSystemFont" />
+            <Label
+                id="companionCaption"
+                translation="[40, 160]"
+                width="620"
+                height="430"
+                horizAlign="center"
+                wrap="true"
+                text="Cinemeta is ready for movie and show search.&#10;&#10;1. Keep this screen open.&#10;2. On the same Wi-Fi, open the address below in a browser.&#10;3. Paste your configured HTTPS add-on link.&#10;&#10;Then use the Roku remote to search, choose and play."
+                font="font:SmallSystemFont" />
+
+            <!-- Local setup address is shown only after the listener starts. -->
+            <Label
+                id="setupHint"
+                translation="[40, 636]"
+                width="620"
+                height="30"
+                horizAlign="center"
+                visible="false"
+                text="One-time browser setup:"
+                font="font:SmallSystemFont" />
+            <Label
+                id="setupUrl"
+                translation="[40, 672]"
+                width="620"
+                height="44"
+                horizAlign="center"
+                visible="false"
+                font="font:MediumBoldSystemFont" />
+        </Group>
+
+        <Label
+            id="addonsStatus"
+            translation="[80, 1000]"
+            width="1760"
+            height="40"
+            font="font:SmallSystemFont" />
+    </children>
+</component>

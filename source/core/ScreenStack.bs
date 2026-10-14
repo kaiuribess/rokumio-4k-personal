@@ -1,0 +1,126 @@
+' Thin screen stack over the Scene's child components.
+'
+' Screens are declared declaratively as children of MainScene and looked up by
+' node id. Only one is visible and focused at a time; every transition blurs
+' the outgoing screen so an un-blurred list can never eat OK/arrow keys again.
+' The stack also owns each screen's screenActive flag (see Screen.xml): true only
+' for the interactive top, so async task handlers know when they may grab focus.
+'
+' Back is routed by MainScene: the top screen gets it first via OnBackPressed;
+' if it returns false and there is more than one screen on the stack, this pops.
+
+class ScreenStack
+    scene as object
+    entries as object
+
+    sub new(scene as object)
+        m.scene = scene
+        m.entries = []
+    end sub
+
+    function count() as integer
+        return m.entries.Count()
+    end function
+
+    function top() as dynamic
+        if m.entries.Count() = 0 then return invalid
+        return m.entries[m.entries.Count() - 1]
+    end function
+
+    function has(screenId as string) as boolean
+        for each entry in m.entries
+            if entry.id = screenId then return true
+        end for
+        return false
+    end function
+
+    sub push(screenId as string, params = invalid as dynamic, modal = false as boolean)
+        ' Resolve the target first: a push to an unknown screen is a true no-op
+        ' that leaves the current screen visible, focused and un-blurred. (This
+        ' bit us: a bad id hid the outgoing screen before FindNode returned
+        ' invalid, leaving a blank screen with the old top still on the stack.)
+        node = m.scene.FindNode(screenId)
+        if node = invalid then return
+        m.pushNode(node, params, modal, false)
+    end sub
+
+    ' Push a screen instance the stack does not resolve by id, for a screen the
+    ' caller builds itself. `destroy` hands the stack the node's whole lifetime:
+    ' pop() tears it out of the tree and drops the reference, so SceneGraph
+    ' destroys the component for real instead of it lingering as an orphan.
+    ' A surviving component keeps everything it owns — a mid-buffer Video node's
+    ' media player above all — alive behind the next screen. Static screens pass
+    ' false and are never removed (see push).
+    sub pushNode(node as object, params = invalid as dynamic, modal = false as boolean, destroy = true as boolean)
+        if node = invalid then return
+        screenId = node.id
+
+        shown = m.top()
+        if shown <> invalid
+            ' A non-modal push hides the outgoing screen. A modal push keeps it
+            ' visible (dimmed by the modal's own scrim) but still blurs it, so
+            ' the underlying screen can never eat keys while the modal is up.
+            '
+            ' Hiding unconditionally is also what keeps the incoming screen on top
+            ' without inspecting z-order. An earlier version left the outgoing
+            ' screen visible whenever the incoming one was declared later in
+            ' MainScene.xml, on the theory that a still-visible screen holds its
+            ' textures and so evicts less. Measured on device that bought
+            ' nothing — eviction is driven by total texture demand, not by
+            ' whether a node is visible, so the grid reloaded either way — and it
+            ' cost a real regression: DetailsScreen is declared before
+            ' LibraryScreen, so Library → Details left Details underneath it. It
+            ' also needed node-identity comparison to find the declaration
+            ' order, which is where the roSGNode `=` crash came from.
+            if not modal then shown.node.visible = false
+            shown.node.callFunc("BlurFocus")
+            shown.node.screenActive = false
+        end if
+
+        m.entries.Push({ id: screenId, node: node, destroy: destroy })
+        node.visible = true
+        node.screenActive = true
+        node.SetFocus(true)
+        node.callFunc("OnEnter", params)
+    end sub
+
+    function pop() as boolean
+        if m.entries.Count() <= 1 then return false
+
+        removed = m.entries.Pop()
+        removed.node.visible = false
+        removed.node.callFunc("BlurFocus")
+        removed.node.callFunc("OnExit")
+        removed.node.screenActive = false
+
+        if removed.destroy
+            parent = removed.node.getParent()
+            if parent <> invalid then parent.RemoveChild(removed.node)
+        end if
+        removed.node = invalid
+
+        shown = m.top()
+        if shown <> invalid
+            shown.node.visible = true
+            shown.node.screenActive = true
+            shown.node.SetFocus(true)
+            shown.node.callFunc("OnEnter", invalid)
+        end if
+        return true
+    end function
+
+    function onBackPressed() as boolean
+        shown = m.top()
+        if shown = invalid then return false
+        return shown.node.callFunc("OnBackPressed") = true
+    end function
+
+    function popTo(screenId as string) as boolean
+        while m.count() > 0
+            if m.top().id = screenId then return true
+            if m.count() = 1 then return false
+            m.pop()
+        end while
+        return false
+    end function
+end class

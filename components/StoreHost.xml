@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="StoreHost" extends="Group">
+    <interface>
+        <!-- One entry point per store method the components use. BrightScript
+             has no dynamic dispatch, so each call site names its operation
+             outright; checkStoreHandoffContract() in tests/run.js requires a
+             declaration here AND a one-line forwarder in StoreHost.brs for
+             every call, and requires the name's store prefix to match the
+             m.stores.<store> alias it is reached through. -->
+        <function name="AddonsCatalogCapabilities" />
+        <function name="AddonsCatalogTitle" />
+        <function name="AddonsGet" />
+        <function name="AddonsGetAll" />
+        <function name="AddonsHasResource" />
+        <function name="AddonsHasType" />
+        <function name="AddonsInstallFromDescriptor" />
+        <function name="AddonsIsBuiltin" />
+        <function name="AddonsRegister" />
+        <function name="AddonsSupportsResource" />
+        <function name="AddonsUninstall" />
+        <function name="AuthGetAuthKey" />
+        <function name="AuthGetSession" />
+        <function name="AuthGetUser" />
+        <function name="AuthIsLoggedIn" />
+        <function name="AuthLoginGuest" />
+        <function name="AuthLoginStremio" />
+        <function name="AuthLogout" />
+        <function name="EpisodesEpisodesForSeason" />
+        <function name="EpisodesFirstEpisode" />
+        <function name="EpisodesMergeMeta" />
+        <function name="EpisodesNeedsMetaFetch" />
+        <function name="EpisodesOrderedSeasons" />
+        <function name="EpisodesOrderedVideoIds" />
+        <function name="EpisodesResolveVideoId" />
+        <function name="EpisodesSeasons" />
+        <function name="LibraryAddSaved" />
+        <function name="LibraryBuildLibraryChangeItem" />
+        <function name="LibraryBuildWatchStateItem" />
+        <function name="LibraryBuildWatchedStateItem" />
+        <function name="LibraryContinueWatching" />
+        <function name="LibraryEpisodeMark" />
+        <function name="LibraryIsChannelType" />
+        <function name="LibraryIsSaved" />
+        <function name="LibraryLibraryView" />
+        <function name="LibraryMarkAllIfDone" />
+        <function name="LibraryMarkEpisodeUnwatched" />
+        <function name="LibraryMarkEpisodeWatched" />
+        <function name="LibraryMarkUpToUnwatched" />
+        <function name="LibraryMarkUpToWatched" />
+        <function name="LibraryMarkWatchedIfFinished" />
+        <function name="LibraryProgressFraction" />
+        <function name="LibraryRemoveSaved" />
+        <function name="LibraryResumeFor" />
+        <function name="LibrarySessionType" />
+        <function name="LibrarySetPosition" />
+        <function name="LibrarySyncFromStremio" />
+        <function name="LibraryWatchedGlyph" />
+        <function name="EffectiveSessionType" />
+        <function name="SettingsClearServerAddress" />
+        <function name="SettingsGetLanguage" />
+        <function name="SettingsGetAudioMode" />
+        <function name="SettingsSetAudioMode" />
+        <function name="SettingsGetServerAddress" />
+        <function name="SettingsSaveFailed" />
+        <function name="SettingsSetLanguage" />
+        <function name="SettingsSetServerAddress" />
+        <function name="SwitchSession" />
+        <function name="TimeNowIso" />
+        <function name="TimeAirDateLabel" />
+        <function name="WatchLatest" />
+        <function name="WatchRecord" />
+    </interface>
+
+    <!-- Only the sources StoreHost.brs constructs something out of. This is
+         MainScene.xml's list minus the ones the Scene itself needs (ScreenStack,
+         AsyncTask, Theme) plus DeepLinkStore, which the host never builds — the
+         Scene parses deep links with a throwaway instance per call. -->
+    <script type="text/brightscript" uri="pkg:/source/stores/Transport.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/SettingsStore.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/AuthStore.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/AddonsStore.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/CatalogStore.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/EpisodesStore.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/WatchedCodec.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/VideoIdCodec.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/TimeUtil.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/WatchStateBuffer.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/StremioLibraryCodec.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/LibraryStore.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/PlaybackStore.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/SubtitlesStore.bs" />
+    <script type="text/brightscript" uri="pkg:/components/StoreHost.brs" />
+</component>

@@ -1,0 +1,52 @@
+# Development and contributions
+
+## Build and validate
+
+Use Node.js 22 LTS, npm and Python 3.12+ for the package verifier. The lockfile records development dependencies. On a clean checkout:
+
+```sh
+npm ci
+npm test
+npm run build
+python scripts/verify-package.py
+```
+
+`npm test` transpiles stores and executes production BrightScript callbacks in the `@rokucommunity/brs` interpreter, plus Node media/transport suites and a local mock add-on. Native SceneGraph/device boundaries are simulated. Tests do not certify acoustic sound, actual Roku OS scheduling, HDMI/HDR negotiation or entire films.
+
+The verifier checks ZIP integrity, manifest fields, component inheritance, every packaged XML script reference and exclusion of development files. The compiled archive has `manifest` at its root. Build output is excluded from Git; downloadable ZIPs belong to Releases.
+
+## Architecture
+
+- `source/main.brs`: Roku screen, input events and local setup socket loop.
+- `components/MainScene.brs`: navigation, shared StoreHost binding and deferred account writes.
+- `source/core/ScreenStack.bs`: static screen lifetime, focus and Back routing.
+- `components/StoreHost.brs`: stores remain inside one component; plain data and SG-node references cross component boundaries.
+- `StreamsScreen`: provider loading, source cards, fresh-link refresh, quality filter and automatic selection.
+- `StreamResolveTask` / media utilities: resolution and bounded preflight work away from the render thread.
+- `PlayerScreen`: native Video handoff, buffering deadline, watch-state persistence, subtitles and playback facts.
+- `PlayerAudioRecovery` / `EnglishAudio` / `AudioCapabilities`: bounded English track recovery and native compatibility observations.
+- `PlayerSourceMemory` / `SourceMemory`: hashed identities of working sources; private signed URLs are not persisted as cache identities.
+- `SourcePrefetch`: short-lived source-list preloading tied to provider/audio context.
+- `NextEpisode` / `PlayerNextEpisode`: provider-id-preserving episode order, future-date gate and cancellable timer transition.
+
+## Next-episode implementation
+
+Details and episode selection carry complete series metadata where available. The player fetches missing metadata through a deferred `MetaLoaderTask`. Only an accepted native `finished` state schedules the countdown; a measured early ending stays in same-episode recovery. Diagnostic samples and movies do not advance.
+
+The finish observer only starts a pre-existing Timer. The timer saves completion, emits a current-video-scoped request, and MainScene removes the old player and reuses the existing StreamsScreen. This avoids duplicate references to static screens and unbounded navigation growth. Fresh source candidates are fetched for the new provider episode id, with position zero and the same quality/audio preferences.
+
+Keep SG node creation, teardown and navigation outside native Video transition callbacks. Previous versions encountered device freezes when worker creation ran on that observer stack; an interpreter pass is not enough to validate this scheduling boundary.
+
+## Source inspector
+
+`npm run check-source` runs an optional local PC diagnostic interface. It performs bounded metadata inspection and does not download a whole film or prove Roku decoding. The app does not depend on it during playback. Do not expose the inspector or Roku local setup/diagnostic ports to the internet. Avoid sharing configured manifests, signed URLs or keys in reports.
+
+## Contributing / fork instructions
+
+Fork the GitHub repo, create a branch, make a bounded change, run relevant production callback tests and the full build/package checks, then open a PR explaining the trigger and before/after behavior. Keep the MIT notice and font license in redistributions. Do not commit account configuration, browser profiles, installer passwords, device dumps or private playback logs.
+
+For a playback issue, report the app version, Roku model/OS, container, video/audio codec, channel layout, declared language, connection route and safe error code. Redact all private URLs and provider identifiers. State whether resolution comes from a label, file metadata or native segment data. Physical-device test results should identify exactly what was observed without turning one working sample into a universal claim.
+
+## Development dependency audit
+
+On 2026-10-14, `npm audit` reported 11 advisories in the locked development dependency tree (3 moderate, 7 high, 1 critical), including archive extraction in transitive `decompress` and pattern parsing in `braces`. These Node dependencies are not bundled in the Roku ZIP. The tests/build here do not use the interpreter to extract user-supplied ZIPs. Do not use affected development helpers to unpack untrusted archives. Dependency migration remains separate work; a passing app test does not mean the toolchain has no advisories. Re-run `npm audit` for current details. CI installs with lifecycle scripts disabled.

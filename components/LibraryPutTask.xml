@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="LibraryPutTask" extends="Task">
+    <interface>
+        <field id="authKey" type="string" value="" />
+        <field id="item" type="assocarray" />
+        <field id="result" type="assocarray" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/source/stores/Transport.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/StremioApiStore.bs" />
+    <script type="text/brightscript" uri="pkg:/components/LibraryPutTask.brs" />
+</component>

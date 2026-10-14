@@ -1,0 +1,573 @@
+' WatchedCodec — decodes Stremio's per-episode watched bitfield.
+'
+' A synced account library item carries state.watched, a single string:
+'
+'   {lastVideoID}:{lastLength}:{base64-deflate(bits)}
+'
+' where lastVideoID is the video id of the last watched episode
+' ("{imdbId}:{season}:{episode}"), lastLength is how many episodes the
+' bitfield covers counting up to and including that last watched one (its
+' index in the ordered list + 1), and the payload is the full per-episode
+' bits, one per episode in the series' ordered video list (sorted season →
+' episode → release), in a byte array compressed with zlib and base64-encoded.
+' Bit i set = the i-th episode is watched. A receiver that sees a different
+' (e.g. grown) video list re-aligns the bits around the anchor so the last
+' watched episode stays on its own id. The payload is a DEFLATE stream wrapped
+' in the usual 2-byte zlib header plus a trailing Adler-32 checksum we ignore.
+'
+' Decoding needs the ordered episode list (the bitfield is only an index into
+' it), which only Cinemeta provides — so this is exercised on EpisodesScreen,
+' never by grid tiles.
+'
+' Pure logic on a byte array, no Roku-only APIs, so it runs in the interpreter
+' test harness. Bit work uses integer arithmetic (mod / \) rather than and/or
+' so the exact same source behaves on a device (where and/or are bitwise) and
+' in the brs interpreter (where they are not).
+
+class WatchedCodec
+    data as dynamic
+    bitpos as integer
+
+    fixedLitLen as object
+    fixedDist as object
+    litlen as dynamic
+    dist as dynamic
+
+    lengthBase as object
+    lengthExtra as object
+    distBase as object
+    distExtra as object
+
+    sub new()
+        m.data = []
+        m.bitpos = 0
+        m.litlen = invalid
+        m.dist = invalid
+
+        ' RFC 1951 §3.2.5 length/distance code tables.
+        m.lengthBase = [3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258]
+        m.lengthExtra = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0]
+        m.distBase = [1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577]
+        m.distExtra = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13]
+
+        ' RFC 1951 §3.2.6 fixed-Huffman code lengths.
+        litLenLengths = []
+        for i = 0 to 143
+            litLenLengths.Push(8)
+        end for
+        for i = 144 to 255
+            litLenLengths.Push(9)
+        end for
+        for i = 256 to 279
+            litLenLengths.Push(7)
+        end for
+        for i = 280 to 287
+            litLenLengths.Push(8)
+        end for
+        m.fixedLitLen = m.BuildHuffman(litLenLengths)
+        distLengths = []
+        for i = 0 to 31
+            distLengths.Push(5)
+        end for
+        m.fixedDist = m.BuildHuffman(distLengths)
+    end sub
+
+    ' ---- base64 ----
+
+    ' Decode a base64 string into an array of integers (0..255). Trailing '='
+    ' padding is honored; interior or excess padding is rejected. Malformed
+    ' input returns invalid, "" decodes to an empty array.
+    function Base64Decode(input as string) as object
+        if input = invalid then return invalid
+        alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+        s = input
+        pad = 0
+        while s <> "" and s.Right(1) = "="
+            pad = pad + 1
+            s = s.Left(s.Len() - 1)
+        end while
+        if pad > 2 then return invalid
+        if s.Len() mod 4 = 1 then return invalid
+
+        values = []
+        for i = 0 to s.Len() - 1
+            index = alphabet.InStr(s.Mid(i, 1))
+            if index < 0 then return invalid
+            values.Push(index)
+        end for
+
+        k = values.Count()
+        full = k \ 4
+        rest = k mod 4
+        result = []
+        for g = 0 to full - 1
+            v0 = values[g * 4]
+            v1 = values[g * 4 + 1]
+            v2 = values[g * 4 + 2]
+            v3 = values[g * 4 + 3]
+            result.Push(v0 * 4 + v1 \ 16)
+            result.Push((v1 mod 16) * 16 + v2 \ 4)
+            result.Push((v2 mod 4) * 64 + v3)
+        end for
+        if rest = 2
+            v0 = values[k - 2]
+            v1 = values[k - 1]
+            result.Push(v0 * 4 + v1 \ 16)
+        else if rest = 3
+            v0 = values[k - 3]
+            v1 = values[k - 2]
+            v2 = values[k - 1]
+            result.Push(v0 * 4 + v1 \ 16)
+            result.Push((v1 mod 16) * 16 + v2 \ 4)
+        end if
+        return result
+    end function
+
+    ' ---- DEFLATE bit reader ----
+
+    sub ResetStream(stream as object)
+        m.data = stream
+        m.bitpos = 0
+        m.litlen = invalid
+        m.dist = invalid
+    end sub
+
+    ' The value of bit position p within a byte: 2^p for p 0..7.
+    function Power2(p as integer) as integer
+        if p = 0 then return 1
+        if p = 1 then return 2
+        if p = 2 then return 4
+        if p = 3 then return 8
+        if p = 4 then return 16
+        if p = 5 then return 32
+        if p = 6 then return 64
+        return 128
+    end function
+
+    ' Next bit of the stream (bits are packed into bytes LSB-first). Returns -1
+    ' when the stream is exhausted.
+    function NextBit() as integer
+        index = m.bitpos \ 8
+        if index >= m.data.Count() then return -1
+        byteVal = m.data[index]
+        bitIndex = m.bitpos mod 8
+        m.bitpos = m.bitpos + 1
+        return (byteVal \ m.Power2(bitIndex)) mod 2
+    end function
+
+    ' Read a count-bit little-endian numeric field. Returns -1 on exhaustion.
+    function ReadBits(count as integer) as integer
+        value = 0
+        place = 1
+        if count > 0
+            for i = 1 to count
+                bit = m.NextBit()
+                if bit < 0 then return -1
+                value = value + bit * place
+                place = place * 2
+            end for
+        end if
+        return value
+    end function
+
+    ' ---- canonical Huffman ----
+
+    ' Build a canonical Huffman table from an array of code lengths (0 =
+    ' unused, lengths 1..15). Oversubscribed tables (more codes than the
+    ' Huffman space allows) are invalid. An all-zero table is valid but empty.
+    ' Returns { counts, symbols } where counts[l] is the number of codes of
+    ' length l and symbols lists the code numbers in canonical order.
+    function BuildHuffman(lengths as object) as object
+        n = lengths.Count()
+        counts = m.ZeroArray(16)
+        for each len in lengths
+            if len < 0 or len > 15 then return invalid
+            if len > 0 then counts[len] = counts[len] + 1
+        end for
+        left = 1
+        for i = 1 to 15
+            left = left * 2 - counts[i]
+            if left < 0 then return invalid
+        end for
+        symbols = []
+        for l = 1 to 15
+            if counts[l] > 0
+                for k = 0 to n - 1
+                    if lengths[k] = l then symbols.Push(k)
+                end for
+            end if
+        end for
+        return { counts: counts, symbols: symbols }
+    end function
+
+    function ZeroArray(size as integer) as object
+        a = []
+        for i = 1 to size
+            a.Push(0)
+        end for
+        return a
+    end function
+
+    ' Decode one symbol from a canonical Huffman table (RFC 1951 §3.2.2).
+    ' Returns -1 when the bit pattern matches no code or the stream ends.
+    function DecodeHuffman(table as object) as integer
+        counts = table.counts
+        symbols = table.symbols
+        code = 0
+        first = 0
+        indexOff = 0
+        for len = 1 to 15
+            bit = m.NextBit()
+            if bit < 0 then return -1
+            code = code * 2 + bit
+            count = counts[len]
+            if code >= first and code < first + count
+                return symbols[indexOff + code - first]
+            end if
+            indexOff = indexOff + count
+            first = first + count
+            first = first * 2
+        end for
+        return -1
+    end function
+
+    ' ---- DEFLATE decode ----
+
+    ' Inflate a whole zlib stream (byte array starting with the 2-byte
+    ' header). Returns the decompressed byte array, or invalid on malformed
+    ' input. Blocks are decoded until the final one; the trailing Adler-32
+    ' checksum is never read, so streams with or without it both work.
+    function Inflate(zlibBytes as object) as object
+        if zlibBytes = invalid or Type(zlibBytes) <> "roArray" or zlibBytes.Count() < 4 then return invalid
+        cmf = zlibBytes[0]
+        flg = zlibBytes[1]
+        if cmf mod 16 <> 8 then return invalid
+        if cmf \ 16 > 7 then return invalid
+        if (cmf * 256 + flg) mod 31 <> 0 then return invalid
+        if (flg \ 32) mod 2 <> 0 then return invalid
+        stream = []
+        for i = 2 to zlibBytes.Count() - 1
+            stream.Push(zlibBytes[i])
+        end for
+        return m.InflateRaw(stream)
+    end function
+
+    ' Inflate a raw DEFLATE stream (no zlib header). Upper bound on output so a
+    ' corrupt stream cannot grow without limit.
+    function InflateRaw(stream as object) as object
+        m.ResetStream(stream)
+        output = []
+        while true
+            finalBit = m.NextBit()
+            if finalBit < 0 then return invalid
+            final = (finalBit = 1)
+            btype = m.ReadBits(2)
+            if btype < 0 then return invalid
+            if btype = 0
+                if not m.InflateStored(output) then return invalid
+            else if btype = 1
+                m.litlen = m.fixedLitLen
+                m.dist = m.fixedDist
+                if not m.InflateSymbols(output) then return invalid
+            else if btype = 2
+                if not m.InflateDynamic(output) then return invalid
+            else
+                return invalid
+            end if
+            if final then exit while
+        end while
+        return output
+    end function
+
+    ' Stored (uncompressed) block: aligned to a byte boundary, then LEN/NLEN.
+    function InflateStored(output as object) as boolean
+        while m.bitpos mod 8 <> 0
+            if m.NextBit() < 0 then return false
+        end while
+        byteStart = m.bitpos \ 8
+        if byteStart + 3 >= m.data.Count() then return false
+        len = m.data[byteStart] + m.data[byteStart + 1] * 256
+        notLen = m.data[byteStart + 2] + m.data[byteStart + 3] * 256
+        if len + notLen <> 65535 then return false
+        if byteStart + 4 + len > m.data.Count() then return false
+        for i = byteStart + 4 to byteStart + 4 + len - 1
+            if output.Count() >= 8192 then return false
+            output.Push(m.data[i])
+        end for
+        m.bitpos = (byteStart + 4 + len) * 8
+        return true
+    end function
+
+    ' Dynamic block: parse the three code-length tables, then decode symbols.
+    function InflateDynamic(output as object) as boolean
+        hlit = m.ReadBits(5) + 257
+        hdist = m.ReadBits(5) + 1
+        hclen = m.ReadBits(4) + 4
+        if hlit > 286 or hdist > 30 then return false
+
+        order = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15]
+        clenLengths = m.ZeroArray(19)
+        for i = 0 to 18
+            value = 0
+            if i < hclen
+                value = m.ReadBits(3)
+                if value < 0 then return false
+            end if
+            clenLengths[order[i]] = value
+        end for
+        codeLenTable = m.BuildHuffman(clenLengths)
+        if codeLenTable = invalid then return false
+
+        total = hlit + hdist
+        lengths = []
+        prevLen = 0
+        while lengths.Count() < total
+            sym = m.DecodeHuffman(codeLenTable)
+            if sym < 0 then return false
+            if sym >= 0 and sym <= 15
+                prevLen = sym
+                lengths.Push(sym)
+            else if sym = 16
+                rep = 3 + m.ReadBits(2)
+                if rep < 3 or lengths.Count() + rep > total then return false
+                for j = 1 to rep
+                    lengths.Push(prevLen)
+                end for
+            else if sym = 17
+                rep = 3 + m.ReadBits(3)
+                if rep < 3 or lengths.Count() + rep > total then return false
+                for j = 1 to rep
+                    lengths.Push(0)
+                end for
+                prevLen = 0
+            else if sym = 18
+                rep = 11 + m.ReadBits(7)
+                if rep < 11 or lengths.Count() + rep > total then return false
+                for j = 1 to rep
+                    lengths.Push(0)
+                end for
+                prevLen = 0
+            else
+                return false
+            end if
+        end while
+
+        litLenLengths = []
+        for i = 0 to hlit - 1
+            litLenLengths.Push(lengths[i])
+        end for
+        distLengths = []
+        for i = hlit to total - 1
+            distLengths.Push(lengths[i])
+        end for
+        m.litlen = m.BuildHuffman(litLenLengths)
+        m.dist = m.BuildHuffman(distLengths)
+        if m.litlen = invalid or m.dist = invalid then return false
+        return m.InflateSymbols(output)
+    end function
+
+    ' Decode literals/lengths until the end-of-block marker (256).
+    function InflateSymbols(output as object) as boolean
+        while true
+            sym = m.DecodeHuffman(m.litlen)
+            if sym < 0 then return false
+            if sym < 256
+                if output.Count() >= 8192 then return false
+                output.Push(sym)
+            else if sym = 256
+                return true
+            else if sym <= 285
+                li = sym - 257
+                lenExtra = m.lengthExtra[li]
+                extra = m.ReadBits(lenExtra)
+                if extra < 0 then return false
+                len = m.lengthBase[li] + extra
+                dsym = m.DecodeHuffman(m.dist)
+                if dsym < 0 or dsym > 29 then return false
+                distExtra = m.distExtra[dsym]
+                extra2 = m.ReadBits(distExtra)
+                if extra2 < 0 then return false
+                dist = m.distBase[dsym] + extra2
+                if dist = 0 or dist > output.Count() then return false
+                for j = 1 to len
+                    if output.Count() >= 8192 then return false
+                    output.Push(output[output.Count() - dist])
+                end for
+            else
+                return false
+            end if
+        end while
+        return false
+    end function
+
+    ' ---- bitfield encode ----
+
+    ' Base64-encode a byte array (standard alphabet, no line breaks, "=" padding).
+    function Base64Encode(bytes as object) as string
+        alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+        result = ""
+        n = bytes.Count()
+        if n = 0 then return result
+        i = 0
+        while i < n
+            b0 = bytes[i]
+            result = result + alphabet.Mid(b0 \ 4, 1)
+            if i + 1 < n
+                b1 = bytes[i + 1]
+                result = result + alphabet.Mid((b0 mod 4) * 16 + b1 \ 16, 1)
+                if i + 2 < n
+                    b2 = bytes[i + 2]
+                    result = result + alphabet.Mid((b1 mod 16) * 4 + b2 \ 64, 1)
+                    result = result + alphabet.Mid(b2 mod 64, 1)
+                else
+                    result = result + alphabet.Mid((b1 mod 16) * 4, 1)
+                    result = result + "="
+                end if
+            else
+                result = result + alphabet.Mid((b0 mod 4) * 16, 1)
+                result = result + "=="
+            end if
+            i = i + 3
+        end while
+        return result
+    end function
+
+    ' Wrap a byte array as one final stored (BTYPE=00) DEFLATE block inside a
+    ' zlib wrapper. Stored blocks are always legal DEFLATE, so any real
+    ' inflater — including the stremio server's zlib — accepts the stream and
+    ' this side never has to build Huffman tables. Header 78 01 (deflate, 32K
+    ' window, fastest level, no preset dict) passes Inflate()'s own guards, and
+    ' a correct Adler-32 trails so strict inflaters check out.
+    function DeflateStored(bytes as object) as object
+        out = [120, 1]
+        ' BFINAL=1, BTYPE=00, then pad bits: 0b00000001, already byte-aligned
+        ' after the 2-byte header.
+        out.Push(1)
+        len = bytes.Count()
+        out.Push(len mod 256)
+        out.Push(len \ 256)
+        notLen = 65535 - len
+        out.Push(notLen mod 256)
+        out.Push(notLen \ 256)
+        for each byteValue in bytes
+            out.Push(byteValue)
+        end for
+        a = 1
+        b = 0
+        for each byteValue in bytes
+            a = (a + byteValue) mod 65521
+            b = (b + a) mod 65521
+        end for
+        out.Push(b \ 256)
+        out.Push(b mod 256)
+        out.Push(a \ 256)
+        out.Push(a mod 256)
+        return out
+    end function
+
+    ' Encode a watched set into the account's state.watched string: the set is
+    ' { episodeVideoId: true } indexed against orderedEpisodeIds (bit i is the
+    ' i-th id; the whole payload is written, watched or not), and the stored
+    ' "last length" is lastVideoId's index in the list plus 1 — the canonical
+    ' anchor position stremio-watched-bitfield serializes, NOT the list size —
+    ' so a receiver re-aligning around the anchor maps the bits straight back.
+    ' lastVideoId must be a real id — the decoder refuses an empty prefix —
+    ' reported by the caller as the last watched episode. An empty set anchors
+    ' on the first id with length 1; the all-zero payload reads as nothing
+    ' watched everywhere. A stored block keeps the payload lossless and the
+    ' bits in place.
+    function WatchedEncode(orderedEpisodeIds as object, watched as object, lastVideoId as string) as string
+        if orderedEpisodeIds = invalid or Type(orderedEpisodeIds) <> "roArray" or orderedEpisodeIds.Count() = 0 then return ""
+        if watched = invalid or Type(watched) <> "roAssociativeArray" then return ""
+        if lastVideoId = invalid or lastVideoId = "" then return ""
+        n = orderedEpisodeIds.Count()
+        bytes = m.ZeroArray((n + 7) \ 8)
+        for i = 0 to n - 1
+            if watched[orderedEpisodeIds[i]] <> invalid
+                bytes[i \ 8] = bytes[i \ 8] + m.Power2(i mod 8)
+            end if
+        end for
+        anchorIndex = m.IndexInIds(orderedEpisodeIds, lastVideoId)
+        anchorVideoId = lastVideoId
+        if anchorIndex < 0 then
+            anchorIndex = 0
+            anchorVideoId = orderedEpisodeIds[0]
+        end if
+        return anchorVideoId + ":" + (anchorIndex + 1).ToStr() + ":" + m.Base64Encode(m.DeflateStored(bytes))
+    end function
+
+    ' The index of videoId in the ordered episode-id list, or -1 when absent.
+    function IndexInIds(orderedEpisodeIds as object, videoId as string) as integer
+        if orderedEpisodeIds = invalid or Type(orderedEpisodeIds) <> "roArray" then return -1
+        for i = 0 to orderedEpisodeIds.Count() - 1
+            if orderedEpisodeIds[i] = videoId then return i
+        end for
+        return -1
+    end function
+
+    ' ---- bitfield ----
+
+    ' Decode a state.watched string into a map of { episodeVideoId: true } for
+    ' watched episodes, where orderedEpisodeIds is the series' ordered video id
+    ' list (sorted season → episode → release). Malformed, empty or unknown
+    ' inputs decode to an empty map, never a crash.
+    '
+    ' The bits were authored against whatever list the writer held at push time
+    ' — which can differ from ours (season-0 specials prepended by the writer,
+    ' episodes that aired since, …). The anchor re-aligns: reading a field
+    ' positionally against a shifted list paints the marks on the wrong episodes
+    ' (the "everything shifted by N" symptom). So the bit position is rebased by
+    ' `lastLength − 1 − index(anchor)`, stremio-watched-bitfield's resize rule:
+    ' bit i of the payload maps to list[i + offset] (out-of-range reads as
+    ' unwatched). A field whose anchor is not in our list cannot be realigned —
+    ' stremio-core blanks it, and so do we, rather than trust stray positions.
+    function WatchedDecode(bitfield, orderedEpisodeIds as object) as object
+        watched = {}
+        if bitfield = invalid or bitfield = "" then return watched
+        if orderedEpisodeIds = invalid or Type(orderedEpisodeIds) <> "roArray" or orderedEpisodeIds.Count() = 0 then return watched
+
+        parts = bitfield.Split(":")
+        if parts.Count() < 3 then return watched
+
+        payloadStr = parts[parts.Count() - 1]
+        lastLengthStr = parts[parts.Count() - 2]
+        videoIdPrefix = ""
+        for i = 0 to parts.Count() - 3
+            if i > 0 then videoIdPrefix = videoIdPrefix + ":"
+            videoIdPrefix = videoIdPrefix + parts[i]
+        end for
+        if videoIdPrefix = "" then return watched
+
+        lastLength = 0
+        lastLengthDigits = true
+        digits = "0123456789"
+        for i = 0 to lastLengthStr.Len() - 1
+            d = digits.InStr(lastLengthStr.Mid(i, 1))
+            if d < 0 then lastLengthDigits = false
+            lastLength = lastLength * 10 + d
+        end for
+        if not lastLengthDigits then return watched
+
+        decoded = m.Base64Decode(payloadStr)
+        if decoded = invalid or decoded.Count() = 0 then return watched
+        inflated = m.Inflate(decoded)
+        if inflated = invalid or inflated.Count() = 0 then return watched
+
+        anchorIndex = m.IndexInIds(orderedEpisodeIds, videoIdPrefix)
+        if anchorIndex < 0 then return watched
+        offset = lastLength - 1 - anchorIndex
+        bitLimit = inflated.Count() * 8
+
+        for i = 0 to orderedEpisodeIds.Count() - 1
+            bitIndex = i + offset
+            if bitIndex < 0 or bitIndex >= bitLimit then continue for
+            byteIndex = bitIndex \ 8
+            bit = (inflated[byteIndex] \ m.Power2(bitIndex mod 8)) mod 2
+            if bit = 1
+                id = orderedEpisodeIds[i]
+                if id <> invalid and id <> "" then watched[id] = true
+            end if
+        end for
+        return watched
+    end function
+end class

@@ -1,0 +1,696 @@
+' PlaybackStore — stream list for a movie/episode and its resolution to a
+' playable URL, against an add-on server and the dedicated streaming server.
+'
+' Streams(...) speaks the Stremio add-on protocol: GET
+' {addonAddress}/stream/{type}/{videoId}.json returns the streams (direct URLs
+' or torrent infoHashes) for that video.
+'
+' A torrent stream resolves to a streaming-server URL built exactly the way the
+' official Stremio client builds it — {server}/{infoHash}/{fileIdx|-1} — so a
+' torrent with no index of its own needs no round trip at all: -1 tells the
+' server to pick, and the file list it picks from is on the server already. The
+' client's only additions are the trailing /hls.m3u8, because the service
+' transcodes to Roku-native H.264/AAC and a Roku cannot play the container a
+' torrent actually holds, and the `f=`/`tr=` query parameters the official
+' client sends. The per-quality playlists (stream-q-<height>.m3u8) are deferred
+' until we need the served bitrate control they cost in phone-server CPU.
+'
+' Resolution also carries the stream's container (StreamFormat), because Roku
+' does not reliably sniff one and defaults to MP4: an MKV or an HLS manifest
+' handed to the Video node with no format set buffers and then errors.
+'
+' The store is stateless like CatalogStore/EpisodesStore — every call passes
+' the addresses in, nothing is persisted here. Resume positions belong to
+' LibraryStore.
+
+' The playlist probe asks a liveness question, not for a download, so it gets a
+' timeout of its own rather than Transport's 15s default. The wait loop's whole
+' bound is attempts x (this + the interval between them), which is only a sensible
+' ceiling while a request cannot eat the default each time.
+'
+' Raised from 4000 to 8000 against the streaming server's own log, which is what
+' settled the last unexplained timeout in this path. The server logged the engine
+' being created, then our probe arriving 4.4s later, then NOTHING until a second
+' probe 4s after that — roughly 8.4s from engine creation to a served playlist.
+' The engine existed the whole time; it had no torrent metadata yet, and a
+' request for a playlist is HELD OPEN by the server while it gathers some rather
+' than refused. So a 4s deadline was not detecting a slow answer, it was
+' cancelling a request the server was still legitimately working on, and the
+' recovery it bought was a second identical request plus another 4s of waiting.
+'
+' 8000 is the ceiling that lets the first attempt actually wait out a cold
+' engine. It is paid for by cutting the attempt count from six to four
+' (StreamResolveTask), because the bound is attempts x (this + interval) and
+' 6 x (4000 + 4000) and 4 x (8000 + 4000) are both 44s — the same worst case
+' spent on one attempt that can succeed instead of two that cannot.
+const PROBE_TIMEOUT_MS = 8000
+
+' The warm-up's two timeouts, split because the two requests it makes are not
+' remotely alike and one shared number was letting the wrong one fail.
+'
+' The HEAD asks the server to CREATE the engine, and the server's log puts that
+' at 30-65ms from request to "Engine created". It is not a request that waits;
+' it is a request that submits work. 4000ms is roughly a hundred times what it
+' has ever taken, which is the point — a budget that large on a 40ms request is
+' not headroom, it is the number that gets reused for the request below.
+'
+' The ranged GET is the one that actually waits. It blocks until the engine has
+' torrent metadata, which for a DHT-only stream is the whole cost of a cold start
+' — measured across four plays at 1.78s, 3.03s, 4.71s, and one that outlived an
+' 8s cap entirely. That last one is what this number is for: the read is SUPPOSED
+' to block, and a cap that expires before the engine is ready does not fail the
+' stream (the probe behind it picks the wait up) but it throws away the one
+' request that was doing the waiting productively, and the player starts several
+' seconds later than it needed to.
+'
+' Together they cost 14s, less than the 16s they cost when both were 8000, so
+' splitting them bought the readiness wait 2s of real headroom by taking 4s off a
+' request that never used it.
+const ENGINE_HEAD_TIMEOUT_MS = 4000
+
+' The readiness read's own budget, and the only number in this file that is
+' genuinely allowed to be large — it is bounded by DHT, not by us. Kept well
+' under the point where it stops being a wait and starts being a hang on a server
+' that will never answer, because the probe loop behind it is what decides
+' whether the stream is servable and this must not become the thing that decides.
+const ENGINE_READY_TIMEOUT_MS = 10000
+
+' Torrentio permits a 30-second debrid availability check before returning its
+' stream list. Leave room for the add-on's own lookup and network overhead;
+' the ordinary 15-second metadata deadline can cancel a valid source response.
+' This remains bounded, and a timeout is not retried by Transport.
+const STREAM_LIST_TIMEOUT_MS = 45000
+
+class PlaybackStore
+    transport as object
+
+    sub new(http as object)
+        m.transport = http
+    end sub
+
+    ' GET {address}/stream/{type}/{videoId}.json — the stream candidates for a
+    ' movie or episode. The response must carry a streams array.
+    function Streams(addonAddress as string, metaType as string, videoId as string) as object
+        result = { ok: false, streams: invalid, error: "" }
+        if addonAddress = ""
+            result.error = "no addon address"
+            return result
+        end if
+        if metaType = "" or videoId = ""
+            result.error = "type or video id missing"
+            return result
+        end if
+
+        ' IDs are opaque provider identifiers, not URL path fragments. Escape
+        ' each segment so episode IDs containing /, ?, #, or : reach the add-on
+        ' intact after its normal URL decoding, without altering its config query.
+        typeSegment = m.transport.EncodeQueryValue(metaType)
+        idSegment = m.transport.EncodeQueryValue(videoId)
+        url = m.transport.EndpointUrl(addonAddress, "/stream/" + typeSegment + "/" + idSegment + ".json")
+        response = m.transport.Get(url, invalid, STREAM_LIST_TIMEOUT_MS)
+        if not response.ok or response.json = invalid
+            result.error = response.error
+            return result
+        end if
+
+        streams = response.json.streams
+        if streams = invalid or Type(streams) <> "roArray"
+            result.error = "stream response missing streams"
+            return result
+        end if
+
+        result.streams = streams
+        result.ok = true
+        return result
+    end function
+
+    ' The stream's own file index, or -1 when it gave us nothing usable as one.
+    '
+    ' Only a real index counts, and a name is not one. This field used to be
+    ' forwarded as a search needle when it held a filename, which is a different
+    ' field with a different meaning — and a DIGIT sent as a needle matches
+    ' whatever release name happens to contain that digit, so fileIdx 0 found the
+    ' 1080p file because of the zero in "1080p" and played it without question.
+    ' The official client types this field as an integer and treats anything else
+    ' as absent, and so does this: no usable index means -1, which is the
+    ' server's own "you choose" answer.
+    '
+    ' "Is this a number" is settled by trying to make it one rather than by
+    ' asking Type(). That is deliberate. Type() names the object types the same
+    ' way everywhere — roArray, roAssociativeArray — but names the primitives by
+    ' their own type instead of the ro-prefixed interface, so under the test
+    ' interpreter a string is "String", not "roString". A Type()-based string
+    ' check therefore reads FALSE in the suite and TRUE on the device: the suite
+    ' would certify a branch the device never takes, and say nothing about the
+    ' one it does. Coercion is the one question both answer the same way.
+    function DirectFileIdx(stream as object) as integer
+        if stream = invalid then return -1
+        fileIdx = stream.fileIdx
+        if fileIdx = invalid then return -1
+        if Type(fileIdx) = "roArray" or Type(fileIdx) = "roAssociativeArray" then return -1
+        try
+            index = Int(fileIdx)
+        catch notAnumber
+            ' Not a number at all, so not an index.
+            return -1
+        end try
+        if index < 0 then return -1
+        ' A fraction coerces to a whole number, and no file list has a position
+        ' 1.5, so the value has to survive the round trip unchanged.
+        if index <> fileIdx then return -1
+        return index
+    end function
+
+    ' A value as trimmed text, or "" when it is not text. A number throws on
+    ' Trim and that throw is the answer, so a bare number can never be mistaken
+    ' for a name here. Same portability reason as DirectFileIdx: a Type() check
+    ' for "roString" would read false in the suite and true on the device.
+    private function AsText(value as dynamic) as string
+        if value = invalid then return ""
+        try
+            return value.Trim()
+        catch notText
+            return ""
+        end try
+    end function
+
+    ' The name fragments for a series episode, as the streaming server's protocol
+    ' spells them. This lives beside the request that sends them because the
+    ' spelling IS the protocol: the server substring-matches these literals
+    ' against release names, so a change here is a change to what the server is
+    ' being asked, not a change to how the app talks to itself.
+    '
+    ' Sent as repeated `f=` parameters, which is how the official client passes
+    ' fileMustInclude. The server ANDs the list, so these are two halves of one
+    ' instruction, never a menu.
+    '
+    ' An empty list when there is nothing to ask for: a movie has no season or
+    ' episode, and neither does season 0. Specials are excluded deliberately —
+    ' "season: 0" does not narrow the match to the right file, it narrows it to
+    ' the wrong one, and the server's own largest-video fallback is the better
+    ' answer than a confident miss.
+    function EpisodeFilters(season as integer, episode as integer) as object
+        if season <= 0 or episode <= 0 then return []
+        return ["episode: " + episode.ToStr(), "season: " + season.ToStr()]
+    end function
+
+    ' The stream's tracker list, or an empty array.
+    '
+    ' These are the engine's bootstrapping sources, and the official client passes
+    ' every one of them straight through as `tr=` parameters. Dropping them is
+    ' what made a cold engine expensive: with nothing to try, metadata has to
+    ' arrive over DHT alone, which is where the long first-play stall came from.
+    '
+    ' The add-on protocol calls the field `sources` and the streaming-server one
+    ' calls it `announce`; they are the same list and add-ons in the wild send
+    ' both, so both are read, sources first. Anything that is not a list of text
+    ' is dropped rather than trusted — a non-text entry would otherwise throw
+    ' inside ToStr and take the whole URL down with it.
+    function StreamTrackers(stream as object) as object
+        if stream = invalid then return []
+        sources = stream.sources
+        if Type(sources) <> "roArray" then sources = stream.announce
+        if Type(sources) <> "roArray" then return []
+        trackers = []
+        for each entry in sources
+            text = m.AsText(entry)
+            if text <> "" then trackers.Push(text)
+        end for
+        return trackers
+    end function
+
+    ' The streaming URL for a torrent, in the shape the official Stremio client
+    ' builds: {server}/{infoHash}/{fileIdx|-1}, carrying the file filters and
+    ' the stream's trackers as query parameters.
+    '
+    ' The path segment IS the file-selection protocol. A number is that index;
+    ' -1 is the server's own "pick the largest video" answer, which is why a
+    ' stream that arrived without an index still needs nothing asked of it. The
+    ' one addition to the official shape is the trailing /hls.m3u8: the service
+    ' transcodes to H.264/AAC because a Roku cannot play the container a torrent
+    ' actually holds, and the Roku player wants the master playlist, so the
+    ' suffix belongs on the request rather than being a separate route the
+    ' official client simply has no reason to use.
+    function PlaybackUrl(serverAddress as string, infoHash as string, fileIdx as integer, filters = [] as object, trackers = [] as object) as string
+        return m.TorrentUrl(serverAddress, infoHash, fileIdx, filters, trackers, "/hls.m3u8")
+    end function
+
+    ' The bare torrent route — the official client shape with no HLS suffix —
+    ' which is where the engine is asked into existence.
+    '
+    ' Built from the same stream ResolvePlayback resolved, so the two URLs cannot
+    ' disagree about which file is being warmed or which trackers the engine will
+    ' be handed. Takes the stream rather than the parts because the caller holds
+    ' the stream, and re-deriving it here is the only way the warm-up stays in
+    ' step with the URL that follows it.
+    function EngineUrl(serverAddress as string, stream as object, season = 0 as integer, episode = 0 as integer) as string
+        infoHash = m.StreamInfoHash(stream)
+        if infoHash = "" or serverAddress = "" then return ""
+        return m.TorrentUrl(serverAddress, infoHash, m.DirectFileIdx(stream), m.EpisodeFilters(season, episode), m.StreamTrackers(stream), "")
+    end function
+
+    ' The one place that knows the shape of a streaming-server torrent request:
+    ' {server}/{infoHash}/{fileIdx|-1}{suffix}, carrying f= and tr= as query
+    ' parameters.
+    '
+    ' The suffix is a parameter instead of a boolean because the only two callers
+    ' differ by exactly one path segment, and a flag here would be read at the
+    ' call site as an unanswerable "which one is this" — the /hls.m3u8 literal
+    ' already answers it where the call is made.
+    function TorrentUrl(serverAddress as string, infoHash as string, fileIdx as integer, filters as object, trackers as object, suffix as string) as string
+        url = serverAddress + "/" + infoHash + "/" + fileIdx.ToStr() + suffix
+        query = m.QueryString(filters, trackers)
+        if query <> "" then url = url + "?" + query
+        return url
+    end function
+
+    ' The query string for a torrent request: repeated f= for the file filters,
+    ' then repeated tr= for the trackers.
+    '
+    ' REPEATED keys, not one comma-joined value. The server collects every
+    ' occurrence of a key, so f=a&f=b is two constraints it ANDs together — the
+    ' whole point of sending a season and an episode — while "f=a,b" would be a
+    ' single constraint looking for that literal comma-and-b, which matches
+    ' nothing and fails silently into the largest-video fallback.
+    '
+    ' Values are percent-encoded because both carry characters a query cannot
+    ' hold raw: the filters contain a space and a colon, and a tracker is a URL
+    ' with a scheme and a port in it.
+    function QueryString(filters as object, trackers as object) as string
+        parts = []
+        for each filter in m.TextList(filters)
+            parts.Push("f=" + m.transport.EncodeQueryValue(filter))
+        end for
+        for each tracker in m.TextList(trackers)
+            parts.Push("tr=" + m.transport.EncodeQueryValue(tracker))
+        end for
+        query = ""
+        for each part in parts
+            if query <> "" then query = query + "&"
+            query = query + part
+        end for
+        return query
+    end function
+
+    ' The text entries of a list, with anything that is not text dropped. Used on
+    ' both query inputs, where one bad entry from an add-on must not cost the
+    ' whole URL: an invalid or numeric entry throws inside ToStr, and an
+    ' exception escaping here would take playback down over a malformed tracker.
+    private function TextList(values as object) as object
+        out = []
+        if Type(values) <> "roArray" then return out
+        for each value in values
+            text = m.AsText(value)
+            if text <> "" then out.Push(text)
+        end for
+        return out
+    end function
+
+    ' One-call resolution for a play button: a direct-URL stream plays as is, a
+    ' torrent stream becomes a streaming-server playlist URL. Returns
+    ' { ok, url, error }.
+    '
+    ' Nothing is asked of the server to resolve a stream. The file index is
+    ' either in the stream or it is -1, and the file list that -1 is chosen from
+    ' is on the server regardless, so the URL is fully determined by what is
+    ' already in hand and the engine comes up when the playlist is first
+    ' requested.
+    '
+    ' The alternative was a POST to the streaming server's create endpoint to
+    ' have it pick a file, and that bought exactly one thing — a chosen index —
+    ' at the price of a cold-engine park on the render thread before the player
+    ' was told what to play at all: metadata over DHT and trackers, tens of
+    ' seconds, with a timeout long enough to notice. That wait now happens
+    ' behind the player's own buffering, where it is invisible, and the pass-
+    ' through of `tr=` gives the engine the sources it was missing anyway.
+    function ResolvePlayback(serverAddress as string, stream as object, season = 0 as integer, episode = 0 as integer) as object
+        result = { ok: false, url: "", error: "", streamFormat: "", mode: "", headers: [] }
+        if stream = invalid
+            result.error = "no stream"
+            return result
+        end if
+
+        url = m.AsText(stream.url)
+        if url <> ""
+            if LCase(url).Left(8) <> "https://" and LCase(url).Left(7) <> "http://"
+                result.error = "unsupported stream URL scheme"
+                return result
+            end if
+            result.ok = true
+            result.url = url
+            result.streamFormat = m.StreamFormat(stream, result.url)
+            result.mode = "direct"
+            result.headers = m.DirectHeaders(stream)
+            return result
+        end if
+
+        infoHash = m.StreamInfoHash(stream)
+        if infoHash = ""
+            result.error = "stream has no infoHash"
+            return result
+        end if
+        if serverAddress = ""
+            result.error = "no streaming server address"
+            return result
+        end if
+
+        result.url = m.PlaybackUrl(serverAddress, infoHash, m.DirectFileIdx(stream), m.EpisodeFilters(season, episode), m.StreamTrackers(stream))
+        result.streamFormat = m.StreamFormat(stream, result.url)
+        result.mode = "server"
+        result.ok = true
+        return result
+    end function
+
+    ' Stremio request headers belong to this media item, never to the shared
+    ' app HTTP agent. Values are used only for playback and are not logged.
+    ' Reject control characters/header injection and transport-owned headers.
+    function DirectHeaders(stream as object) as object
+        headers = []
+        if stream = invalid or Type(stream.behaviorHints) <> "roAssociativeArray" then return headers
+        proxyHeaders = stream.behaviorHints.proxyHeaders
+        if Type(proxyHeaders) <> "roAssociativeArray" then return headers
+        request = proxyHeaders.request
+        if Type(request) <> "roAssociativeArray" then return headers
+        for each name in request
+            value = m.AsText(request[name])
+            cleanName = m.AsText(name)
+            lower = LCase(cleanName)
+            if not m.HeaderNameValid(cleanName) then continue for
+            if lower = "host" or lower = "content-length" or lower = "connection" or lower = "range" then continue for
+            if not m.HeaderValueValid(value) then continue for
+            headers.Push(cleanName + ":" + value)
+        end for
+        return headers
+    end function
+
+    private function HeaderNameValid(name as string) as boolean
+        if name = "" then return false
+        allowed = "abcdefghijklmnopqrstuvwxyz0123456789!#$%&'*+-.^_`|~"
+        lower = LCase(name)
+        for index = 0 to lower.Len() - 1
+            if allowed.InStr(lower.Mid(index, 1)) < 0 then return false
+        end for
+        return true
+    end function
+
+    private function HeaderValueValid(value as string) as boolean
+        if value = "" then return false
+        for index = 0 to value.Len() - 1
+            code = Asc(value.Mid(index, 1))
+            if code < 32 or code = 127 then return false
+        end for
+        return true
+    end function
+
+    function StreamInfoHash(stream as object) as string
+        if stream <> invalid and stream.infoHash <> invalid then return stream.infoHash.ToStr()
+        return ""
+    end function
+
+    ' Whether this stream is a torrent the streaming server has to serve, as
+    ' opposed to a direct URL the player opens as-is.
+    '
+    ' Mirrors the precedence ResolvePlayback applies, deliberately, so the two can
+    ' never disagree about the same stream: if a stream somehow carries both a
+    ' playable URL and a hash, the URL wins there and the stream is not a torrent
+    ' here.
+    function IsTorrent(stream as object) as boolean
+        if stream = invalid then return false
+        url = m.AsText(stream.url)
+        if url <> "" then return false
+        return m.StreamInfoHash(stream) <> ""
+    end function
+
+    ' The container the Video node must be told to play, or "" when nothing can be
+    ' inferred. Roku defaults streamFormat to H.264/AAC in an MP4 container, so a
+    ' format left unset is not "let the platform sniff it" — it is actively wrong
+    ' for an MKV or an HLS manifest, and the symptom is a buffer that ends in an
+    ' immediate error (errorCode -5, "media format unknown or unsupported").
+    '
+    ' Which hint wins is deliberate. A manifest URL (m3u8/mpd) IS the transport,
+    ' not a media file, so it is read from the URL and never overridden: a torrent
+    ' resolves to our /hls.m3u8 transcode, and declaring the source file's
+    ' container there would break the very transcoding that makes it playable.
+    ' A recognizable delivery URL wins even when an add-on names the original
+    ' pre-conversion file. For opaque URLs, each filename candidate is consulted
+    ' independently, in the
+    ' protocol's order of trust — behaviorHints.filename, then title, then
+    ' description — and only believed when it actually names a known container:
+    ' an extensionless hint must not shadow a title that ends in a real
+    ' extension, which is a real add-on shape (a slug in the hint, the release
+    ' name with its extension in the title). The description is read because
+    ' some add-ons keep the release name there instead of in the title — the
+    ' same field the stream card renders, on the principle that the detector
+    ' should hear everything the user is shown. `name` is never a candidate: it
+    ' holds the provider/quality label, and a label like "1080p" is not a
+    ' filename. The URL is the last resort, because a direct link can hide the
+    ' container entirely (a presigned URL keeps the filename in its query, not
+    ' in its path).
+    function StreamFormat(stream as object, url as string) as string
+        urlFormat = m.FormatFromUrl(url)
+        if urlFormat <> "" then return urlFormat
+        if stream <> invalid
+            hint = m.FormatFromText(m.AddonFilename(stream))
+            if hint <> "" then return hint
+            hint = m.FormatFromText(m.AddonTitle(stream))
+            if hint <> "" then return hint
+            hint = m.FormatFromText(m.AddonDescription(stream))
+            if hint <> "" then return hint
+        end if
+        return urlFormat
+    end function
+
+    ' The add-on's dedicated filename slot, or "". Read as a candidate, not the
+    ' answer: some add-ons put a non-filename there, and the caller decides.
+    private function AddonFilename(stream as object) as string
+        hints = stream.behaviorHints
+        if hints = invalid or Type(hints) <> "roAssociativeArray" then return ""
+        return m.AsText(hints.filename)
+    end function
+
+    ' The add-on's title, or "". Scanned whole, not down to its first line: the
+    ' extension rule already looks for the LAST bounded extension anywhere in the
+    ' string, and a line feed is a boundary, so the size/seeders lines that follow
+    ' a release name cannot hide its container.
+    private function AddonTitle(stream as object) as string
+        return m.AsText(stream.title)
+    end function
+
+    ' The add-on's description, or "". Several add-ons that leave title empty put
+    ' the release name, size and quality here instead (the stream card renders it
+    ' too), so an empty title is not a dead end.
+    private function AddonDescription(stream as object) as string
+        return m.AsText(stream.description)
+    end function
+
+    ' The container a URL names: the path first, the query only as a fallback. The
+    ' query matters because a presigned link puts the real filename in
+    ' response-content-disposition ("...filename=%22movie.mkv%22") while the path
+    ' is an opaque object id with no extension at all.
+    private function FormatFromUrl(url as string) as string
+        cleanUrl = LCase(url.Trim())
+        fragmentIndex = cleanUrl.InStr("#")
+        if fragmentIndex >= 0 then cleanUrl = cleanUrl.Left(fragmentIndex)
+        queryIndex = cleanUrl.InStr("?")
+        if queryIndex >= 0
+            path = cleanUrl.Left(queryIndex)
+            query = cleanUrl.Mid(queryIndex + 1)
+        else
+            path = cleanUrl
+            query = ""
+        end if
+        format = m.FormatFromText(path)
+        if format <> "" then return format
+        if query = "" then return ""
+        ' Signed tokens and tracking parameters are not filenames. An arbitrary
+        ' token ending in .mpd must not turn an MKV into a DASH request.
+        for each part in query.Split("&")
+            equalIndex = part.InStr("=")
+            if equalIndex < 0 then continue for
+            key = part.Left(equalIndex)
+            if key <> "filename" and key <> "file" and key <> "name" and key <> "response-content-disposition" then continue for
+            value = part.Mid(equalIndex + 1).Replace("%2e", ".")
+            format = m.FormatFromText(value)
+            if format <> "" then return format
+        end for
+        return ""
+    end function
+
+    ' The container named by the LAST file extension in `text`, or "". The last
+    ' one, because a release name carries earlier dots ("Show.2026.mkv") and the
+    ' file's extension is the final one. An extension only counts when it ends the
+    ' string or meets a character that cannot be part of a filename, which is what
+    ' lets a percent-encoded query filename (".mkv%22") still be found while
+    ' refusing to read a container out of the middle of a word.
+    private function FormatFromText(text as string) as string
+        if text = "" then return ""
+        lower = LCase(text)
+        extensions = [".m3u8", ".m3u", ".mpd", ".mkv", ".mp4", ".m4v", ".mov"]
+        formats = ["hls", "hls", "dash", "mkv", "mp4", "mp4", "mp4"]
+        bestIndex = -1
+        bestFormat = ""
+        for i = 0 to extensions.Count() - 1
+            index = m.LastBoundedIndex(lower, extensions[i])
+            if index > bestIndex
+                bestIndex = index
+                bestFormat = formats[i]
+            end if
+        end for
+        return bestFormat
+    end function
+
+    ' The index of the final occurrence of `ext` in `text` that ends at a
+    ' boundary, or -1. Scanned by shrinking the string rather than with InStr's
+    ' optional start argument, which this codebase has never put on a device.
+    private function LastBoundedIndex(text as string, ext as string) as integer
+        found = -1
+        offset = 0
+        index = text.InStr(ext)
+        while index >= 0
+            after = index + ext.Len()
+            if after >= text.Len() or m.IsExtensionBoundary(text.Mid(after, 1))
+                found = offset + index
+            end if
+            offset = offset + index + 1
+            text = text.Mid(index + 1)
+            index = text.InStr(ext)
+        end while
+        return found
+    end function
+
+    ' Whether a character ends an extension — anything that cannot be part of a
+    ' filename (letter, digit or dot). Callers pass lowercased text.
+    private function IsExtensionBoundary(ch as string) as boolean
+        if ch = "" then return true
+        filenameChars = "abcdefghijklmnopqrstuvwxyz0123456789."
+        return filenameChars.InStr(ch) < 0
+    end function
+
+    ' HEAD the bare torrent route so the streaming server has created the engine
+    ' before the playlist is ever asked for.
+    '
+    ' Stremio's own client opens every torrent this way, and the server log shows
+    ' the engine appearing on the back of that request. Asking for the playlist
+    ' first is what left the probe timing out six times over: that was not a slow
+    ' engine being raced, it was a server that had never been asked to make one.
+    '
+    ' Best effort, and never fatal. The probe loop behind this is what decides
+    ' whether the stream is servable and it runs either way, so a warm-up that
+    ' fails costs the optimisation and nothing else — which is why the caller can
+    ' keep it in a try of its own.
+    '
+    ' The status comes back for the reason the probe's does: to be able to say
+    ' afterwards whether the request reached the server at all. A 2xx here is not
+    ' logged by the transport trace, so this record is the only trace of it.
+    '
+    ' Then the forced-metadata read, which is the request that actually makes the
+    ' engine able to answer. The HEAD above only asks the server to CREATE the
+    ' engine, and it returns in milliseconds — so "HEAD 200" was never evidence
+    ' the engine could serve a playlist, and the probe behind this was left
+    ' discovering the difference the slow way, one 4s timeout at a time.
+    '
+    ' Stremio's client does not poll for readiness at all. It asks for the first
+    ' 64KB of the file and lets THAT block until the engine has metadata, and the
+    ' server's log for a working device shows exactly that request sitting between
+    ' the HEAD and the /hls.m3u8. So this mirrors the client's own sequence rather
+    ' than inventing a readiness protocol: one ranged GET converts "the engine
+    ' exists" into "the engine can serve", and the probe behind it then hits a
+    ' ready engine on attempt 1.
+    '
+    ' The Range header is what keeps this from being the mistake the HEAD comment
+    ' above warns about. An unbounded GET on this route is a request to buffer an
+    ' entire feature into a string; 64KB is enough to prove the engine can serve
+    ' bytes and small enough to be free. The body is discarded — this is a
+    ' readiness signal, not data, and the player fetches its own segments
+    ' afterwards.
+    '
+    ' Recorded separately rather than folded into `ok`, because whether the engine
+    ' was CREATED and whether it went READY are different questions and only the
+    ' first is answered by the HEAD. A cold engine and an unreachable server are
+    ' indistinguishable without the second, which is the whole difference between
+    ' "wait longer" and "this stream is not coming".
+    function WarmEngine(url as string) as object
+        result = { ok: false, status: 0, error: "", range: invalid }
+        if url = "" then
+            result.error = "no engine url"
+            return result
+        end if
+        raw = m.transport.Head(url, ENGINE_HEAD_TIMEOUT_MS)
+        if raw = invalid
+            result.error = "no transport"
+            return result
+        end if
+        result.ok = raw.ok
+        result.status = raw.status
+        if raw.error <> invalid then result.error = raw.error
+
+        ' Not guarded on the HEAD's own success. A refused or timed-out HEAD still
+        ' leaves the server building the engine, and this request is the one that
+        ' finds out whether it did — so skipping it on a failed HEAD would throw
+        ' away the only remaining evidence exactly when there is least of it.
+        ranged = m.transport.GetRaw(url, ENGINE_READY_TIMEOUT_MS, { "Range": "bytes=0-65535" })
+        if ranged <> invalid then
+            result.range = { ok: ranged.ok, status: ranged.status, error: ranged.error }
+        end if
+        return result
+    end function
+
+    ' One plain GET of the playlist URL, with the body left as text.
+    '
+    ' This is the probe the player is NOT asked to make. Whatever the server says
+    ' here is what the Video node is about to be told, a moment earlier and on a
+    ' thread whose patience is ours rather than the node's — and the node's is
+    ' much the shorter of the two.
+    '
+    ' No retrying and no sleeping here: the store is asked a question and answers
+    ' it. How many times to keep asking, and how long to pause between asks, is a
+    ' property of the thread doing the asking, so it belongs to the resolve task.
+    ' That split is not tidiness, it is testability — a Wait() inside store code
+    ' ABORTS the brs interpreter's run and Ticks() does not exist in it, so a wait
+    ' loop written here would be neither exercised by the suite nor timed.
+    function ProbePlaylist(url as string) as object
+        probe = { ok: false, status: 0, body: "", error: "" }
+        raw = m.transport.GetRaw(url, PROBE_TIMEOUT_MS)
+        if raw = invalid
+            probe.error = "no transport"
+            return probe
+        end if
+        probe.ok = raw.ok
+        probe.status = raw.status
+        probe.body = m.BodyHead(raw.body)
+        if raw.error <> invalid then probe.error = raw.error
+        return probe
+    end function
+
+    ' The opening of a response body, kept for the diagnostic that says whether
+    ' the server handed back a manifest at all. Long enough to identify one, short
+    ' enough that a segment list cannot fill a label or a log file.
+    private function BodyHead(body as dynamic) as string
+        if body = invalid then return ""
+        text = body.ToStr()
+        if Len(text) <= 400 then return text
+        return text.Left(400)
+    end function
+
+    ' Liveness check for the streaming server: GET /heartbeat → { success: true }.
+    function Heartbeat(serverAddress as string) as object
+        result = { ok: false, alive: false, error: "" }
+        if serverAddress = ""
+            result.error = "no streaming server address"
+            return result
+        end if
+
+        response = m.transport.Get(serverAddress + "/heartbeat")
+        if response.ok and response.json <> invalid and response.json.success = true
+            result.ok = true
+            result.alive = true
+        else
+            if response.error <> "" then
+                result.error = response.error
+            else
+                result.error = "unexpected heartbeat response"
+            end if
+        end if
+        return result
+    end function
+end class

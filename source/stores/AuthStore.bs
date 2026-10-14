@@ -1,0 +1,92 @@
+' AuthStore — the current session, persisted locally.
+'
+' Two session modes: a local "guest" session (no transport, no network call, no
+' authKey — the app simply runs without an account, so nothing syncs), and a
+' "stremio" session that carries the account authKey + user profile (link-code
+' pairing and the account sync live in later stages). The session survives
+' relaunches through the "session" key of the "auth" registry section, so
+' MainScene can skip the auth screen when IsLoggedIn() is true.
+
+class AuthStore
+    registry as dynamic
+    session as string
+    authKey as string
+    user as dynamic
+
+    sub new(registry = invalid as dynamic)
+        m.registry = registry
+        m.session = ""
+        m.authKey = ""
+        m.user = invalid
+        m.Load()
+    end sub
+
+    ' Sign in without an account. Drops any previous account data so a guest
+    ' session never carries a stale authKey or profile.
+    function LoginGuest() as object
+        m.session = "guest"
+        m.authKey = ""
+        m.user = invalid
+        m.Save()
+        return { ok: true, session: m.session }
+    end function
+
+    ' Sign in to a Stremio account with a paired authKey and its user profile.
+    function LoginStremio(authKey as string, user as dynamic) as object
+        m.session = "stremio"
+        m.authKey = authKey
+        m.user = user
+        m.Save()
+        return { ok: true, session: m.session, authKey: m.authKey }
+    end function
+
+    function GetSession() as string
+        return m.session
+    end function
+
+    function GetAuthKey() as string
+        return m.authKey
+    end function
+
+    function GetUser() as dynamic
+        return m.user
+    end function
+
+    function IsLoggedIn() as boolean
+        return m.session <> ""
+    end function
+
+    sub Logout()
+        m.session = ""
+        m.authKey = ""
+        m.user = invalid
+        m.Save()
+    end sub
+
+    sub Save()
+        if m.registry = invalid then return
+        data = { session: m.session, authKey: m.authKey }
+        if m.user <> invalid then data.user = m.user
+        m.registry.Write("session", FormatJson(data))
+        m.registry.Flush()
+    end sub
+
+    sub Load()
+        if m.registry = invalid then return
+        raw = m.registry.Read("session")
+        if raw = "" then return
+        ' The Roku runtime throws on malformed JSON rather than returning
+        ' invalid (see Transport.Parse); a corrupt session key must mean "no
+        ' session", not a cold-start crash.
+        parsed = invalid
+        try
+            parsed = ParseJson(raw)
+        catch e
+            return
+        end try
+        if parsed = invalid then return
+        if parsed.session <> invalid then m.session = parsed.session
+        if parsed.authKey <> invalid then m.authKey = parsed.authKey
+        if parsed.user <> invalid then m.user = parsed.user
+    end sub
+end class

@@ -1,0 +1,11 @@
+1
+00:00:00,000 --> 00:00:03,000
+This is the English caption track.
+
+2
+00:00:03,500 --> 00:00:07,000
+Each subtitle sits on its own cue.
+
+3
+00:00:08,000 --> 00:00:12,000
+Switch tracks any time with the * menu.

@@ -1,0 +1,149 @@
+' SubtitlesStore — caption tracks for a movie/episode from an add-on server.
+'
+' Subtitles(...) speaks the Stremio add-on protocol: GET
+' {addonAddress}/subtitles/{type}/{videoId}.json returns the available tracks
+' (each a { id, url, lang, langName, … } entry) for that video. The list is
+' passed through as the add-on provides it; picking a single default track
+' lives in PickTrack so it is unit-testable without a transport. Nothing here
+' renders subtitles — building Roku SubtitleTracks ContentNodes is the
+' player's job — so the store stays pure data like its siblings.
+'
+' Stateless like CatalogStore/PlaybackStore: every call passes the addresses
+' in, nothing is persisted here.
+
+' Strip an add-on address down to something safe to write to the console log.
+'
+' A stored add-on address routinely carries the user's credential in its query
+' string — Transport.EndpointUrl exists precisely to keep a "?token=..." intact
+' through request assembly — so printing one in full puts a live API key into the
+' device log, and from there into any log pasted into a bug report. Every trace in
+' this feature names the provider, so this is what they name it as.
+'
+' Declared at file scope, beside the store rather than inside it: both callers that
+' need it are components which already include this file (PlayerScreen.xml and
+' SubtitleLoaderTask.xml), so it resolves in their scope. Transport.bs redacts its
+' own URLs for the same reason and cannot be reached from a component — a
+' user-defined global resolves to invalid when invoked from another component's
+' code, which is why PercentEncode there is reached through the class.
+function RedactUrl(url as string) as string
+    if url = invalid then return "[endpoint]"
+    at = url.InStr("://")
+    if at <= 0 then return "[endpoint]"
+    scheme = LCase(url.Left(at))
+    if scheme <> "http" and scheme <> "https" then return "[endpoint]"
+    authority = url.Mid(at + 3)
+    for each separator in ["/", "?", "#"]
+        cut = authority.InStr(separator)
+        if cut >= 0 then authority = authority.Left(cut)
+    end for
+    userinfo = authority.InStr("@")
+    if userinfo >= 0 then authority = authority.Mid(userinfo + 1)
+    if authority = "" then return "[endpoint]"
+    return scheme + "://" + authority + "/[redacted]"
+end function
+
+class SubtitlesStore
+    transport as object
+
+    sub new(http as object)
+        m.transport = http
+    end sub
+
+    ' GET {address}/subtitles/{type}/{videoId}.json — the caption candidates for
+    ' a movie or episode. The response must carry a subtitles array.
+    '
+    ' The result carries `issued` alongside `status`, and the two together are what
+    ' let the caller tell "we never asked" from "we asked and it refused", which
+    ' call for opposite behaviour and cannot both be expressed by one number:
+    '
+    '   issued = false  rejected before any request — our own bad input. The next
+    '                   request would be byte-identical, so it is never retried.
+    '   issued = true, status < 0
+    '                   the transfer never completed: DNS failure, refused
+    '                   connection, TLS failure. Nothing was heard back, so asking
+    '                   again is worth it.
+    '   issued = true, status = 0
+    '                   handed to roUrlTransfer and never came back: timed out, or
+    '                   the transfer would not start. Also worth another go.
+    '   issued = true, 2xx
+    '                   it answered. ok is false past that point only if the body
+    '                   would not parse, which on a degraded link is as likely to be
+    '                   a truncated or gateway-wrapped response as anything else.
+    '   issued = true, 4xx  it answered "no". Asking again changes nothing.
+    '
+    ' `issued` used to be a `status = -1` sentinel for the pre-request case, and
+    ' that was unsound: Transport reports a NEGATIVE status for every transport
+    ' failure — see its _execute, which reaches for GetFailureReason precisely
+    ' when status < 0 — so -1 could not be told apart from a real error. A caller
+    ' keying on the sign of status then sent genuine connect failures down its
+    ' non-retryable path, and a refused connection never got a second try.
+    '
+    ' The error string alone cannot carry this either: Transport reports a timeout,
+    ' a connect failure, a malformed body and an HTTP 404 all as free text.
+    function Subtitles(addonAddress as string, metaType as string, videoId as string) as object
+        result = { ok: false, subtitles: invalid, error: "", status: 0, issued: false }
+        if addonAddress = ""
+            result.error = "no addon address"
+            return result
+        end if
+        if metaType = "" or videoId = "" then
+            result.error = "type or video id missing"
+            return result
+        end if
+
+        url = m.transport.EndpointUrl(addonAddress, "/subtitles/" + m.transport.EncodeQueryValue(metaType) + "/" + m.transport.EncodeQueryValue(videoId) + ".json")
+        response = m.transport.Get(url)
+        result.issued = true
+        result.status = response.status
+        if not response.ok or response.json = invalid
+            result.error = response.error
+            return result
+        end if
+
+        subtitles = response.json.subtitles
+        if subtitles = invalid or Type(subtitles) <> "roArray"
+            result.error = "subtitles response missing subtitles"
+            return result
+        end if
+
+        result.subtitles = subtitles
+        result.ok = true
+        return result
+    end function
+
+    ' Index of the track to show by default: the one whose language starts with
+    ' the device locale's two-letter prefix, else an English track, else the
+    ' first track. -1 when there is nothing to pick from; a blank locale simply
+    ' skips the first pass.
+    function PickTrack(subtitles as object, locale as string) as integer
+        if subtitles = invalid or Type(subtitles) <> "roArray" then return -1
+
+        prefix = ""
+        if locale <> invalid and locale.Trim() <> "" then prefix = LCase(locale.Trim().Left(2))
+
+        if m.TrackMatchesLang(subtitles, prefix) >= 0 then return m.TrackMatchesLang(subtitles, prefix)
+        if m.TrackMatchesLang(subtitles, "en") >= 0 then return m.TrackMatchesLang(subtitles, "en")
+        if subtitles.Count() > 0 then return 0
+        return -1
+    end function
+
+    ' Index of the first track whose language code starts with code, or -1. A
+    ' blank code never matches (so empty-language tracks survive a match pass).
+    function TrackMatchesLang(subtitles as object, code as string) as integer
+        if subtitles = invalid or Type(subtitles) <> "roArray" then return -1
+        if code = "" then return -1
+        for i = 0 to subtitles.Count() - 1
+            if m.TrackLang(subtitles[i]).Left(2) = code then return i
+        end for
+        return -1
+    end function
+
+    ' The track's language code lowercased, or "" when the track carries none.
+    ' Matching keys off lang (the Stremio field every subtitle add-on sets);
+    ' langName is a display label, never a reliable code ("Spanish" is not "es").
+    function TrackLang(track as object) as string
+        if track = invalid or Type(track) <> "roAssociativeArray" then return ""
+        if track.lang <> invalid and track.lang.Trim() <> "" then return LCase(track.lang.Trim())
+        return ""
+    end function
+end class

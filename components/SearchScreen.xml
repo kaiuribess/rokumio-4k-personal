@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="SearchScreen" extends="Screen">
+    <!-- Search: every installed add-on's search-capable catalogs. A
+         Voice-enabled StandardKeyboardDialog prompt on entry, then results as poster rows, one per
+         search-capable catalog (Stremio-style). OK on a result publishes a
+         pushRequest the Scene routes to Details. The * (options) key reopens
+         a fresh keyboard prompt. -->
+    <interface>
+        <!-- The one action Search reports upward: a push request. -->
+        <field id="pushRequest" type="assocarray" alwaysNotify="true" />
+
+        <!-- Screen contract: called by ScreenStack for show/hide/focus/back. -->
+        <function name="OnEnter" />
+        <function name="OnExit" />
+        <function name="OnBackPressed" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/components/SearchScreen.brs" />
+    <script type="text/brightscript" uri="pkg:/source/core/AsyncTask.bs" />
+    <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
+    <script type="text/brightscript" uri="pkg:/source/core/TileSize.bs" />
+
+    <children>
+        <Rectangle id="searchBg" width="1920" height="1080" color="0x0" />
+        <Label
+            id="searchTitle"
+            translation="[150, 48]"
+            width="1760"
+            height="70"
+            text="Search"
+            font="font:LargeBoldSystemFont" />
+        <Label
+            id="searchSub"
+            translation="[150, 128]"
+            width="1760"
+            height="40"
+            text="Speak or type a movie or TV show"
+            font="font:MediumSystemFont" />
+
+        <Label
+            id="searchStatus"
+            translation="[150, 180]"
+            width="1760"
+            height="40"
+            font="font:MediumSystemFont" />
+
+        <!-- Results grid: poster rows, one per catalog that returned results.
+             numRows is set from m.rows; a catalog with no matches gets no row,
+             so the grid can start empty and fill in as add-ons answer. -->
+        <RowList
+            id="searchResults"
+            translation="[150, 270]"
+            numRows="2"
+            itemSize="[1660, 324]"
+            itemSpacing="[0, 64]"
+            rowItemSize="[[216, 324]]"
+            rowItemSpacing="[[18, 0]]"
+            showRowLabel="[true]"
+            rowLabelOffset="[[0, 10]]"
+            rowLabelFont="font:MediumBoldSystemFont"
+            drawFocusFeedback="true"
+            itemComponentName="PosterTile" />
+        <Rectangle id="searchFooterBg" translation="[130, 990]" width="1660" height="70" />
+        <Label id="searchHelp" translation="[150, 1008]" width="1620" height="40"
+            text="OK: details     *: new search     Back: return"
+            font="font:MediumSystemFont" />
+    </children>
+</component>

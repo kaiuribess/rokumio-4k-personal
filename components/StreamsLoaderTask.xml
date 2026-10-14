@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="StreamsLoaderTask" extends="Task">
+    <interface>
+        <field id="metaType" type="string" value="" />
+        <field id="videoId" type="string" value="" />
+        <field id="addonAddress" type="string" value="" />
+        <field id="providerIndex" type="integer" value="-1" />
+        <field id="providerName" type="string" value="" />
+        <field id="providerId" type="string" value="" />
+        <field id="audioMode" type="string" value="projector" />
+        <!-- Which LoadStreams pass this task belongs to. Set from StreamsScreen
+             when the task is launched. StreamsScreen cannot compare task NODES to
+             tell a stale report from a live one — roSGNode exposes no identity
+             operator (see the reference: ifAssociativeArray, ifSGNodeChildren,
+             ifSGNodeField, ifSGNodeDict, ifSGNodeFocus, ifSGNodeBoundingRect,
+             ifSGNodeHttpAgentAccess — no IsSame, and `a <> b` between two nodes is
+             a runtime &h18). A scalar the screen stamps is the documented way to
+             say "this report belongs to the batch I am still waiting on". -->
+        <field id="loadToken" type="string" value="" />
+        <field id="result" type="assocarray" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/source/stores/Transport.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/PlaybackStore.bs" />
+    <script type="text/brightscript" uri="pkg:/source/util/CinemaStreams.brs" />
+    <script type="text/brightscript" uri="pkg:/components/StreamsLoaderTask.brs" />
+</component>

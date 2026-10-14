@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="StreamResolveTask" extends="Task">
+    <interface>
+        <field id="serverAddress" type="string" value="" />
+        <field id="stream" type="assocarray" />
+        <!-- Season and episode, as INTEGERS, not as the `f=` parameters they turn
+             into. AsyncTask_Launch assigns task fields through AddReplace, which
+             enforces the declared type and refuses anything else at runtime
+             ("Type mismatch" on the device, with the suite green because the
+             interpreter does not check), so a list cannot be handed across this
+             boundary under an assocarray field however well it nests.
+
+             The numbers are also the honest thing to pass: what the streaming
+             server substring-matches against release names is its own protocol,
+             so the store builds the parameters and the screen only supplies the
+             two values it already has. 0 means "not a series" and produces no
+             filters, which is also what a movie wants. -->
+        <field id="season" type="integer" value="0" />
+        <field id="episode" type="integer" value="0" />
+        <field id="audioMode" type="string" value="projector" />
+        <field id="result" type="assocarray" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/source/stores/Transport.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/PlaybackStore.bs" />
+    <script type="text/brightscript" uri="pkg:/components/StreamResolveTask.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/NativeMedia.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/EnglishAudio.brs" />
+</component>

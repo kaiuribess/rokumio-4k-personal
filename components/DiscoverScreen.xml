@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="DiscoverScreen" extends="Screen">
+    <!-- Discover: browse every installed add-on's catalogs by filter. Three
+         chips (Type · Catalog · Genre) sit above a poster grid. OK on a chip
+         opens a dropdown menu of the chip's options — Up/Down to move, OK to
+         pick, Back to dismiss — so a wrong pick is an instant Back, never a
+         full cycle. OK on a result publishes a pushRequest the Scene routes to
+         Details. The type chip lists every declared catalog type that has a
+         feed-capable catalog; the catalog chip lists every such catalog of the
+         chosen type; the genre chip takes its options from the chosen catalog's
+         manifest (and is omitted when that catalog declares no genre). -->
+    <interface>
+        <!-- The one action Discover reports upward: a push request. -->
+        <field id="pushRequest" type="assocarray" alwaysNotify="true" />
+
+        <!-- Screen contract: called by ScreenStack for show/hide/focus/back. -->
+        <function name="OnEnter" />
+        <function name="OnExit" />
+        <function name="OnBackPressed" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/components/DiscoverScreen.brs" />
+    <script type="text/brightscript" uri="pkg:/source/core/AsyncTask.bs" />
+    <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
+    <script type="text/brightscript" uri="pkg:/source/core/TileSize.bs" />
+
+    <children>
+        <Rectangle id="discoverBg" width="1920" height="1080" color="0x0" />
+        <Label
+            id="discoverTitle"
+            translation="[150, 48]"
+            width="1660"
+            height="70"
+            text="Discover"
+            font="font:LargeBoldSystemFont" />
+        <Label
+            id="discoverSub"
+            translation="[150, 128]"
+            width="1660"
+            height="40"
+            text="OK on a chip to open its menu · Up/Down to reach the results · Back to exit · * Focus filters"
+            font="font:SmallSystemFont" />
+
+        <Label
+            id="discoverStatus"
+            translation="[150, 176]"
+            width="1660"
+            height="40"
+            font="font:SmallSystemFont" />
+
+        <!-- Current filter summary, e.g. "Featured · Movies · Sci-Fi". -->
+        <Label
+            id="discoverHeader"
+            translation="[150, 300]"
+            width="1660"
+            height="40"
+            font="font:MediumSystemFont" />
+
+        <!-- Results grid: one fetch's metas chunked into poster rows so the
+             RowList clips/scrolls vertically. UpdateGrid computes the column
+             count to fit the 1660px row budget for the active tile size (5 for
+             2:3, 3 for 16:9), so a landscape row never overflows into per-row
+             horizontal scrolling. Same PosterTile contract as Home's grid. -->
+        <RowList
+            id="discoverGrid"
+            translation="[150, 362]"
+            numRows="1"
+            itemSize="[1660, 405]"
+            itemSpacing="[0, 18]"
+            rowItemSize="[[270, 405]]"
+            rowItemSpacing="[[18, 0]]"
+            showRowLabel="false"
+            drawFocusFeedback="true"
+            itemComponentName="PosterTile" />
+
+        <!-- The filter chips + dropdown (FilterBar). The component owns the
+             chip row, the option menu and their geometry; the screen supplies
+             the chip options and the commit effect. Declared last (a custom
+             component renders in its own pass, in declaration order) so the
+             dropdown paints over the results grid; the chip row at y 232 does
+             not overlap the grid at y 342, so ordering it after is harmless. -->
+        <FilterBar id="filterBar" translation="[150, 232]" />
+    </children>
+</component>

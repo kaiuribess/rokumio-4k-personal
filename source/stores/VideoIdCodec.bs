@@ -1,0 +1,40 @@
+' VideoIdCodec — the Stremio episode id convention "{imdbId}:{season}:{episode}",
+' the single translator between a season+episode and the string stream add-ons
+' and the account library both key on. Previously the convention lived in three
+' places (EpisodesStore.ResolveVideoId, LibraryStore's EpisodeWatched inline
+' build, and StremioLibraryCodec's ParseLibraryItem split); a format change
+' touched in one and missed in another would silently desync the ids a series'
+' ordered episode list builds from the ids watched-state queries and decodes.
+' This class is the one home: Build constructs a 3-part id, Parse reads one back
+' (returning invalid for anything that is not exactly 3 parts — callers
+' distinguish a bare movie id from a malformed one with a colon check).
+'
+' Pure string logic, no Roku APIs, so it behaves identically in the interpreter
+' test harness and on a device. Constructed under MainScene scope wherever a
+' store new() needs it (episode ordering, watched state, wire parsing), like
+' WatchedCodec — never built inside a method, or the per-component scope of
+' user-defined globals would make the constructor resolve to invalid when
+' invoked from a screen.
+
+class VideoIdCodec
+
+    ' "{seriesId}:{season}:{episode}".
+    function Build(seriesId as string, season as integer, episode as integer) as string
+        return seriesId + ":" + season.ToStr() + ":" + episode.ToStr()
+    end function
+
+    ' { season, episode } for a well-formed 3-part episode id, invalid for
+    ' anything else — a bare movie id has one part, and every malformed count
+    ' (2, 4, …) also reads as invalid. The movie-vs-junk distinction is the
+    ' caller's: after Parse returns invalid, a colon in the id means malformed.
+    function Parse(videoId as dynamic) as dynamic
+        if videoId = invalid then return invalid
+        parts = videoId.Split(":")
+        if parts.Count() <> 3 then return invalid
+        return {
+            season: parts[1].ToInt()
+            episode: parts[2].ToInt()
+        }
+    end function
+
+end class

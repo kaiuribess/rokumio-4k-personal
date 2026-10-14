@@ -1,0 +1,931 @@
+' AddonsStore — the registry of installed add-ons, incl. the Stremio-built-ins.
+'
+' Cinemeta and OpenSubtitles v3 are the Stremio official built-ins this client
+' ships so a fresh install of the channel is already a working product. They are
+' NOT protected: removing one is the user's call (the device is theirs), and a
+' removal persists in its own registry key so a relaunch does not re-seed it.
+' Reinstall by adding the official URL again. A same-id mirror (e.g. a
+' self-hosted/translated clone that reuses "com.linvo.cinemeta") installs
+' normally on top of the shipped built-in, and the store tells one from the
+' other by the record's builtin flag. No third-party add-ons ship by default.
+'
+' Persistence is session-aware registry keys: a guest session uses "addons"
+' (FormatJson of an AA keyed by addon id) + "addons_removed" (a JSON array of
+' removed built-in ids); a stremio session uses "stremio_addons" +
+' "stremio_addons_removed" so the two sessions never share state. The registry
+' section object is shared; only the key changes. Records are plain data only —
+' FormatJson drops unsupported values.
+'
+' Each session also has an "<registry key>_order" key holding the display order
+' as a JSON array of ids. It is separate from the record map because that map
+' is persisted as a JSON OBJECT, and ParseJson does not preserve object key
+' order — a display order stored in the map is silently gone by the next
+' launch. See GetAll for why the order is explicit rather than emergent.
+'
+' showBuiltIns rules the virtual built-in seeds: they appear for a guest
+' session (a fresh install is already a working product) and never for a stremio
+' session (only what the account syncs in — see the addon-sync stage).
+'
+' Helpers live as instance methods, not file-scope functions: Roku scopes global
+' functions per component, so a bare global called from a method that gets
+' invoked from another component's code would resolve to invalid (call of a
+' non-function). Anything the instance needs must be reachable through m.
+
+const CINEMETA_ADDRESS = "https://v3-cinemeta.strem.io"
+const OPENSUBTITLES_V3_ADDRESS = "https://opensubtitles-v3.strem.io"
+
+class AddonsStore
+    transport as object
+    registry as dynamic
+    sessionType as string
+    showBuiltIns as boolean
+    installed as object
+    removed as object
+    order as object
+
+    sub new(http as object, registry = invalid as dynamic, sessionType = "guest" as string)
+        m.transport = http
+        m.registry = registry
+        m.sessionType = "guest"
+        if sessionType = "stremio" then m.sessionType = "stremio"
+        m.showBuiltIns = (m.sessionType = "guest")
+        m.installed = {}
+        m.removed = []
+        m.order = []
+        m.Load()
+    end sub
+
+    ' A missing AA key reads back as invalid in BrightScript, so this stands in
+    ' for roAssociativeArray.DidExist (which the brs interpreter does not
+    ' implement).
+    function HasKey(aa as object, key as string) as boolean
+        if aa = invalid then return false
+        return aa[key] <> invalid
+    end function
+
+    ' The two shipped built-in add-ons. Their catalogs/types are unknown until a
+    ' manifest is fetched (CatalogStore.Manifest), so only the stable identity and
+    ' address are seeded here. They are virtual: they render through GetAll/Get
+    ' but live nowhere until installed, so a same-id clone can be installed on
+    ' top of one. Use HasKey/IsRemoved to respect user removal.
+    function BuiltIns() as object
+        return {
+            "com.linvo.cinemeta": {
+                id: "com.linvo.cinemeta"
+                name: "Cinemeta"
+                address: CINEMETA_ADDRESS
+                version: ""
+                types: ["movie", "series"]
+                catalogs: invalid
+                resources: ["catalog", "meta"]
+                builtin: true
+            }
+            "org.stremio.opensubtitlesv3": {
+                id: "org.stremio.opensubtitlesv3"
+                name: "OpenSubtitles v3"
+                address: OPENSUBTITLES_V3_ADDRESS
+                version: ""
+                types: ["movie", "series"]
+                catalogs: []
+                resources: ["subtitles"]
+                builtin: true
+            }
+        }
+    end function
+
+    ' The shipped built-in ids in a FIXED order. BuiltIns() hands back an
+    ' roAssociativeArray and "for each" over its keys has NO defined order — the
+    ' brs simulator yields declaration order, a Roku device yields its own hash
+    ' order — so every walk of the built-ins goes through this list instead.
+    ' The order below is a product decision (metadata before captions), not an
+    ' accident of how the literal happens to be written.
+    function BuiltinIds() as object
+        return ["com.linvo.cinemeta", "org.stremio.opensubtitlesv3"]
+    end function
+
+    ' Whether the given id is one of the shipped built-ins. This keys off the
+    ' ID, never off a record's builtin flag: the account sync stamps every
+    ' record it adopts with builtin: false, so on a stremio session the flag
+    ' carries no information at all while the id survives intact. Anything
+    ' ranking a provider has to rank on this.
+    function IsBuiltin(id as string) as boolean
+        return m.HasKey(m.BuiltIns(), id)
+    end function
+
+    ' Validate the authority separately from the configured path. Configured
+    ' add-ons often include colons in path segments; those are not port numbers.
+    ' Preserve that path/query exactly and require the final manifest filename.
+    function SanitizeUrl(url as string) as string
+        candidate = url.Trim()
+        if candidate = "" then return ""
+        for i = 0 to candidate.Len() - 1
+            code = Asc(candidate.Mid(i, 1))
+            if code <= 32 or code = 127 then return ""
+        end for
+        if candidate.InStr(Chr(92)) >= 0 or candidate.InStr("#") >= 0 then return ""
+        schemeAt = candidate.InStr("://")
+        if schemeAt <= 0 then return ""
+        scheme = LCase(candidate.Left(schemeAt))
+        if scheme <> "http" and scheme <> "https" then return ""
+        rest = candidate.Mid(schemeAt + 3)
+        pathAt = rest.InStr("/")
+        if pathAt <= 0 then return ""
+        authority = rest.Left(pathAt)
+        if authority.InStr("@") >= 0 or authority.InStr("?") >= 0 or authority.InStr("%") >= 0 then return ""
+        host = authority
+        portStr = ""
+        if authority.Left(1) = "["
+            closeAt = authority.InStr("]")
+            if closeAt <= 1 then return ""
+            host = authority.Left(closeAt + 1)
+            afterHost = authority.Mid(closeAt + 1)
+            if afterHost <> ""
+                if afterHost.Left(1) <> ":" then return ""
+                portStr = afterHost.Mid(1)
+                if portStr = "" then return ""
+            end if
+        else
+            hostParts = authority.Split(":")
+            if hostParts.Count() > 2 then return ""
+            host = hostParts[0]
+            if hostParts.Count() = 2
+                portStr = hostParts[1]
+                if portStr = "" then return ""
+            end if
+            for i = 0 to host.Len() - 1
+                ch = LCase(host.Mid(i, 1))
+                if not ((ch >= "a" and ch <= "z") or (ch >= "0" and ch <= "9") or ch = "." or ch = "-") then return ""
+            end for
+        end if
+        if host = "" then return ""
+        if portStr <> ""
+            if portStr.Len() > 5 then return ""
+            for i = 0 to portStr.Len() - 1
+                if portStr.Mid(i, 1) < "0" or portStr.Mid(i, 1) > "9" then return ""
+            end for
+            portNumber = Val(portStr)
+            if portNumber < 1 or portNumber > 65535 then return ""
+        end if
+        path = rest.Mid(pathAt)
+        queryAt = path.InStr("?")
+        if queryAt >= 0 then path = path.Left(queryAt)
+        if path.Right(14) <> "/manifest.json" then return ""
+        return candidate
+    end function
+
+    ' Extract the stored addon address from a manifest URL: strip the
+    ' /manifest.json file segment but KEEP anything after it that starts with "?"
+    ' — those query args are the user's add-on config (e.g. a ?token=... API
+    ' key) and must ride along on every later request. Returns "" when
+    ' the URL carries no /manifest.json.
+    function BaseFromManifestUrl(url as string) as string
+        candidate = m.SanitizeUrl(url)
+        if candidate = "" then return ""
+        path = candidate
+        query = ""
+        queryAt = candidate.InStr("?")
+        if queryAt >= 0
+            path = candidate.Left(queryAt)
+            query = candidate.Mid(queryAt)
+        end if
+        base = path.Left(path.Len() - 14)
+        while base.Right(1) = "/"
+            base = base.Left(base.Len() - 1)
+        end while
+        return base + query
+    end function
+
+    ' A resource's declared types/idPrefixes exactly as the manifest shipped them,
+    ' or invalid when the key is absent. An empty array is preserved on purpose:
+    ' Stremio treats "present but empty" differently from "absent" (see
+    ' MatchesIdPrefixes).
+    function DeclaredList(value as dynamic) as dynamic
+        if Type(value) = "roArray" then return value
+        return invalid
+    end function
+
+    ' Manifest resources may be strings or {name, types, idPrefixes} objects per
+    ' the Stremio spec. Normalize both to one descriptor shape so the resource
+    ' matcher can tell which filters the add-on actually declared:
+    '
+    '   "catalog"                                -> { name, short: true,  types: invalid, idPrefixes: invalid }
+    '   {name:"stream",types:[...],idPrefixes:[...]} -> { name, short: false, types: [...],  idPrefixes: [...] }
+    '
+    ' A short string inherits the manifest's types AND idPrefixes (Stremio's rule),
+    ' which the matcher reads off `short`; a full object's own types/idPrefixes
+    ' override, and an absent key stays invalid so "declared nothing" is kept
+    ' distinct from "declared empty". Idempotent, so Load() can re-run it over an
+    ' already-normalized registry.
+    function NormalizeResources(resources as dynamic) as object
+        list = []
+        if resources = invalid or Type(resources) <> "roArray" then return list
+        for each resource in resources
+            kind = Type(resource)
+            if kind = "roString" or kind = "String"
+                if resource <> "" then
+                    list.Push({ name: resource, short: true, types: invalid, idPrefixes: invalid })
+                end if
+            else if kind = "roAssociativeArray"
+                if not m.IsNonemptyString(resource.name) then continue for
+                list.Push({
+                    name: resource.name
+                    short: (resource.short = true)
+                    types: m.DeclaredList(resource.types)
+                    idPrefixes: m.DeclaredList(resource.idPrefixes)
+                })
+            end if
+        end for
+        return list
+    end function
+
+    ' Whether an add-on's resources advertise a resource name. Tolerant of the
+    ' normalized descriptor objects (see NormalizeResources) and the raw strings
+    ' or objects from a live manifest. Name-only on purpose: `catalog` and
+    ' `addon_catalog` are not affected by idPrefixes (Stremio never filters them),
+    ' so callers that only need "does it serve X" stay simple.
+    function HasResource(resources as dynamic, name as string) as boolean
+        if resources = invalid or Type(resources) <> "roArray" then return false
+        for each resource in resources
+            if Type(resource) = "roAssociativeArray"
+                if resource.name <> invalid and resource.name = name then return true
+            else
+                if resource = name then return true
+            end if
+        end for
+        return false
+    end function
+
+    ' Whether an add-on's declared types cover the media being watched.
+    ' `types` is the manifest's union (for short resources) or the resource's own
+    ' list (for full objects — see SupportsResource). Matching mirrors
+    ' stremio-core's `types.is_some_and(|types| types.contains(&type))`: a manifest
+    ' that declares no types, or an empty list, is never asked. That is exact
+    ' Stremio behavior, and safe because `types` is a required manifest field —
+    ' Stremio rejects a manifest without it outright.
+    '
+    ' "channel" and "tv" are one family here, because manifests in the wild use
+    ' either spelling for the same live content and the app models both. A blank
+    ' wanted type is the one permissive case: a caller with no type at all (never a
+    ' real Stremio request) should not be left with no providers.
+    function HasType(types as dynamic, metaType as string) as boolean
+        if metaType = "" then return true
+        if types = invalid or Type(types) <> "roArray" then return false
+        wantChannel = (metaType = "channel" or metaType = "tv")
+        for each declared in types
+            if declared = metaType then return true
+            if wantChannel and (declared = "channel" or declared = "tv") then return true
+        end for
+        return false
+    end function
+
+    ' Whether an id satisfies an add-on's declared idPrefixes, mirroring
+    ' stremio-core: an absent list accepts any id; a present list needs one prefix
+    ' the id starts with (so a present-but-empty list matches nothing). Blank
+    ' prefixes are skipped so a malformed [""] cannot match everything.
+    function MatchesIdPrefixes(idPrefixes as dynamic, id as string) as boolean
+        if idPrefixes = invalid or Type(idPrefixes) <> "roArray" then return true
+        for each prefix in idPrefixes
+            if Type(prefix) = "roString" or Type(prefix) = "String"
+                if prefix <> "" and id.Left(prefix.Len()) = prefix then return true
+            end if
+        end for
+        return false
+    end function
+
+    ' Whether this add-on can serve `name` (a resource) for the given
+    ' (metaType, id) — Stremio's Manifest::is_resource_supported, resource branch,
+    ' used to pick which add-ons to ask for streams.
+    '
+    ' `id` is the RESOURCE id: for streams that is the video id (movie = item id,
+    ' series = "{id}:{season}:{episode}", live tv = the channel id).
+    '
+    ' A short string resource ("stream") inherits the manifest's types AND
+    ' idPrefixes; a full object uses its own and does NOT fall back to the
+    ' manifest's (mirroring the code in stremio-core, not its doc comment). The
+    ' two filters then apply through HasType and MatchesIdPrefixes.
+    '
+    ' Only resources/types/idPrefixes cross the component boundary — never the
+    ' whole add-on record, whose catalogs array can be large.
+    function SupportsResource(resources as dynamic, manifestTypes as dynamic, manifestIdPrefixes as dynamic, name as string, metaType as string, id as string) as boolean
+        if resources = invalid or Type(resources) <> "roArray" then return false
+
+        found = false
+        short = false
+        types = invalid
+        idPrefixes = invalid
+        for each entry in resources
+            if Type(entry) = "roAssociativeArray"
+                if entry.name = name
+                    found = true
+                    short = (entry.short = true)
+                    types = entry.types
+                    idPrefixes = entry.idPrefixes
+                    exit for
+                end if
+            else if entry = name
+                ' A raw manifest resource string, before normalization.
+                found = true
+                short = true
+                exit for
+            end if
+        end for
+        if not found then return false
+
+        if short
+            types = manifestTypes
+            idPrefixes = manifestIdPrefixes
+        end if
+
+        if not m.HasType(types, metaType) then return false
+        return m.MatchesIdPrefixes(idPrefixes, id)
+    end function
+
+    ' A catalog descriptor's extras, normalized to {name, isRequired, options}.
+    ' Manifests in the wild carry them two ways — an `extra` array of objects
+    ' (modern) or, historically, arrays of bare names via `extraSupported`, plus
+    ' a separate `extraRequired` name list. Folding all three into one shape lets
+    ' the capability rules below read a single list instead of guessing the era.
+    function CatalogExtras(catalog as object) as object
+        list = []
+        if catalog = invalid or Type(catalog) <> "roAssociativeArray" then return list
+
+        declared = catalog.extra
+        if declared <> invalid and Type(declared) = "roArray"
+            for each entry in declared
+                if Type(entry) = "roAssociativeArray"
+                    if not m.IsNonemptyString(entry.name) then continue for
+                    required = false
+                    if entry.isRequired = true then required = true
+                    options = invalid
+                    if Type(entry.options) = "roArray" then options = entry.options
+                    list.Push({ name: entry.name, isRequired: required, options: options })
+                else if Type(entry) = "roString" or Type(entry) = "String"
+                    list.Push({ name: entry, isRequired: false, options: invalid })
+                end if
+            end for
+        end if
+
+        supported = catalog.extraSupported
+        if supported <> invalid and Type(supported) = "roArray"
+            for each name in supported
+                if Type(name) = "roString" or Type(name) = "String"
+                    found = false
+                    for each existing in list
+                        if existing.name = name then found = true
+                    end for
+                    if not found then list.Push({ name: name, isRequired: false, options: invalid })
+                end if
+            end for
+        end if
+
+        required = catalog.extraRequired
+        if required <> invalid and Type(required) = "roArray"
+            for each name in required
+                for each existing in list
+                    if existing.name = name then existing.isRequired = true
+                end for
+            end for
+        end if
+
+        return list
+    end function
+
+    ' What a catalog descriptor is allowed to be asked for, derived from its
+    ' extras. Three independent answers:
+    '   search — the catalog declares search AND nothing beyond search/skip is
+    '            required (Stremio sends no genre during a search, so a
+    '            required-genre catalog would fail every query).
+    '   feed   — the catalog can be browsed without supplying anything beyond
+    '            skip/genre (genre is handled by the screen's chip). This is what
+    '            keeps required-extra catalogs like cinemeta's last-videos out of
+    '            Discover without any per-add-on hardcoding.
+    '   genre  — the catalog filters by genre, with its declared option list
+    '            (falling back to the top-level `genres` array some manifests
+    '            ship) and whether a genre is required.
+    function CatalogCapabilities(catalog as object) as object
+        caps = { search: false, feed: true, genre: false, genreRequired: false, genreOptions: [] }
+        if catalog = invalid or Type(catalog) <> "roAssociativeArray" then
+            caps.feed = false
+            return caps
+        end if
+
+        searchDeclared = false
+        blocksSearch = false
+        blocksFeed = false
+        for each extra in m.CatalogExtras(catalog)
+            name = extra.name
+            if name = invalid then name = ""
+            if name = "search" then searchDeclared = true
+            if name = "genre"
+                caps.genre = true
+                if extra.options <> invalid and Type(extra.options) = "roArray" then caps.genreOptions = extra.options
+                if extra.isRequired then caps.genreRequired = true
+            end if
+            if extra.isRequired and name <> "skip"
+                if name <> "genre" then blocksFeed = true
+                if name <> "search" then blocksSearch = true
+            end if
+        end for
+
+        if caps.genre and caps.genreOptions.Count() = 0 and catalog.genres <> invalid and Type(catalog.genres) = "roArray" then
+            caps.genreOptions = catalog.genres
+        end if
+
+        caps.search = searchDeclared and not blocksSearch
+        caps.feed = caps.feed and not blocksFeed
+        return caps
+    end function
+
+    ' A catalog's display name. Real manifests ship catalogs with only type/id,
+    ' and an invalid label degrades a chip/row title, so fall back catalog name
+    ' -> catalog id -> addon name -> "Unknown". Duplicate names across add-ons
+    ' are disambiguated by the screen, not here.
+    function CatalogTitle(catalog as object, addonName as dynamic) as string
+        title = ""
+        if catalog <> invalid and Type(catalog) = "roAssociativeArray"
+            if catalog.name <> invalid then title = catalog.name
+            if title = "" and catalog.id <> invalid then title = catalog.id
+        end if
+        if title = "" and addonName <> invalid then title = addonName
+        if title = invalid or title = "" then title = "Unknown"
+        return title
+    end function
+
+    ' Catalog manifests may omit a display name — real-world add-ons (Stremio's
+    ' own Channels add-on among them) ship catalogs with only type/id. Every
+    ' consumer renders the catalog name as a row/chip label, so an invalid name
+    ' degrades badly; fill it in at the source with the addon name, then the
+    ' catalog id when the addon name is also blank. Non-arrays pass through
+    ' untouched (built-in seeds ship catalogs = invalid until a manifest lands).
+    function NormalizeCatalogNames(catalogs as dynamic, fallbackName as dynamic) as dynamic
+        if catalogs = invalid or Type(catalogs) <> "roArray" then return []
+        kept = []
+        name = fallbackName
+        if not m.IsNonemptyString(name) then name = ""
+        for each catalog in catalogs
+            if catalog <> invalid and Type(catalog) = "roAssociativeArray"
+                if not m.IsNonemptyString(catalog.id) or not m.IsNonemptyString(catalog.type) then continue for
+                if not m.IsNonemptyString(catalog.name) then catalog.name = name
+                if catalog.name = "" then catalog.name = catalog.id
+                catalog.extra = m.CatalogExtras(catalog)
+                kept.Push(catalog)
+            end if
+        end for
+        return kept
+    end function
+
+    function IsNonemptyString(value as dynamic) as boolean
+        if Type(value) <> "roString" and Type(value) <> "String" then return false
+        return value.Trim() <> ""
+    end function
+
+    ' Fail before persisting a manifest that cannot be queried by this client.
+    ' Stream-only manifests legitimately have an empty or absent catalog list.
+    function ManifestError(manifest as dynamic) as string
+        if Type(manifest) <> "roAssociativeArray" then return "manifest must be a JSON object"
+        if not m.IsNonemptyString(manifest.id) or not m.IsNonemptyString(manifest.name) then return "manifest missing id or name"
+        if Type(manifest.types) <> "roArray" then return "manifest media types must be a list"
+        for each mediaType in manifest.types
+            if not m.IsNonemptyString(mediaType) then return "manifest contains an invalid media type"
+        end for
+        if Type(manifest.resources) <> "roArray" then return "manifest resources must be a list"
+        if m.NormalizeResources(manifest.resources).Count() = 0 then return "manifest has no usable resources"
+        if manifest.catalogs <> invalid and Type(manifest.catalogs) <> "roArray" then return "manifest catalogs must be a list"
+        return ""
+    end function
+
+    ' Fetch the manifest URL the user provides and register the addon. The user
+    ' supplies the full URL (including /manifest.json and any query args); we
+    ' fetch it directly and extract the base address for later use. Returns a
+    ' record keyed by the manifest id, or an error when the URL is malformed,
+    ' the manifest is missing its id/name, the id is already installed, or the
+    ' request fails.
+    function Install(addonAddress as string) as object
+        result = { ok: false, id: "", error: "" }
+
+        manifestUrl = m.SanitizeUrl(addonAddress)
+        if manifestUrl = ""
+            if addonAddress.Trim() = ""
+                result.error = "no addon address"
+            else
+                result.error = "invalid addon address"
+            end if
+            return result
+        end if
+
+        base = m.BaseFromManifestUrl(manifestUrl)
+        if base = ""
+            result.error = "invalid addon address"
+            return result
+        end if
+
+        response = m.transport.Get(manifestUrl)
+        if not response.ok or response.json = invalid
+            result.error = response.error
+            if result.error = invalid or result.error = "" then result.error = "manifest response was empty"
+            return result
+        end if
+
+        json = response.json
+        result.error = m.ManifestError(json)
+        if result.error <> "" then return result
+
+        if m.HasKey(m.installed, json.id)
+            result.error = "addon already installed"
+            return result
+        end if
+
+        record = {
+            id: json.id
+            name: json.name
+            version: json.version
+            types: json.types
+            idPrefixes: m.DeclaredList(json.idPrefixes)
+            catalogs: m.NormalizeCatalogNames(json.catalogs, json.name)
+            resources: m.NormalizeResources(json.resources)
+            address: base
+            builtin: false
+        }
+        if not m.Register(record)
+            result.error = "addon already installed"
+            return result
+        end if
+        result.ok = true
+        result.id = json.id
+        return result
+    end function
+
+    ' Adopt a record into m.installed and persist it. Enforces the duplicate
+    ' rule (id must not already be installed) and is the single write path for
+    ' both Install and off-thread adoption (AddonsInstallTask returns a
+    ' validated record, AddonsScreen hands it to Register here so the screen's
+    ' store stays the single writer with the real registry).
+    function Register(record as object) as boolean
+        if Type(record) <> "roAssociativeArray" then return false
+        if not m.IsNonemptyString(record.id) then return false
+        if m.HasKey(m.installed, record.id) then return false
+        m.installed[record.id] = record
+        ' Registration order is display order (see GetAll). Appended, not
+        ' inserted: during an account sync the descriptors arrive in the order
+        ' the Stremio API returned them, which is the user's own arrangement, so
+        ' a plain append reproduces it. A local install lands at the end, and a
+        ' re-install after a removal does too.
+        if not m.InOrder(record.id) then m.order.Push(record.id)
+        m.Save()
+        return true
+    end function
+
+    function InOrder(id as string) as boolean
+        if m.order = invalid then return false
+        for each entry in m.order
+            if entry = id then return true
+        end for
+        return false
+    end function
+
+    ' Drop an id from the order list, keeping the rest in sequence.
+    private sub DropFromOrder(id as string) as void
+        kept = []
+        for each entry in m.order
+            if entry <> id then kept.Push(entry)
+        end for
+        m.order = kept
+    end sub
+
+    ' Adopt an addon the account-sync API already described (transport URL +
+    ' full manifest are in the addonCollectionGet response), so no manifest
+    ' re-fetch is needed. Rejects transports this platform cannot drive
+    ' (non-http(s)) and manifests missing their identity; the record's address
+    ' is the transport base (the URL minus the /manifest.json segment, query
+    ' args preserved) so request building stays uniform. Duplicates are skipped
+    ' by Register.
+    function InstallFromDescriptor(transportUrl as dynamic, manifest as dynamic) as object
+        result = { ok: false, id: "", error: "", record: invalid }
+        if transportUrl = invalid or transportUrl = ""
+            result.error = "no addon address"
+            return result
+        end if
+        if Type(manifest) <> "roAssociativeArray" or not m.IsNonemptyString(manifest.id) or not m.IsNonemptyString(manifest.name)
+            result.error = "manifest missing id or name"
+            return result
+        end if
+
+        base = m.BaseFromManifestUrl(transportUrl)
+        if base = ""
+            ' Legacy /stremio/v1, IPFS, and malformed descriptors cannot be
+            ' queried with the modern HTTP resource routes this client uses.
+            result.error = "unsupported addon transport"
+            return result
+        end if
+        result.error = m.ManifestError(manifest)
+        if result.error <> "" then return result
+
+        ' Only http(s) transports can be driven from Roku.
+        parts = base.Split("://")
+        if parts.Count() < 2 or (LCase(parts[0]) <> "http" and LCase(parts[0]) <> "https") then
+            result.error = "unsupported addon transport"
+            return result
+        end if
+
+        record = {
+            id: manifest.id
+            name: manifest.name
+            version: manifest.version
+            types: manifest.types
+            idPrefixes: m.DeclaredList(manifest.idPrefixes)
+            catalogs: m.NormalizeCatalogNames(manifest.catalogs, manifest.name)
+            resources: m.NormalizeResources(manifest.resources)
+            address: base
+            builtin: false
+        }
+        if not m.Register(record)
+            result.error = "addon already installed"
+            if m.HasKey(m.installed, record.id) then result.record = m.installed[record.id]
+            return result
+        end if
+        result.ok = true
+        result.id = record.id
+        result.record = record
+        return result
+    end function
+
+    ' Remove an installed add-on, or a shipped built-in. The caller says which
+    ' row it is through builtin: a built-in row is a virtual seed and is hidden
+    ' (persistently) in its own registry key — deleting by id would be
+    ' ambiguous with a same-id installed clone; an installed row is deleted from
+    ' the registry outright. Defaults to installed-row semantics so single-arg
+    ' callers keep working.
+    function Uninstall(id as string, builtin = false as boolean) as boolean
+        if builtin = true
+            if m.IsBuiltin(id) and not m.IsRemoved(id)
+                m.removed.Push(id)
+                m.SaveRemoved()
+                return true
+            end if
+            return false
+        end if
+        if m.HasKey(m.installed, id)
+            m.installed.Delete(id)
+            m.DropFromOrder(id)
+            m.Save()
+            return true
+        end if
+        return false
+    end function
+
+    ' An installed add-on wins over a built-in with the same id (e.g. a
+    ' self-hosted mirror of an official add-on). A removed built-in reports
+    ' invalid until it is reinstalled by URL. Built-in seeds only resolve in a
+    ' session that shows them (guest); a stremio session resolves only what it
+    ' actually installed.
+    function Get(id as string) as dynamic
+        if m.HasKey(m.installed, id) then return m.installed[id]
+        if m.showBuiltIns
+            builtins = m.BuiltIns()
+            if m.HasKey(builtins, id) and not m.IsRemoved(id) then return builtins[id]
+        end if
+        return invalid
+    end function
+
+    ' THE ordered view of the registry, and the reason this method exists at
+    ' all. Every row that lists add-ons and every "which provider do I ask"
+    ' picker reads its order from here.
+    '
+    ' It used to be "built-ins, then for each id in m.installed" — which is not
+    ' an order at all. m.installed is an roAssociativeArray, and iterating its
+    ' keys yields declaration order under the brs simulator and the runtime's
+    ' own hash order on a Roku device. Same registry, different list, per
+    ' platform, and no test could ever have caught it because the interpreter
+    ' only has one behaviour. The visible symptom was Home's catalog rows
+    ' landing in a different order on the device than in the simulator; the
+    ' quiet one was every "first add-on that advertises X" picker choosing a
+    ' different provider on device than in the sim.
+    '
+    ' A guest session hid it, because its list opened with the two built-in
+    ' seeds and only the tail moved. A stremio session is hash-ordered end to
+    ' end, so it was the only session where ANY of this was reachable.
+    '
+    ' Order is explicit now, in three parts:
+    '   1. built-in seeds in BuiltinIds() order (guest only)
+    '   2. installed add-ons in registration order — which for an account sync
+    '      is the order the Stremio API returned them in, i.e. the order the
+    '      user arranged them in their own Stremio app
+    '   3. anything installed before this existed, or out of band, sorted by
+    '      name then id so it still lands somewhere stable
+    '
+    ' Part 2 is persisted in its own key because the record map cannot carry it:
+    ' FormatJson(m.installed) writes a JSON OBJECT, and ParseJson does not
+    ' preserve object key order, so an order stored there is gone by the next
+    ' launch. A JSON ARRAY does preserve it, which is why OrderKey() is
+    ' separate from RegistryKey().
+    '
+    ' A same-id clone still appears twice (its built-in seed and itself) until
+    ' one of them is removed.
+    function GetAll() as object
+        list = []
+        if m.showBuiltIns
+            builtins = m.BuiltIns()
+            for each id in m.BuiltinIds()
+                if m.HasKey(builtins, id) and not m.IsRemoved(id) then list.Push(builtins[id])
+            end for
+        end if
+
+        ' Installed records the order list does not mention. Collected first so
+        ' the two output walks below stay a straight read of m.order.
+        listed = {}
+        for each id in m.order
+            listed[id] = true
+        end for
+        unlisted = []
+        for each id in m.installed
+            if not m.HasKey(listed, id) then unlisted.Push(m.installed[id])
+        end for
+        m.SortByNameThenId(unlisted)
+
+        for each id in m.order
+            if m.HasKey(m.installed, id) then list.Push(m.installed[id])
+        end for
+        for each record in unlisted
+            list.Push(record)
+        end for
+        return list
+    end function
+
+    ' Insertion sort by name, then by id. Deliberately not "whatever
+    ' roAssociativeArray iteration yields" and not an assumption that Sort() is
+    ' stable — this way the ordering is something the store fully controls and
+    ' a test can state.
+    private sub SortByNameThenId(list as object) as void
+        for i = 1 to list.Count() - 1
+            item = list[i]
+            j = i - 1
+            while j >= 0
+                if not m.SortsAfter(list[j], item) then exit while
+                list[j + 1] = list[j]
+                j = j - 1
+            end while
+            list[j + 1] = item
+        end for
+    end sub
+
+    ' True when a belongs strictly after b. Name first so the list reads the way
+    ' a person would say it, id as the tiebreak so two add-ons that share a name
+    ' still have one fixed order.
+    private function SortsAfter(a as object, b as object) as boolean
+        an = ""
+        if a.name <> invalid then an = a.name
+        bn = ""
+        if b.name <> invalid then bn = b.name
+        if an <> bn then return an > bn
+        ai = ""
+        if a.id <> invalid then ai = a.id
+        bi = ""
+        if b.id <> invalid then bi = b.id
+        return ai > bi
+    end function
+
+    ' Whether the user removed the shipped built-in with this id. Checked
+    ' whenever a built-in would otherwise surface through Get/GetAll.
+    function IsRemoved(id as string) as boolean
+        if m.removed = invalid then return false
+        for each item in m.removed
+            if item = id then return true
+        end for
+        return false
+    end function
+
+    ' Flat list of the catalogs each add-on advertises — the Home row source.
+    ' Built-ins that have not had a manifest fetched yet carry catalogs = invalid
+    ' and contribute nothing until the Home screen resolves manifests on demand.
+    function Catalogs() as object
+        list = []
+        for each addon in m.GetAll()
+            catalogs = addon.catalogs
+            if catalogs <> invalid and Type(catalogs) = "roArray"
+                for each catalog in catalogs
+                    list.Push({
+                        addonId: addon.id
+                        type: catalog.type
+                        catalogId: catalog.id
+                        name: catalog.name
+                    })
+                end for
+            end if
+        end for
+        return list
+    end function
+
+    ' Guest/stremio sessions persist under different keys so relisting one
+    ' session can never surface the other's installed add-ons or removals. The
+    ' registry section object is shared; only the key name changes.
+    function RegistryKey() as string
+        if m.sessionType = "stremio" then return "stremio_addons"
+        return "addons"
+    end function
+
+    function RemovedKey() as string
+        if m.sessionType = "stremio" then return "stremio_addons_removed"
+        return "addons_removed"
+    end function
+
+    ' The display order, in its own key. It cannot live inside the record map:
+    ' that map is persisted as a JSON OBJECT, and ParseJson does not preserve
+    ' object key order, so an order kept there is lost on the next launch. A
+    ' JSON ARRAY round-trips in sequence, which is the whole reason this key
+    ' exists separately — see GetAll.
+    function OrderKey() as string
+        return m.RegistryKey() + "_order"
+    end function
+
+    ' Repoint the store at another session's data. A same-session switch is a
+    ' no-op; installed/removed are reloaded fresh so the in-memory state always
+    ' mirrors the active session's persisted key.
+    sub SwitchSession(sessionType as string)
+        if sessionType <> "guest" and sessionType <> "stremio" then return
+        if m.sessionType = sessionType then return
+        m.sessionType = sessionType
+        m.showBuiltIns = (sessionType = "guest")
+        m.installed = {}
+        m.removed = []
+        m.order = []
+        m.Load()
+    end sub
+
+    sub Save()
+        if m.registry = invalid then return
+        m.registry.Write(m.RegistryKey(), FormatJson(m.installed))
+        m.registry.Write(m.OrderKey(), FormatJson(m.order))
+        m.registry.Flush()
+    end sub
+
+    sub SaveRemoved()
+        if m.registry = invalid then return
+        m.registry.Write(m.RemovedKey(), FormatJson(m.removed))
+        m.registry.Flush()
+    end sub
+
+    sub Load()
+        if m.registry = invalid then return
+        raw = m.registry.Read(m.RegistryKey())
+        if raw <> ""
+            ' The Roku runtime throws on malformed JSON rather than returning
+            ' invalid (see Transport.Parse); a corrupt addons key must mean
+            ' "start with the defaults", not a cold-start crash.
+            parsed = invalid
+            try
+                parsed = ParseJson(raw)
+            catch e
+                parsed = invalid
+            end try
+            if parsed <> invalid and Type(parsed) = "roAssociativeArray"
+                m.installed = {}
+                ' Records persisted before resources normalization may carry object
+                ' resources from live manifests — fix them in memory.
+                for each id in parsed
+                    record = parsed[id]
+                    if Type(record) <> "roAssociativeArray" then continue for
+                    if not m.IsNonemptyString(record.id) or not m.IsNonemptyString(record.name) then continue for
+                    if record.resources <> invalid then record.resources = m.NormalizeResources(record.resources)
+                    if record.catalogs <> invalid then record.catalogs = m.NormalizeCatalogNames(record.catalogs, record.name)
+                    m.installed[id] = record
+                end for
+            end if
+        end if
+
+        ' The display order, in the key that can actually hold one. A missing or
+        ' malformed order is not an error: GetAll falls back to sorting by name,
+        ' which is stable even if it is not the user's arrangement.
+        orderRaw = m.registry.Read(m.OrderKey())
+        if orderRaw <> ""
+            parsedOrder = invalid
+            try
+                parsedOrder = ParseJson(orderRaw)
+            catch e
+                parsedOrder = invalid
+            end try
+            if parsedOrder <> invalid and Type(parsedOrder) = "roArray"
+                keptOrder = []
+                for each entry in parsedOrder
+                    ' Drop ids the order names but the record map no longer has,
+                    ' so a re-install of a removed add-on lands at the end rather
+                    ' than silently inheriting a slot it no longer owns.
+                    if m.HasKey(m.installed, entry) then keptOrder.Push(entry)
+                end for
+                m.order = keptOrder
+            end if
+        end if
+
+        removedRaw = m.registry.Read(m.RemovedKey())
+        if removedRaw <> ""
+            parsedRemoved = invalid
+            try
+                parsedRemoved = ParseJson(removedRaw)
+            catch e
+                parsedRemoved = invalid
+            end try
+            if parsedRemoved <> invalid and Type(parsedRemoved) = "roArray"
+                m.removed = parsedRemoved
+            end if
+        end if
+    end sub
+end class

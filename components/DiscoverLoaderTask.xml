@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="DiscoverLoaderTask" extends="Task">
+    <interface>
+        <field id="addonAddress" type="string" value="" />
+        <field id="metaType" type="string" value="" />
+        <field id="catalogId" type="string" value="" />
+        <field id="genre" type="string" value="" />
+        <field id="pageOffset" type="integer" value="0" />
+        <field id="result" type="assocarray" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/source/stores/Transport.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/CatalogStore.bs" />
+    <script type="text/brightscript" uri="pkg:/components/DiscoverLoaderTask.brs" />
+</component>

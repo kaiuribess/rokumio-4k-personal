@@ -1,0 +1,268 @@
+' EpisodesStore — series/movie meta and episode resolution from an add-on
+' server. GetMeta talks to the add-on; the rest are pure helpers over an
+' already-fetched meta so they unit-test without any transport.
+'
+' Video ids follow the Stremio convention "{imdbId}:{season}:{episode}" that
+' stream add-ons expect, so ResolveVideoId is the bridge from
+' a Details-selected episode to a Pass-2 stream lookup.
+
+class EpisodesStore
+    transport as object
+
+    sub new(http as object)
+        m.transport = http
+        m.videoId = VideoIdCodec()
+    end sub
+
+    ' Fetch {address}/meta/{type}/{id}.json. A series must carry a non-empty
+    ' meta.videos array, otherwise it is rejected.
+    function GetMeta(addonAddress as string, metaType as string, id as string) as object
+        result = { ok: false, meta: invalid, error: "" }
+        if addonAddress = ""
+            result.error = "no addon address"
+            return result
+        end if
+        if metaType = "" or id = ""
+            result.error = "meta type or id missing"
+            return result
+        end if
+
+        url = m.transport.EndpointUrl(addonAddress, "/meta/" + m.transport.EncodeQueryValue(metaType) + "/" + m.transport.EncodeQueryValue(id) + ".json")
+        response = m.transport.Get(url)
+        if not response.ok or response.json = invalid
+            result.error = response.error
+            return result
+        end if
+
+        meta = response.json.meta
+        if meta = invalid or Type(meta) <> "roAssociativeArray"
+            result.error = "meta response missing meta"
+            return result
+        end if
+        if metaType = "series" and (meta.videos = invalid or Type(meta.videos) <> "roArray" or meta.videos.Count() = 0)
+            result.error = "series meta missing videos"
+            return result
+        end if
+
+        if meta.videos <> invalid and Type(meta.videos) = "roArray"
+            videos = []
+            for each video in meta.videos
+                if video = invalid or Type(video) <> "roAssociativeArray" then continue for
+                if metaType = "series"
+                    season = m.EpisodeOrdinal(video.season)
+                    episode = m.EpisodeOrdinal(video.episode)
+                    if season = invalid or episode = invalid then continue for
+                    video.season = season
+                    video.episode = episode
+                    if not m.IsNonemptyText(video.id) then video.id = m.videoId.Build(id, season, episode)
+                end if
+                ' SDK uses title; Cinemeta also returns name. The Roku UI reads
+                ' name/overview, so support both without discarding opaque ids.
+                if not m.IsNonemptyText(video.name) then video.name = m.Text(video.title)
+                if not m.IsNonemptyText(video.overview) then video.overview = m.Text(video.description)
+                videos.Push(video)
+            end for
+            meta.videos = videos
+            if metaType = "series" and videos.Count() = 0
+                result.error = "series meta missing usable videos"
+                return result
+            end if
+        end if
+
+        result.meta = meta
+        result.ok = true
+        return result
+    end function
+
+    ' Sorted list of the distinct season numbers in a series meta.
+    function Seasons(meta as object) as object
+        seasons = []
+        if meta = invalid or Type(meta.videos) <> "roArray" then return seasons
+        for each video in meta.videos
+            if Type(video) <> "roAssociativeArray" then continue for
+            season = m.EpisodeOrdinal(video.season)
+            if season <> invalid
+                found = false
+                for each existing in seasons
+                    if existing = season then found = true
+                end for
+                if not found then seasons.Push(season)
+            end if
+        end for
+        seasons.Sort()
+        return seasons
+    end function
+
+    function EpisodesForSeason(meta as object, season as integer) as object
+        episodes = []
+        if meta = invalid or Type(meta.videos) <> "roArray" then return episodes
+        for each video in meta.videos
+            if Type(video) <> "roAssociativeArray" then continue for
+            videoSeason = m.EpisodeOrdinal(video.season)
+            videoEpisode = m.EpisodeOrdinal(video.episode)
+            if videoSeason <> invalid and videoEpisode <> invalid and videoSeason = season
+                video.season = videoSeason
+                video.episode = videoEpisode
+                episodes.Push(video)
+            end if
+        end for
+        for i = 1 to episodes.Count() - 1
+            item = episodes[i]
+            j = i - 1
+            while j >= 0
+                if item.episode = invalid or episodes[j].episode = invalid then exit while
+                if episodes[j].episode <= item.episode then exit while
+                episodes[j + 1] = episodes[j]
+                j = j - 1
+            end while
+            episodes[j + 1] = item
+        end for
+        return episodes
+    end function
+
+    ' Numbers parsed as floats and digit strings still have to cross integer
+    ' SceneGraph fields as integers. Reject fractions, negatives and overflow.
+    function EpisodeOrdinal(value as dynamic) as dynamic
+        kind = Type(value)
+        if kind = "String" or kind = "roString"
+            text = value.Trim()
+            if text = "" then return invalid
+            ordinal = 0
+            for index = 0 to text.Len() - 1
+                digit = Asc(text.Mid(index, 1)) - 48
+                if digit < 0 or digit > 9 then return invalid
+                if ordinal > 214748364 or (ordinal = 214748364 and digit > 7) then return invalid
+                ordinal = ordinal * 10 + digit
+            end for
+            return ordinal
+        end if
+        if kind <> "Integer" and kind <> "roInt" and kind <> "roInteger" and kind <> "Float" and kind <> "roFloat" and kind <> "Double" and kind <> "roDouble" and kind <> "LongInteger" and kind <> "roLongInteger" then return invalid
+        try
+            if value < 0 or value > 2147483647 then return invalid
+            ordinal = Int(value)
+            if ordinal < 0 or ordinal <> value then return invalid
+            return ordinal
+        catch invalidOrdinal
+            return invalid
+        end try
+    end function
+
+    private function IsNonemptyText(value as dynamic) as boolean
+        if Type(value) <> "String" and Type(value) <> "roString" then return false
+        return value.Trim() <> ""
+    end function
+
+    private function Text(value as dynamic) as string
+        if Type(value) = "String" or Type(value) = "roString" then return value
+        return ""
+    end function
+
+    ' The first regular season/episode, with specials only when no regular
+    ' season exists. A provider need not have season 1 or number its pilot 1.
+    function FirstEpisode(meta as dynamic) as dynamic
+        if meta = invalid or meta.videos = invalid or Type(meta.videos) <> "roArray" then return invalid
+        for each season in m.OrderedSeasons(m.Seasons(meta))
+            for each episode in m.EpisodesForSeason(meta, season)
+                if episode.episode <> invalid then return episode
+            end for
+        end for
+        return invalid
+    end function
+
+    ' "{imdbId}:{season}:{episode}" — the video id stream add-ons resolve.
+    ' Built through VideoIdCodec so the convention has one owner (the account
+    ' bitfield indexes the OrderedVideoIds list, and watched-state queries key
+    ' on the same string).
+    function ResolveVideoId(seriesId as string, season as integer, episode as integer, meta = invalid as dynamic) as string
+        ' Video ids are opaque in the protocol. Only fall back to the common
+        ' IMDb convention when the provider has not supplied a matching id.
+        if meta <> invalid and meta.videos <> invalid and Type(meta.videos) = "roArray"
+            for each video in meta.videos
+                if video = invalid or Type(video) <> "roAssociativeArray" then continue for
+                if video.season = season and video.episode = episode
+                    if GetInterface(video.id, "ifString") <> invalid and video.id <> "" then return video.id
+                end if
+            end for
+        end if
+        return m.videoId.Build(seriesId, season, episode)
+    end function
+
+    ' Real seasons keep ascending order; season 0 (specials) is pushed to the
+    ' end of the list so it never masquerades as the first broadcast season.
+    function OrderedSeasons(allSeasons as object) as object
+        ordered = []
+        specials = []
+        for each season in allSeasons
+            if season = 0
+                specials.Push(0)
+            else
+                ordered.Push(season)
+            end if
+        end for
+        for each special in specials
+            ordered.Push(special)
+        end for
+        return ordered
+    end function
+
+    ' The series' ordered episode-id list, "{metaId}:{season}:{episode}" per
+    ' regular (non-special) episode in display order — the ordering the account
+    ' watched bitfield indexes (bit i is the i-th id here), so it must never
+    ' drift from what EpisodesScreen paints. Skips season 0 (specials).
+    function OrderedVideoIds(seriesId as string, meta as object) as object
+        ids = []
+        if seriesId = "" or meta = invalid or meta.videos = invalid then return ids
+        seasons = m.Seasons(meta)
+        ordered = m.OrderedSeasons(seasons)
+        for s = 0 to ordered.Count() - 1
+            season = ordered[s]
+            if season = 0 then continue for
+            episodes = m.EpisodesForSeason(meta, season)
+            for each ep in episodes
+                if ep.episode <> invalid
+                    ids.Push(m.ResolveVideoId(seriesId, season, ep.episode, meta))
+                end if
+            end for
+        end for
+        return ids
+    end function
+
+    ' Whether a meta handed in from a list screen is too sparse to render a hero:
+    ' catalog/search rows usually carry only { id, type, name, poster }, so the
+    ' Detail description, rating line and background are blank. Returns false for
+    ' invalid metas and metas without a fetchable id/type — those have nothing to
+    ' improve by fetching.
+    function NeedsMetaFetch(meta as object) as boolean
+        if meta = invalid then return false
+        if meta.id = invalid or meta.id = "" then return false
+        if meta.type = invalid or meta.type = "" then return false
+        if meta.type = "series" and (meta.videos = invalid or Type(meta.videos) <> "roArray" or meta.videos.Count() = 0) then return true
+        fields = ["description", "releaseInfo", "imdbRating", "background", "poster"]
+        for each field in fields
+            if meta[field] = invalid or meta[field] = "" then return true
+        end for
+        return false
+    end function
+
+    ' Merge a freshly fetched full meta into the slim record a screen pushed in.
+    ' Values the provided record already has always win, so nothing the source
+    ' screen supplied is lost; invalid and blank strings give way so the fetched
+    ' meta fills those gaps. Object/array fields (e.g. Cinemeta `links`) count as
+    ' present and are never compared for blank-ness. Returns a new object —
+    ' neither input is mutated.
+    function MergeMeta(provided as object, fetched as object) as object
+        merged = {}
+        if fetched <> invalid
+            for each key in fetched
+                merged[key] = fetched[key]
+            end for
+        end if
+        if provided <> invalid
+            for each key in provided
+                value = provided[key]
+                if value <> invalid and (GetInterface(value, "ifString") = invalid or value <> "") then merged[key] = value
+            end for
+        end if
+        return merged
+    end function
+end class

@@ -1,0 +1,452 @@
+' Transport — synchronous roUrlTransfer wrapper.
+'
+' Transport is the only store that touches Roku's networking primitives. Real
+' requests go through a blocking HTTP client (roUrlTransfer async calls parked
+' on a message port with Wait); tests inject a fake client so every store,
+' Transport itself included, runs in the brs interpreter with no device calls.
+'
+' The client seam returns a raw result { ok, status, body, error }. Transport
+' normalizes that into { ok, status, json, error }: it parses the body as JSON
+' and treats an unparseable body on an otherwise-successful response as a
+' failure. Stores read result.json and never care where the bytes came from.
+'
+' Helpers live as instance methods: Roku scopes user-defined global functions
+' per component, so a bare global called from a method that is invoked from
+' another component's code resolves to invalid (call of a non-function). Only
+' the platform's own globals (CreateObject, Wait, ParseJson, ...) resolve from
+' any scope; anything user-defined must be reachable through m.
+
+const REQUEST_TIMEOUT_MS = 15000
+
+' The dedicated-request timeout ceiling for the one caller that can legitimately
+' take tens of seconds (a full addon-collection sync against a slow account). A
+' default-sized request would abort it partway, so it rides the long path.
+const LONG_REQUEST_TIMEOUT_MS = 120000
+
+' How many times a request is attempted before its failure is final. The device
+' refuses NEW concurrent connections past a ceiling of roughly 4-6 (measured:
+' sequential soaks are perfect while 8-wide bursts drop transfers), so a fetch
+' that loses the race can simply be re-issued. Three attempts ride out a single
+' collision without turning a host that is truly down into a long stall.
+const MAX_TRANSPORT_ATTEMPTS = 3
+
+' Backoff before retry N (1-based: the first retry waits one base unit). Short
+' and linear — a refused connect costs milliseconds — so a recovery costs about
+' three quarters of a second while a dead host still fails fast.
+const TRANSPORT_RETRY_BACKOFF_MS = 250
+
+' Random spread added on top of that backoff, so colliding clients stop retrying
+' in lockstep.
+'
+' The collisions this rides out are the device refusing NEW connections past a
+' low ceiling, and a refused connect is answered fast — which is precisely when
+' a fixed backoff is worst. Every loser wakes at the same instant, spends the
+' same milliseconds being refused again, and spends the next one the same way.
+' A fixed backoff reproduces the stampede it is meant to break; jitter spreads
+' the retries across a 150ms window so the ones that gave up at different moments
+' come back at different moments too.
+'
+' Small on purpose. It has to be invisible next to the connect it is spacing out
+' (milliseconds) while still being large enough to reorder retries, and it is
+' added to a linear base that already grows with the attempt number, so by the
+' last retry the total wait is still under a second and a dead host still fails
+' fast.
+const TRANSPORT_RETRY_JITTER_MS = 150
+
+' A negative status is a transport-level failure: the transfer never completed
+' (refused connect, DNS, TLS). The dominant one is CURLE_COULDNT_CONNECT (-7),
+' which this device emits when too many NEW connections are opened at once. A
+' refused connect sends no bytes, so re-issuing is safe even for a POST; HTTP
+' errors (status >= 0) are never retried, and a timeout (status 0) must not be
+' multiplied by full waits.
+function TransportFailureIsRetryable(status as integer) as boolean
+    return status < 0
+end function
+
+' Backoff before retry `attempt` (1-based: the first retry waits one base unit).
+function TransportRetryBackoffMs(attempt as integer) as integer
+    return TRANSPORT_RETRY_BACKOFF_MS * attempt
+end function
+
+' The real client. Serializes a body assocarray to JSON and issues a blocking
+' GET or POST over roUrlTransfer. The transfer runs async and Wait parks this
+' thread until its roUrlEvent lands: the synchronous GetToString/PostFromString
+' entry points discard the response code (and roUrlTransfer no longer exposes
+' GetResponseCode), while the async path surfaces both the body
+' (roUrlEvent.GetString) and the status (roUrlEvent.GetResponseCode).
+function CreateSyncHttpClient() as object
+    client = {}
+
+    ' One line per failed fetch, from the one place in the app that fetches bytes.
+    '
+    ' Every store in the app reaches the network through this client — catalog,
+    ' meta, streams, subtitles, library, auth, the streaming server — and before
+    ' this, each of them reported failure its own way, or not at all. Transport
+    ' itself had no trace, so a request that died at the socket left
+    ' nothing anywhere to say so. One line here covers all sixteen call sites at
+    ' once, which is the only practical way to answer "did this fetch work".
+    '
+    ' Query string stripped before printing. Addon addresses routinely carry
+    ' credentials — EndpointUrl exists specifically to keep a "?token=..." intact
+    ' through request assembly — and a raw URL would put those tokens into the
+    ' console log, and from there into any log pasted into a bug report.
+    '
+    ' Every non-2xx is logged, not just transport failures, so an HTTP 404 shows up
+    ' alongside the connect errors. That means legitimately-missing responses are
+    ' logged too (a subtitle provider 404s a language it does not carry), so some
+    ' noise is expected; narrowing to `status < 200 or status >= 500` is a one-line
+    ' change if that drowns out the real faults.
+    '
+    ' Wrapped in try/catch: a diagnostic that raised would be caught by the caller's
+    ' own catch and reported as a fetch failure, turning the trace into the fault.
+    client._trace = function(request as object, result as object) as object
+        if result.status >= 200 and result.status < 300 then return result
+        try
+            ' Configured paths can contain secrets too, and low-level error
+            ' strings can repeat the full URL. Log only the origin and status.
+            print "[http] " + request.method + " " + TransportLogOrigin(request.url) + " -> status=" + result.status.ToStr()
+        catch ignored
+        end try
+        return result
+    end function
+
+    ' Retry policy, reached through m for the same cross-component reason the
+    ' request functions are; the decisions themselves are file-scope so they can
+    ' be unit-tested without a device.
+    client._retryable = function(status as integer) as boolean
+        return TransportFailureIsRetryable(status)
+    end function
+    client._retryAfter = function(attempt as integer) as integer
+        ' The jitter is added HERE rather than inside TransportRetryBackoffMs
+        ' because that file-scope function is exercised by the brs interpreter,
+        ' which has no Rnd. Rnd is a Roku global and resolves on device; the
+        ' closure is only ever built by CreateSyncHttpClient, which the suite
+        ' never calls (every store test injects a fake client). So the one place
+        ' that needs randomness is exactly the one place that runs only on the
+        ' device.
+        return TransportRetryBackoffMs(attempt) + Rnd(TRANSPORT_RETRY_JITTER_MS)
+    end function
+
+    ' Shared roUrlTransfer round-trip for both timeouts. roUrlTransfer is not
+    ' re-entrant, so each request builds its own transfer + port; the two
+    ' request flavors only differ in how long Wait parks before cancelling.
+    ' Lives on the client AA (not as a bare global) because user-defined globals
+    ' resolve to invalid when a caller from another component invokes the
+    ' request functions — anything user-defined must be reachable through m.
+    client._attempt = function(request as object) as object
+        result = { ok: false, status: 0, body: "", error: "" }
+        transfer = CreateObject("roUrlTransfer")
+        transfer.SetCertificatesFile("common:/certs/ca-bundle.crt")
+        transfer.EnablePeerVerification(true)
+        transfer.EnableHostVerification(true)
+        transfer.EnableEncodings(true)
+        transfer.SetUrl(request.url)
+        if request.headers <> invalid then transfer.SetHeaders(request.headers)
+        transfer.RetainBodyOnError(true)
+        port = CreateObject("roMessagePort")
+        transfer.SetMessagePort(port)
+
+        issued = false
+        if request.method = "POST"
+            payload = ""
+            if request.body <> invalid then payload = FormatJson(request.body)
+            issued = transfer.AsyncPostFromString(payload)
+        else if request.method = "HEAD"
+            ' AsyncHead(), not SetRequest("HEAD") + AsyncGetToString(). SetRequest
+            ' is documented as a way to change the method and carries the warning
+            ' that it can generate invalid requests; AsyncHead() is the purpose-
+            ' built call and lands its roUrlEvent on the port like the others.
+            '
+            ' It has to be a real HEAD. The streaming server's bare torrent route
+            ' is a stream endpoint that advertises Accept-Ranges and a
+            ' Content-Length in the gigabytes, so a GET here would be a request
+            ' to buffer an entire feature into a string — and would do it while
+            ' believing it was only asking for headers.
+            issued = transfer.AsyncHead()
+        else
+            issued = transfer.AsyncGetToString()
+        end if
+        if not issued
+            result.error = "request could not be issued"
+            return result
+        end if
+
+        event = Wait(request.timeoutMs, port)
+        if event = invalid
+            transfer.AsyncCancel()
+            result.error = "request timed out"
+            return result
+        end if
+        if Type(event) <> "roUrlEvent"
+            result.error = "unexpected port message"
+            return result
+        end if
+
+        result.body = event.GetString()
+        result.status = event.GetResponseCode()
+        result.ok = result.status >= 200 and result.status < 300
+        if not result.ok
+            ' A negative status is the transfer never completing — refused
+            ' connection, DNS failure, TLS failure — and is the case GetFailureReason
+            ' exists to explain. This is also why the sign of status alone cannot be
+            ' used to reason about a failure: negative means transport-level, and
+            ' SubtitlesStore.Subtitles therefore reports `issued` separately instead
+            ' of reserving a sentinel inside the same negative range.
+            if result.status < 0
+                ' Low-level reasons may contain the configured URL/API key and
+                ' are forwarded to status labels by callers. Keep them private.
+                result.error = "network connection failed (" + result.status.ToStr() + ")"
+            else
+                result.error = "HTTP " + result.status.ToStr()
+            end if
+        end if
+        return result
+    end function
+
+    ' Bounded retry around a single round-trip. The measured failure is a device
+    ' ceiling on NEW concurrent connections (~4-6): sequential soaks are perfect,
+    ' 8-wide bursts lose transfers, and the app's parallel launch syncs collide.
+    ' Only a transport-level failure (status < 0) retries — a refused connect
+    ' never sent bytes, so re-issuing is safe even for POST, while an HTTP error
+    ' is an answer and a timeout (status 0) must not be multiplied by full waits.
+    client._execute = function(request as object) as object
+        attempt = 1
+        while true
+            result = m._attempt(request)
+            if result.ok then return m._trace(request, result)
+            if not m._retryable(result.status) then return m._trace(request, result)
+            if attempt >= MAX_TRANSPORT_ATTEMPTS then return m._trace(request, result)
+            Wait(m._retryAfter(attempt), invalid)
+            attempt = attempt + 1
+        end while
+    end function
+
+    client.request = function(method as string, url as string, headers = invalid as dynamic, body = invalid as dynamic, timeoutMs = REQUEST_TIMEOUT_MS as integer) as object
+        return m._execute({
+            method: method
+            url: url
+            headers: headers
+            body: body
+            timeoutMs: timeoutMs
+        })
+    end function
+    client.requestLong = function(method as string, url as string, headers = invalid as dynamic, body = invalid as dynamic) as object
+        return m._execute({
+            method: method
+            url: url
+            headers: headers
+            body: body
+            timeoutMs: LONG_REQUEST_TIMEOUT_MS
+        })
+    end function
+    return client
+end function
+
+' Origin-only diagnostics keep API keys in configured paths/query strings out
+' of logs. Strip URL userinfo as well, even if a non-addon caller supplied it.
+function TransportLogOrigin(url as string) as string
+    schemeAt = url.InStr("://")
+    if schemeAt <= 0 then return "[endpoint]"
+    scheme = LCase(url.Left(schemeAt))
+    if scheme <> "http" and scheme <> "https" then return "[endpoint]"
+    authority = url.Mid(schemeAt + 3)
+    for each separator in ["/", "?", "#"]
+        at = authority.InStr(separator)
+        if at >= 0 then authority = authority.Left(at)
+    end for
+    userParts = authority.Split("@")
+    authority = userParts[userParts.Count() - 1]
+    if authority = "" then return "[endpoint]"
+    return scheme + "://" + authority
+end function
+
+' Percent-encode a value for a URL path segment or query component. The
+' platform owns the real encoder: roUrlTransfer.Escape percent-encodes per
+' RFC 3986, including proper UTF-8 for accented characters, and every caller
+' runs inside a Task node where roUrlTransfer is available. The byte loop is
+' only the fallback for environments without the component (the brs interpreter
+' in `npm test`), where ASCII values encode identically.
+'
+' Named PercentEncode while the Transport method below is EncodeQueryValue, so
+' the two never collide: one name for both would make the unqualified call
+' inside the method resolve back to the method. The method is deliberately not
+' UrlEncode either — that is the deprecated roUrlTransfer method, this already
+' calls its replacement, and a method of that name reads as a call to it.
+'
+' File-scope with that method forwarding to it, deliberately: stores must reach
+' user-defined helpers through m, but the scripted test transport is a plain
+' object and has no m.transport to call. Keeping the implementation here lets
+' that mock forward to THIS function rather than carry a second copy that could
+' drift from it and make the tests assert an encoding the device never
+' produces.
+function PercentEncode(value as string) as string
+    try
+        transfer = CreateObject("roUrlTransfer")
+        return transfer.Escape(value)
+    catch e
+    end try
+
+    result = ""
+    HEX = "0123456789ABCDEF"
+    i = 1
+    while i <= Len(value)
+        b = Asc(Mid(value, i, 1))
+        if (b >= 65 and b <= 90) or (b >= 97 and b <= 122) or (b >= 48 and b <= 57) or b = 45 or b = 95 or b = 46 or b = 126
+            result = result + Chr(b)
+        else
+            result = result + "%" + Mid(HEX, b \ 16 + 1, 1) + Mid(HEX, (b mod 16) + 1, 1)
+        end if
+        i = i + 1
+    end while
+    return result
+end function
+
+class Transport
+    client as object
+
+    sub new(client = invalid as dynamic)
+        if client = invalid then client = CreateSyncHttpClient()
+        m.client = client
+    end sub
+
+    ' Percent-encode a value destined for a URL. Stores that assemble a URL call
+    ' this through m rather than reaching for the file-scope function directly,
+    ' because a bare user-defined global is only resolvable within the component
+    ' that declares it.
+    '
+    ' Renamed from UrlEncode, which was never a call to that method: the encoder
+    ' here has always been roUrlTransfer.Escape. The name was the only thing
+    ' wrong with it, and it is a name a static analyser reads as the deprecated
+    ' roUrlTransfer.UrlEncode — a deprecation this file does not have, reported
+    ' against a call nobody can find.
+    function EncodeQueryValue(value as string) as string
+        return PercentEncode(value)
+    end function
+
+    ' Stream discovery may wait on a provider cache check longer than a catalog
+    ' request. A caller can extend that one JSON request without changing the
+    ' default for search, metadata or manifests.
+    function Get(url as string, headers = invalid as dynamic, timeoutMs = REQUEST_TIMEOUT_MS as integer) as object
+        return m.Result(m.client.request("GET", url, headers, invalid, timeoutMs))
+    end function
+
+    ' A GET whose body comes back as text instead of being parsed as JSON.
+    '
+    ' Only for the streaming server's HLS manifest, which is not JSON. Through
+    ' Get a perfectly good playlist reads back as "invalid JSON response" — the
+    ' one response whose text is the entire diagnosis would be the one response
+    ' thrown away.
+    ' timeoutMs is a parameter because the one caller that polls — the playlist
+    ' readiness probe — wants a timeout of its own, and at the default 15s a dead
+    ' server would let its four attempts stretch the player's wait past a minute.
+    ' The default keeps every other caller's behaviour untouched.
+    '
+    ' headers is here for the one GET that must not read the whole response: the
+    ' streaming server's torrent route serves a feature-sized body, so asking it
+    ' for a byte range through a Range header is what turns a readiness check into
+    ' 64KB instead of a buffered film. Kept optional so the probe's existing
+    ' two-argument call is untouched.
+    function GetRaw(url as string, timeoutMs = REQUEST_TIMEOUT_MS as integer, headers = invalid as dynamic) as object
+        return m.client.request("GET", url, headers, invalid, timeoutMs)
+    end function
+
+    ' A HEAD — the response's status and headers, and no body by definition.
+    '
+    ' Raw rather than m.Result(), for the same reason GetRaw is: there is no body
+    ' to parse, and running "" through Parse would manufacture an "invalid JSON
+    ' response" failure out of a request that actually succeeded.
+    function Head(url as string, timeoutMs = REQUEST_TIMEOUT_MS as integer) as object
+        return m.client.request("HEAD", url, invalid, invalid, timeoutMs)
+    end function
+
+    function Post(url as string, body = invalid as dynamic, headers = invalid as dynamic) as object
+        return m.Result(m.client.request("POST", url, headers, body))
+    end function
+
+    ' Long-window POST for requests that may legitimately run tens of seconds —
+    ' today the Stremio API's addon-collection sync, which can sit behind a slow
+    ' account. Uses requestLong so the default timeout is never stretched for
+    ' every caller.
+    function PostLong(url as string, body = invalid as dynamic, headers = invalid as dynamic) as object
+        return m.Result(m.client.requestLong("POST", url, headers, body))
+    end function
+
+    ' Build a full add-on endpoint URL from a stored address that may carry a
+    ' query string (the user's add-on config, e.g. a ?token=... API key).
+    ' The endpoint path is inserted BEFORE the query so the request hits the
+    ' right resource with the user's args intact.
+    function EndpointUrl(storedAddress as string, endpointPath as string) as string
+        at = storedAddress.InStr("?")
+        if at < 0 then return storedAddress + endpointPath
+        return storedAddress.Left(at) + endpointPath + storedAddress.Mid(at)
+    end function
+
+    ' Normalize a raw client result into the transport result: parse JSON when
+    ' the body is non-empty, and demote a 2xx with a broken body to a failure.
+    function Result(raw as object) as object
+        result = {
+            ok: raw.ok
+            status: raw.status
+            json: invalid
+            error: raw.error
+        }
+        body = raw.body
+        if (body = invalid or body = "") and result.ok
+            result.ok = false
+            result.error = "empty JSON response"
+            return result
+        end if
+        if body <> invalid and body <> ""
+            if not TransportBodyLooksHtml(body)
+                parsed = m.Parse(body)
+                if parsed = invalid
+                    result.ok = false
+                    result.error = "invalid JSON response"
+                end if
+                result.json = parsed
+            else
+                ' The add-on answered 2xx in HTML — its landing page for an
+                ' unknown path, or a gateway page — not in the JSON this
+                ' transport promises. Same verdict as a body that fails to
+                ' parse, but without handing the markup to ParseJson: the Roku
+                ' runtime prints "BRIGHTSCRIPT: ERROR: ParseJSON: ..." to the
+                ' console for every malformed body it is shown, and the dead
+                ' opensubtitles.strem.io subtitle endpoint answers its
+                ' stremio/v1 path exactly that way on every play. A body that
+                ' opens with '<' is never JSON, so skipping the parse loses
+                ' nothing but the noise.
+                result.ok = false
+                result.error = "invalid JSON response"
+            end if
+        end if
+        return result
+    end function
+
+    ' Parse is a guard around ParseJson: the Roku runtime throws on malformed
+    ' input rather than returning invalid, and Transport must turn that into a
+    ' clean failure instead of a crash.
+    function Parse(body as string) as dynamic
+        try
+            return ParseJson(body)
+        catch e
+            return invalid
+        end try
+    end function
+end class
+
+' HTML is the one body this transport is guaranteed never to mean as JSON: the
+' dead subtitle endpoint answers its stremio/v1 path with the add-on's landing
+' page, and the Roku runtime prints "BRIGHTSCRIPT: ERROR: ParseJSON: ..." to the
+' console for every malformed body ParseJson is handed — up to once per retry
+' per play. Correct to skip the parser when the body clearly is not JSON (JSON
+' can never start with '<'), and cheap: only the first non-whitespace character
+' is inspected, so a large body costs one loop iteration.
+function TransportBodyLooksHtml(body as string) as boolean
+    limit = Len(body)
+    if limit > 64 then limit = 64
+    for i = 0 to limit - 1
+        ch = body.Mid(i, 1)
+        if ch <> " " and ch <> Chr(9) and ch <> Chr(10) and ch <> Chr(13) then return ch = "<"
+    end for
+    return false
+end function

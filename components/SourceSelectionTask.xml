@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="SourceSelectionTask" extends="Task">
+    <interface>
+        <field id="streams" type="array" />
+        <field id="videoId" type="string" value="" />
+        <field id="audioMode" type="string" value="projector" />
+        <field id="fourKOnly" type="boolean" value="false" />
+        <field id="loadToken" type="string" value="" />
+        <field id="result" type="assocarray" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/source/util/CinemaStreams.brs" />
+    <script type="text/brightscript" uri="pkg:/components/SourceSelectionTask.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/AutoPlayback.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/SourceMemory.brs" />
+</component>

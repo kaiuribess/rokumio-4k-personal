@@ -1,0 +1,963 @@
+' LibraryStore — saved content and continue-watching positions, persisted
+' locally, pure logic on a registry seam like SettingsStore/AddonsStore.
+'
+' A real store is built over an roRegistrySection and Load()s its state on
+' construction; tests pass a fake registry (or nothing, which means in-memory
+' only). Save() writes the whole library as one registry key. Since the app is
+' guest-only nothing syncs — this is the local mirror of the Stremio library.
+'
+' Persistence is a session-aware registry key: a guest session uses "library"
+' and a stremio session uses "stremio_library", so the two sessions never share
+' saved content or continue-watching positions. What persists differs by
+' session: a guest session saves saved items + continue watching (its data is
+' local-only, nothing to fetch anywhere), while a stremio session persists ONLY
+' the continue-watching stack — the rest of its library is re-synced from the
+' Stremio account in the background on launch and lives in memory for the
+' session, so nothing is written to the device needlessly. The registry section
+' object is shared; only the key changes.
+'
+' Ordering is the array itself: freshly written items land at index 0, so the
+' newest is always first and no sequence number or sort is needed. Continue
+' watching is a capped stack — SetPosition drops the old entry for the same
+' video/series, pushes the new one on top, and pops anything beyond the cap.
+'
+' Membership keeps that stack in step with the library, mirroring Stremio where
+' CW is a view over the account library: RemoveSaved drops the meta's entries (a
+' removed, non-temp account item is not in CW), and AddSaved re-seeds from the
+' account item's progress on stremio — the same state AddToLibrary reuses. A
+' guest has no account item to re-seed from, so a guest re-add stays out of CW;
+' that divergence is deliberate, since Stremio has no local-only library.
+'
+' Helpers live as instance methods: Roku scopes user-defined global functions
+' per component, so a bare global called from a method that is invoked from
+' another component's code would resolve to invalid (call of a non-function).
+'
+' Watched state is two layers merged at read time:
+'   - the local set (m.watched) is display-side only, written by
+'     MarkWatchedIfFinished / MarkSeriesDone, persisted with the saved items so
+'     it survives reloads. It is never pushed to the account.
+'   - the account layer (m.accountWatched) is re-derived on every sync from the
+'     libraryItem state (watched bitfield, flaggedWatched/timesWatched flags,
+'     timeOffset), memory-only for the session.
+' Internally watched is keyed by videoId (a movie's metaId, or a series'
+' "{metaId}:{season}:{episode}") so grid tiles ask coarsely with a metaId while
+' EpisodesScreen asks per episode.
+
+' Guest libraries persist to the device registry, whose size budget is real, so
+' the guest saved list is capped: adding beyond MAX_GUEST_SAVED evicts the
+' oldest entry (the array is newest-first, so the tail is least recent),
+' mirroring the continue-watching cap. A stremio session is memory-only — its
+' saved map is re-synced from the account every launch — so it is never capped
+' and the account stays the authority on how many items it holds.
+const MAX_GUEST_SAVED = 100
+
+' A video counts as watched when the player position has reached ~70% of its
+' duration (so a movie/episode finished per Stremio's rule). position/duration
+' are milliseconds; the comparison stays on integer math.
+const WATCHED_THRESHOLD = 0.7
+const MAX_CONTINUE_WATCHING = 8
+
+' Tile glyph tokens. The store maps watched state to a token; PosterTile/EpisodeTile
+' turn it into an uri ("pkg:/images/" + token + ".png"). Defined once here so a
+' rename touches these two lines and the icon assets, not every screen.
+const GLYPH_WATCHED = "eye"
+const GLYPH_PROGRESS = "clock"
+
+class LibraryStore
+    registry as dynamic
+    sessionType as string
+    saved as object
+    savedOrder as object
+    positions as object
+    stremioLibrary as object
+    watched as object
+    accountWatched as object
+    unwatched as object
+    codec as object
+
+    sub new(registry = invalid as dynamic, sessionType = "guest" as string)
+        m.registry = registry
+        m.sessionType = "guest"
+        if sessionType = "stremio" then m.sessionType = "stremio"
+        m.saved = {}
+        m.savedOrder = []
+        m.positions = []
+        m.stremioLibrary = []
+        m.watched = {}
+        m.accountWatched = {}
+        m.unwatched = {}
+        ' Instance the codec here, not inside EpisodeWatched: Roku scopes
+        ' user-defined global functions per component, so a bare WatchedCodec()
+        ' call from a method invoked under another component's scope resolves to
+        ' invalid (attempted call of a non-function). Construction runs under
+        ' MainScene scope — MainScene.brs is the only construction site — which
+        ' carries WatchedCodec, and the codec's methods only call intrinsics, so
+        ' the stored instance is callable from any component.
+        m.codec = WatchedCodec()
+        m.time = TimeUtil()
+        m.videoId = VideoIdCodec()
+        m.stremioCodec = StremioLibraryCodec()
+        m.Load()
+    end sub
+
+    ' A missing AA key reads back as invalid in BrightScript, so this stands in
+    ' for roAssociativeArray.DidExist (which the brs interpreter does not
+    ' implement).
+    function HasKey(aa as object, key as string) as boolean
+        if aa = invalid then return false
+        return aa[key] <> invalid
+    end function
+
+    ' Add a series/movie to the saved library. False when already saved or the
+    ' id is blank. A guest library is capped at MAX_GUEST_SAVED — adding past
+    ' it drops the oldest entry so the device registry never overflows, exactly
+    ' how the continue-watching stack is capped. A stremio session never caps:
+    ' its saved map is memory-only and re-synced from the account, so the device
+    ' budget does not apply there.
+    '
+    ' An add also re-seeds the local continue-watching entry from the account
+    ' item's stored progress (ReSeedPositionFromAccount): stremio-core's
+    ' AddToLibrary reuses the existing library item, so a title that was watched,
+    ' added and then removed re-enters CW the moment it is added back. A guest
+    ' session has no account item, so nothing is re-seeded and a re-add stays out
+    ' of CW.
+    function AddSaved(metaId as string, metaType as string, name as string, poster = "" as string, posterShape = "" as string) as boolean
+        if metaId = "" then return false
+        if m.HasKey(m.saved, metaId) then return false
+        if m.sessionType <> "stremio"
+            while m.savedOrder.Count() >= MAX_GUEST_SAVED
+                oldestId = m.savedOrder.Pop()
+                m.saved.Delete(oldestId)
+            end while
+        end if
+        m.saved[metaId] = {
+            metaId: metaId
+            metaType: metaType
+            name: name
+            poster: poster
+            posterShape: posterShape
+        }
+        m.savedOrder.Unshift(metaId)
+        m.ReSeedPositionFromAccount(metaId)
+        m.Save()
+        return true
+    end function
+
+    ' Remove a library item and drop its continue-watching entries. Stremio's CW
+    ' is a view over the library: a removed (non-temp) item is not in CW, so the
+    ' local stack must lose the meta here or the row would stay stale until the
+    ' next account sync. Mirrors stremio-core's RemoveFromLibrary (removed:true,
+    ' temp:false). A removed-but-watched title keeps its state.timeOffset on the
+    ' account, so AddSaved re-seeds it — but only on stremio, since a guest has
+    ' no account item to restore from.
+    function RemoveSaved(metaId as string) as boolean
+        if m.HasKey(m.saved, metaId)
+            m.saved.Delete(metaId)
+            for i = m.savedOrder.Count() - 1 to 0 step -1
+                if m.savedOrder[i] = metaId then m.savedOrder.Delete(i)
+            end for
+            m.PrunePositions(metaId)
+            m.Save()
+            return true
+        end if
+        return false
+    end function
+
+    ' Drop every continue-watching entry for one meta (all episodes of a series).
+    ' Membership is what gates CW, and both sessions share this path.
+    sub PrunePositions(metaId as string)
+        if metaId = "" or m.positions = invalid then return
+        for i = m.positions.Count() - 1 to 0 step -1
+            if m.positions[i].metaId = metaId then m.positions.Delete(i)
+        end for
+    end sub
+
+    ' Rebuild the continue-watching entry an add-to-library should surface, from
+    ' the cached account item's own progress — the state stremio-core's
+    ' AddToLibrary preserves when it reuses the existing library item
+    ' (LibraryItem::from((meta_preview, library_item))). Only stremio has an
+    ' account library; a guest returns here without an item and stays out of CW.
+    ' A stored-but-untouched item (no progress) seeds nothing, and a live
+    ' channel/tv title is never a resume point.
+    sub ReSeedPositionFromAccount(metaId as string)
+        if m.sessionType <> "stremio" then return
+        item = m.FindStremioItem(metaId)
+        if item = invalid then return
+        parsed = m.stremioCodec.ParseLibraryItem(item)
+        if parsed = invalid then return
+        if not parsed.inProgress then return
+        if m.IsChannelType(parsed.metaType) then return
+        m.SetPosition(parsed.videoId, parsed.metaId, parsed.metaType, parsed.season, parsed.episode, parsed.name, parsed.poster, parsed.position, parsed.duration, parsed.posterShape)
+    end sub
+
+    ' The cached account item for a meta, or invalid when the account library has
+    ' never seen it. Reads the committed stremioLibrary (kept current by every
+    ' account push), not a server round-trip.
+    function FindStremioItem(metaId as string) as dynamic
+        if metaId = "" or m.stremioLibrary = invalid then return invalid
+        for each item in m.stremioLibrary
+            if item <> invalid and Type(item) = "roAssociativeArray" and item._id = metaId then return item
+        end for
+        return invalid
+    end function
+
+    function IsSaved(metaId as string) as boolean
+        return m.HasKey(m.saved, metaId)
+    end function
+
+    ' Most recently added first — the array holds ids newest-first.
+    function SavedItems() as object
+        items = []
+        for each metaId in m.savedOrder
+            if m.HasKey(m.saved, metaId) then items.Push(m.saved[metaId])
+        end for
+        return items
+    end function
+
+    ' The saved list as the Library screen presents it: filtered by content type
+    ' and ordered by one of the supported sorts, always a fresh array (the
+    ' internal saved map/order are never rearranged — SortByName/SortByWatched
+    ' only reorder the returned copy). typeFilter is "all", "movie" or "series";
+    ' sort is "recent" (saved order, newest first — the default), "az"/"za"
+    ' (case-insensitive by name) or "watched" (any saved item with a
+    ' continue-watching position first, most recently watched first — the
+    ' positions array is newest-first — then everything else by name). The
+    ' Library filter chips only expose All/Movies/Series, so channel/tv entries
+    ' cannot be filtered into a view — they remain in the saved set (and account
+    ' layer) but never appear in the Library screen grid.
+    function LibraryView(typeFilter as string, sort as string) as object
+        items = m.SavedItems()
+        if typeFilter <> "all"
+            filtered = []
+            for each item in items
+                metaType = item.metaType
+                if metaType = invalid then metaType = ""
+                if typeFilter = "channel"
+                    if metaType = "channel" or metaType = "tv" then filtered.Push(item)
+                else
+                    if metaType = typeFilter then filtered.Push(item)
+                end if
+            end for
+            items = filtered
+        end if
+        if sort = "az"
+            m.SortByName(items, false)
+        else if sort = "za"
+            m.SortByName(items, true)
+        else if sort = "watched"
+            m.SortByWatched(items)
+        end if
+        return items
+    end function
+
+    ' Case-insensitive insertion sort of saved records by name, ascending or
+    ' descending. An insertion sort keeps it interpreter-safe, exactly like
+    ' SortByMtimeDesc; roArray.Sort with a function comparator is not guaranteed
+    ' in the brs interpreter. A malformed (invalid/blank) name is coerced to ""
+    ' so the compare cannot throw.
+    sub SortByName(items as object, descending as boolean)
+        for i = 1 to items.Count() - 1
+            temp = items[i]
+            j = i
+            while j > 0
+                left = items[j - 1].name
+                if left = invalid then left = ""
+                right = temp.name
+                if right = invalid then right = ""
+                if descending
+                    if LCase(left) >= LCase(right) then exit while
+                else
+                    if LCase(left) <= LCase(right) then exit while
+                end if
+                items[j] = items[j - 1]
+                j = j - 1
+            end while
+            items[j] = temp
+        end for
+    end sub
+
+    ' Insertion sort that floats items with a continue-watching position to the
+    ' front, most recently watched first (positions is newest-first, so the
+    ' earliest array index is the freshest), then the unwatched by name. Any
+    ' position under a metaId marks it watched — an episode position counts for
+    ' its series.
+    sub SortByWatched(items as object)
+        rank = {}
+        for i = 0 to m.positions.Count() - 1
+            mid = m.positions[i].metaId
+            if mid <> invalid and mid <> "" and not m.HasKey(rank, mid) then rank[mid] = i
+        end for
+        for i = 1 to items.Count() - 1
+            temp = items[i]
+            j = i
+            while j > 0
+                if not m.WatchedBefore(items[j - 1], temp, rank) then exit while
+                items[j] = items[j - 1]
+                j = j - 1
+            end while
+            items[j] = temp
+        end for
+    end sub
+
+    ' true when a should sort after b in the "watched" sort: a is less recently
+    ' watched (higher rank) than b, or equally ranked and names after b. Not
+    ' ranked items all share the cap rank, so unwatched sort by name.
+    function WatchedBefore(a as object, b as object, rank as object) as boolean
+        ra = m.WatchedRank(rank, a.metaId)
+        rb = m.WatchedRank(rank, b.metaId)
+        if ra <> rb then return ra > rb
+        an = a.name
+        if an = invalid then an = ""
+        bn = b.name
+        if bn = invalid then bn = ""
+        return LCase(an) > LCase(bn)
+    end function
+
+    function WatchedRank(rank as object, metaId as string) as integer
+        if metaId <> invalid and metaId <> "" and m.HasKey(rank, metaId) then return rank[metaId]
+        return 1000000000
+    end function
+
+    ' Live add-ons speak Stremio content types "channel"/"tv". A live stream
+    ' never has a resume point, so those entries are kept out of Continue
+    ' Watching entirely: here, at the SyncFromStremio mapping, and at the
+    ' player's save/publish gates (they share this helper so no caller can
+    ' drift). They still ride the saved set and the account layer when the
+    ' account has them.
+    function IsChannelType(metaType as string) as boolean
+        if metaType = "channel" then return true
+        if metaType = "tv" then return true
+        return false
+    end function
+
+    ' Record playback progress for a video (a movie metaId, or the
+    ' "{metaId}:{season}:{episode}" id for an episode). Drops the previous
+    ' entry for the same video or series, pushes the new one on top of the
+    ' capped stack, and pops anything beyond MAX_CONTINUE_WATCHING. Blank
+    ' positions are ignored so a fresh screen never clears stored progress.
+    ' Channel/tv playback records nothing — see IsChannelType.
+    sub SetPosition(videoId as string, metaId as string, metaType as string, season as integer, episode as integer, name as string, poster = "" as string, position = 0 as integer, duration = 0 as integer, posterShape = "" as string)
+        if videoId = "" or metaId = "" then return
+        if m.IsChannelType(metaType) then return
+        for i = m.positions.Count() - 1 to 0 step -1
+            if m.positions[i].videoId = videoId or m.positions[i].metaId = metaId
+                m.positions.Delete(i)
+            end if
+        end for
+        m.positions.Unshift({
+            videoId: videoId
+            metaId: metaId
+            metaType: metaType
+            season: season
+            episode: episode
+            name: name
+            poster: poster
+            posterShape: posterShape
+            position: position
+            duration: duration
+        })
+        while m.positions.Count() > MAX_CONTINUE_WATCHING
+            m.positions.Pop()
+        end while
+        m.Save()
+    end sub
+
+    function Position(videoId as string) as integer
+        for each entry in m.positions
+            if entry.videoId = videoId then return entry.position
+        end for
+        return 0
+    end function
+
+    function IsWatching(videoId as string) as boolean
+        for each entry in m.positions
+            if entry.videoId = videoId then return true
+        end for
+        return false
+    end function
+
+    ' The continue-watching stack as-is: newest first, already capped. A shallow
+    ' copy is returned, never the live m.positions array: callers loop over the
+    ' result and may call helpers that themselves scan m.positions, and a nested
+    ' for-each over the same roArray on-device stops the outer loop after its
+    ' first element (BrightScript shares the array's iterator state).
+    function ContinueWatching() as object
+        result = []
+        for each entry in m.positions
+            result.Push(entry)
+        end for
+        return result
+    end function
+
+    ' The most recent continue-watching entry for one series/movie, or invalid
+    ' when nothing has been watched. Details uses this to resurrect a resume
+    ' hint for episodes opened straight from a catalog row. Since the array is
+    ' newest-first, the first match is the one to resume.
+    function ResumeFor(metaId as string) as dynamic
+        if metaId = "" then return invalid
+        for each entry in m.positions
+            if entry.metaId = metaId then return entry
+        end for
+        return invalid
+    end function
+
+    function RemovePosition(videoId as string) as boolean
+        for i = m.positions.Count() - 1 to 0 step -1
+            if m.positions[i].videoId = videoId
+                m.positions.Delete(i)
+                m.Save()
+                return true
+            end if
+        end for
+        return false
+    end function
+
+    ' ---- watched state ----
+
+    ' Record that a video finished (position >= duration * WATCHED_THRESHOLD),
+    ' when the player knows a duration. Coalesces like SetPosition: the key is
+    ' the video id (a movie's metaId, or a series' "{metaId}:{season}:{episode}")
+    ' so re-watching never duplicates. The local set is display-side only — it
+    ' is written here on both guest and stremio sessions but never pushed to the
+    ' account (the push clones the account's own flags, see BuildWatchStateItem).
+    sub MarkWatchedIfFinished(metaId as string, videoId as string, position as integer, duration as integer)
+        if duration <= 0 then return
+        if position < duration * WATCHED_THRESHOLD then return
+        key = metaId
+        if videoId <> "" then key = videoId
+        if key = "" then return
+        if m.HasKey(m.watched, key) then return
+        m.watched[key] = true
+        m.Save()
+    end sub
+
+    ' Coarse whole-item watched: the local set has the metaId, or the account
+    ' layer flagged the whole item watched (flaggedWatched/timesWatched). Movies
+    ' answer directly; series tiles should use SeriesStatus for the watched/
+    ' progress distinction.
+    function IsWatched(metaId as string) as boolean
+        if metaId = "" then return false
+        if m.HasKey(m.watched, metaId) then return true
+        account = m.AccountLayer(metaId)
+        if account <> invalid and account.watched then return true
+        return false
+    end function
+
+    ' Per-episode watched, precise. Local set first; when the episode list is
+    ' available the account bitfield is decoded against it (it is only an index
+    ' into that ordering, so without the list the account part cannot answer).
+    ' An account that flagged the whole series watched (no bitfield) counts every
+    ' episode — mirroring WatchedSetFor, so badges and what a write would produce
+    ' can never disagree. "orderedEpisodes" is the series' ordered video id list.
+    function EpisodeWatched(metaId as string, season as integer, episode as integer, orderedEpisodes as object, suppliedVideoId = "" as string) as boolean
+        if orderedEpisodes = invalid or Type(orderedEpisodes) <> "roArray" then return false
+        videoId = suppliedVideoId
+        if videoId = "" then videoId = m.videoId.Build(metaId, season, episode)
+        if m.HasKey(m.watched, videoId) then return true
+        if m.HasKey(m.watched, metaId) then return true
+        if m.IsUnwatchOverridden(metaId, videoId) then return false
+        account = m.AccountLayer(metaId)
+        if account = invalid then return false
+        if account.watched and (account.bitfield = invalid or account.bitfield = "") then return true
+        if account.bitfield = invalid or account.bitfield = "" then return false
+        if m.codec = invalid then return false
+        watched = m.codec.WatchedDecode(account.bitfield, orderedEpisodes)
+        if watched <> invalid and m.HasKey(watched, videoId) then return true
+        return false
+    end function
+
+    ' The watched mark for one regular episode — whether it has aired and, when
+    ' aired, whether it is precisely watched. The aired gate exists because an
+    ' account bitfield for a series marked fully watched paints the whole known
+    ' list, placeholders included, and literally decoding that would put checks
+    ' on episodes that don't exist yet. One source for the badge rule shared by
+    ' the build and the re-paint, so it cannot drift. `nowIso` is injectable for
+    ' tests; production passes the store's TimeUtil stamp.
+    function EpisodeMark(metaId as string, season as integer, ep as object, orderedEpisodes as object, nowIso as dynamic) as object
+        mark = { aired: false, watched: false }
+        if metaId = "" or ep = invalid or ep.episode = invalid then return mark
+        if m.time = invalid then return mark
+        mark.aired = m.time.EpisodeAired(ep, nowIso)
+        if mark.aired
+            videoId = ""
+            if GetInterface(ep.id, "ifString") <> invalid then videoId = ep.id
+            mark.watched = m.EpisodeWatched(metaId, season, ep.episode, orderedEpisodes, videoId)
+        end if
+        return mark
+    end function
+
+    ' Once the full episode list is known, a series whose every regular episode
+    ' is watched crosses from in-progress (clock) to done (eye) on the grid
+    ' tiles that only carry a coarse SeriesStatus badge. `metaId` is injected so
+    ' the completion rule is store-pure and shared by the build and the in-place
+    ' re-paint. Persists through MarkSeriesDone on both sessions (display-side).
+    sub MarkAllIfDone(metaId as string, anyRegular as boolean, allDone as boolean) as void
+        if anyRegular and allDone and metaId <> ""
+            m.MarkSeriesDone(metaId)
+        end if
+    end sub
+
+    ' Coarse series status for grid tiles that have no episode list. "done" when
+    ' the whole series is known watched (local MarkSeriesDone, or the account
+    ' flagged the series watched); "progress" when some watch state exists —
+    ' account in-progress/bitfield, or the local layer (a continue-watching
+    ' position or a locally-finished episode); "none" otherwise. Precise done
+    ' (every episode) needs the episode list and is EpisodesScreen's job.
+    function SeriesStatus(metaId as string) as string
+        if metaId = "" then return "none"
+        if m.HasKey(m.watched, metaId) then return "done"
+        account = m.AccountLayer(metaId)
+        if account <> invalid
+            if account.watched then return "done"
+            if account.inProgress or account.bitfield <> "" then return "progress"
+        end if
+        ' Guest/local parity: the account layer is the stremio-only source of
+        ' in-progress, so a guest's progress can only come from the local layer
+        ' (positions + the watched set), mirroring the account's own signals.
+        if m.HasLocalSeriesProgress(metaId) then return "progress"
+        return "none"
+    end function
+
+    ' The local layer's in-progress answer for a series, mirroring the account
+    ' layer's inProgress/bitfield: a continue-watching entry with real progress
+    ' (position > 0), or a locally-finished episode key ("{metaId}:{season}:
+    ' {episode}") that survives even after the CW cap ages the position out.
+    ' SeriesStatus gives "done" precedence, so a MarkSeriesDone series never
+    ' reads as in progress here.
+    function HasLocalSeriesProgress(metaId as string) as boolean
+        if metaId = "" then return false
+        for i = 0 to m.positions.Count() - 1
+            if m.positions[i].metaId = metaId and m.positions[i].position > 0 then return true
+        end for
+        prefix = metaId + ":"
+        for each key in m.watched
+            if Left(key, prefix.Len()) = prefix then return true
+        end for
+        return false
+    end function
+
+    ' The coarse watched glyph for a grid tile without an episode list. Series
+    ' answer by SeriesStatus (done → GLYPH_WATCHED, in-progress → GLYPH_PROGRESS,
+    ' untouched → no badge); everything else by IsWatched (GLYPH_WATCHED or none).
+    ' One definition here, so renaming a glyph touches the store + the PosterTile
+    ' image — not the one-line adapters in Home/Library/Discover/Search.
+    function WatchedGlyph(metaId as string, metaType as string) as string
+        if metaId = invalid or metaId = "" then return ""
+        kind = metaType
+        if kind = invalid then kind = ""
+        if kind = "series"
+            status = m.SeriesStatus(metaId)
+            if status = "done" then return GLYPH_WATCHED
+            if status = "progress" then return GLYPH_PROGRESS
+            return ""
+        end if
+        if m.IsWatched(metaId) then return GLYPH_WATCHED
+        return ""
+    end function
+
+    ' The existing continue-watching position for a meta, as the progress bar
+    ' needs it (position/duration in ms), or invalid when there is none.
+    function ProgressFor(metaId as string) as dynamic
+        if metaId = "" then return invalid
+        for i = 0 to m.positions.Count() - 1
+            if m.positions[i].metaId = metaId
+                return { position: m.positions[i].position, duration: m.positions[i].duration }
+            end if
+        end for
+        return invalid
+    end function
+
+    ' The continue-watching bar fraction for a meta: position/duration clamped to
+    ' (0, 1], or invalid when there is no playable progress (never started, bogus
+    ' or zero duration). Screen code just paints the returned value — the clamped
+    ' fraction math lives here so Home and Library tiles agree on the bar.
+    function ProgressFraction(metaId as string) as dynamic
+        if metaId = "" then return invalid
+        entry = invalid
+        for i = 0 to m.positions.Count() - 1
+            if m.positions[i].metaId = metaId then entry = m.positions[i]
+        end for
+        if entry = invalid then return invalid
+        if entry.duration = invalid or entry.duration <= 0 then return invalid
+        if entry.position = invalid or entry.position <= 0 then return invalid
+        fraction = entry.position / entry.duration
+        if fraction > 1 then fraction = 1
+        return fraction
+    end function
+
+    ' Persist a whole-series done flag (guest local, stremio display-only like
+    ' the watched set). Used by EpisodesScreen once it has the full episode list
+    ' and can see every non-special episode is watched.
+    sub MarkSeriesDone(metaId as string)
+        if metaId = "" then return
+        if m.HasKey(m.watched, metaId) then return
+        m.watched[metaId] = true
+        m.Save()
+    end sub
+
+    function AccountLayer(metaId as string) as dynamic
+        if m.HasKey(m.accountWatched, metaId) then return m.accountWatched[metaId]
+        return invalid
+    end function
+
+    ' ---- watched edits ----
+
+    ' Mark one regular episode watched in the local display layer and persist.
+    ' The whole-series done key is left alone — a single episode mark never turns
+    ' a series done (MarkAllIfDone does that once the full list is known and
+    ' every tile is watched). Drops any session unwatch override for the episode.
+    sub MarkEpisodeWatched(metaId as string, videoId as string) as void
+        if metaId = "" or videoId = "" then return
+        m.watched[videoId] = true
+        m.ClearUnwatchOverride(metaId, videoId)
+        m.Save()
+    end sub
+
+    ' Clear one episode. A local unwatch also drops a previous whole-series done
+    ' key — a series with an unwatched episode cannot stay "done". On a stremio
+    ' session the unwatch is remembered for the session (m.unwatched), because
+    ' the account's bitfield still lists the episode watched until the corrected
+    ' bitfield is pushed and re-synced; the override is what keeps both the tile
+    ' badge and any re-encoded bitfield honoring "not watched" meanwhile.
+    sub MarkEpisodeUnwatched(metaId as string, videoId as string) as void
+        if metaId = "" or videoId = "" then return
+        if m.HasKey(m.watched, videoId) then m.watched.Delete(videoId)
+        if m.HasKey(m.watched, metaId) then m.watched.Delete(metaId)
+        if m.sessionType = "stremio" then m.RecordUnwatchOverride(metaId, videoId)
+        m.Save()
+    end sub
+
+    ' Mark every episode up to and including lastIndex (index into the given
+    ' ordered episode id list) watched, in one write. Clears session unwatch
+    ' overrides for those ids — they are watched again. The list is whatever
+    ' scoped a caller to (the whole series or one season row): the store is
+    ' agnostic, the bitfield it later authors stays series-global regardless.
+    sub MarkUpToWatched(metaId as string, orderedEpisodeIds as object, lastIndex as integer) as void
+        if metaId = "" or orderedEpisodeIds = invalid or Type(orderedEpisodeIds) <> "roArray" or orderedEpisodeIds.Count() = 0 then return
+        if lastIndex < 0 then lastIndex = 0
+        if lastIndex >= orderedEpisodeIds.Count() then lastIndex = orderedEpisodeIds.Count() - 1
+        for i = 0 to lastIndex
+            id = orderedEpisodeIds[i]
+            m.watched[id] = true
+            m.ClearUnwatchOverride(metaId, id)
+        end for
+        m.Save()
+    end sub
+
+    ' The inverse of MarkUpToWatched: every episode up to and including lastIndex
+    ' is cleared locally, the whole-series done key is dropped (a series with an
+    ' unwatched episode cannot stay done), and — on a stremio session — the ids
+    ' are remembered as unwatch overrides so the badge and any re-encoded
+    ' bitfield keep honoring "not watched" until the correction re-syncs.
+    sub MarkUpToUnwatched(metaId as string, orderedEpisodeIds as object, lastIndex as integer) as void
+        if metaId = "" or orderedEpisodeIds = invalid or Type(orderedEpisodeIds) <> "roArray" or orderedEpisodeIds.Count() = 0 then return
+        if lastIndex < 0 then lastIndex = 0
+        if lastIndex >= orderedEpisodeIds.Count() then lastIndex = orderedEpisodeIds.Count() - 1
+        for i = 0 to lastIndex
+            id = orderedEpisodeIds[i]
+            if m.HasKey(m.watched, id) then m.watched.Delete(id)
+            if m.sessionType = "stremio" then m.RecordUnwatchOverride(metaId, id)
+        end for
+        if m.HasKey(m.watched, metaId) then m.watched.Delete(metaId)
+        m.Save()
+    end sub
+
+    sub RecordUnwatchOverride(metaId as string, videoId as string) as void
+        ov = m.unwatched[metaId]
+        if ov = invalid then ov = {} : m.unwatched[metaId] = ov
+        ov[videoId] = true
+    end sub
+
+    sub ClearUnwatchOverride(metaId as string, videoId as string) as void
+        ov = m.unwatched[metaId]
+        if ov <> invalid
+            if ov[videoId] <> invalid then ov.Delete(videoId)
+        end if
+    end sub
+
+    ' Whether an episode is under a session unwatch override (a stremio account
+    ' still lists it watched until the correction lands and re-syncs).
+    function IsUnwatchOverridden(metaId as string, videoId as string) as boolean
+        if metaId = "" or videoId = "" then return false
+        ov = m.unwatched[metaId]
+        if ov <> invalid and ov[videoId] <> invalid then return true
+        return false
+    end function
+
+    ' The watched set for a series as it must be written to the account: the
+    ' local layer (per-episode keys plus the whole-series done key) unioned with
+    ' the account's own marks — its bitfield decoded against the ordered list,
+    ' or every id when the account flagged the whole series watched without a
+    ' bitfield — minus any session unwatch overrides. A written bitfield
+    ' replaces state.watched wholesale, so re-encoding only the local layer
+    ' would silently wipe the watch marks the account already holds.
+    function WatchedSetFor(metaId as string, orderedEpisodeIds as object) as object
+        set = {}
+        if metaId = "" or orderedEpisodeIds = invalid or Type(orderedEpisodeIds) <> "roArray" then return set
+        n = orderedEpisodeIds.Count()
+        for i = 0 to n - 1
+            id = orderedEpisodeIds[i]
+            if m.HasKey(m.watched, id) then set[id] = true
+        end for
+        if m.HasKey(m.watched, metaId)
+            for i = 0 to n - 1
+                set[orderedEpisodeIds[i]] = true
+            end for
+        end if
+        account = m.AccountLayer(metaId)
+        if account <> invalid
+            if account.watched and (account.bitfield = invalid or account.bitfield = "")
+                for i = 0 to n - 1
+                    set[orderedEpisodeIds[i]] = true
+                end for
+            else if account.bitfield <> invalid and account.bitfield <> ""
+                if m.codec <> invalid
+                    decoded = m.codec.WatchedDecode(account.bitfield, orderedEpisodeIds)
+                    if decoded <> invalid
+                        for i = 0 to n - 1
+                            id = orderedEpisodeIds[i]
+                            if decoded[id] <> invalid then set[id] = true
+                        end for
+                    end if
+                end if
+            end if
+        end if
+        ov = m.unwatched[metaId]
+        if ov <> invalid
+            for i = 0 to n - 1
+                id = orderedEpisodeIds[i]
+                if ov[id] <> invalid then set.Delete(id)
+            end for
+        end if
+        return set
+    end function
+
+    ' The id to report as the bitfield's "last watched" slot: the last watched
+    ' id in display order, or the caller's current episode when the set has
+    ' nothing watched (that slot must never be empty — the decoder refuses it).
+    function LastWatchedId(set as object, orderedEpisodeIds as object, videoId as string) as string
+        if set = invalid or orderedEpisodeIds = invalid then return videoId
+        for i = orderedEpisodeIds.Count() - 1 to 0 step -1
+            id = orderedEpisodeIds[i]
+            if id <> invalid and set[id] <> invalid then return id
+        end for
+        if videoId = invalid or videoId = "" then
+            if orderedEpisodeIds.Count() > 0 then return orderedEpisodeIds[0]
+            return ""
+        end if
+        return videoId
+    end function
+
+    ' Reconcile the store with the account's remote library (from the
+    ' datastoreGet pull). The API is the authority, so the whole in-memory state
+    ' is rebuilt, never merged: continue watching is re-derived and re-ordered,
+    ' the saved map is re-filled, and every item (even non-CW ones) is kept in
+    ' stremioLibrary for the future Library screen. Only the continue-watching
+    ' stack is written to the device (Save gates it); the rest lives for the
+    ' session. Stremio sessions only — a guest store has no library to reconcile
+    ' with, and a stray call must never clobber local guest data.
+    sub SyncFromStremio(items as dynamic)
+        if m.sessionType <> "stremio" then return
+        if items = invalid or Type(items) <> "roArray" then return
+
+        m.stremioLibrary = items
+        cw = []
+        saved = {}
+        savedOrder = []
+        accountWatched = {}
+        for each item in items
+            parsed = m.stremioCodec.ParseLibraryItem(item)
+            if parsed = invalid then continue for
+            ' The account layer: re-derived on every sync, memory-only. It peers
+            ' into the item's watch state the same way the app's own watched set
+            ' does — flaggedWatched/timesWatched mark a whole item watched,
+            ' timeOffset marks it in progress, and the raw watched bitfield is
+            ' kept whole so EpisodesScreen can decode it against the episode list.
+            accountWatched[parsed.metaId] = {
+                watched: parsed.watchedFlag
+                inProgress: parsed.inProgress
+                bitfield: parsed.bitfield
+            }
+            if parsed.cw and not m.IsChannelType(parsed.metaType) then cw.Push(parsed)
+            if parsed.saved and parsed.metaId <> "" and not m.HasKey(saved, parsed.metaId)
+                saved[parsed.metaId] = {
+                    metaId: parsed.metaId
+                    metaType: parsed.metaType
+                    name: parsed.name
+                    poster: parsed.poster
+                    posterShape: parsed.posterShape
+                }
+                savedOrder.Push(parsed.metaId)
+            end if
+        end for
+
+        ' Continue watching, newest first. Exactly one resume point survives per
+        ' distinct video OR series (mirroring SetPosition's prune), and the stack
+        ' is capped at MAX_CONTINUE_WATCHING. Tracking seen ids instead of
+        ' deleting as we go is what keeps the NEWEST occurrence of each
+        ' video/series — a delete-then-push pass over a newest-first array would
+        ' leave only the oldest.
+        m.stremioCodec.SortByMtimeDesc(cw)
+        positions = []
+        seenVideo = {}
+        seenMeta = {}
+        for each entry in cw
+            if not m.HasKey(seenMeta, entry.metaId) and not m.HasKey(seenVideo, entry.videoId)
+                seenMeta[entry.metaId] = true
+                seenVideo[entry.videoId] = true
+                positions.Push({
+                    videoId: entry.videoId
+                    metaId: entry.metaId
+                    metaType: entry.metaType
+                    season: entry.season
+                    episode: entry.episode
+                    name: entry.name
+                    poster: entry.poster
+                    posterShape: entry.posterShape
+                    position: entry.position
+                    duration: entry.duration
+                })
+            end if
+        end for
+        while positions.Count() > MAX_CONTINUE_WATCHING
+            positions.Pop()
+        end while
+        m.positions = positions
+
+        m.saved = saved
+        m.savedOrder = savedOrder
+        m.accountWatched = accountWatched
+        m.Save()
+    end sub
+
+    ' The full synced library, kept in memory for the future Library screen.
+    function StremioLibraryItems() as object
+        return m.stremioLibrary
+    end function
+
+    ' Stremio wire-shape parsing and building live in StremioLibraryCodec
+    ' (ParseLibraryItem, SortByMtimeDesc, Identity/ResolveLibraryItem and the
+    ' three Build*Item writers): pure functions with the session gate, the
+    ' freshest-cache read, and the clock injected as parameters. These adapters
+    ' keep the public surface MainScene's push sites call through StoreHost —
+    ' they refuse guest sessions, stamp `now` when left to default, hand the
+    ' store's state to the codec, and then commit the built item back into
+    ' stremioLibrary (CommitStremioItem, the update_and_push_items_to_storage
+    ' step) so the next push of any kind starts from it.
+    function BuildWatchStateItem(packet as dynamic, now = "" as string) as dynamic
+        if m.sessionType <> "stremio" then return invalid
+        if now = "" then now = m.time.NowIso()
+        item = m.stremioCodec.BuildWatchStateItem(m.sessionType, m.stremioLibrary, now, packet)
+        m.CommitStremioItem(item)
+        return item
+    end function
+
+    function BuildLibraryChangeItem(metaId as string, metaType as string, name as string, poster as string, added as boolean, now = "" as string) as dynamic
+        if m.sessionType <> "stremio" then return invalid
+        if now = "" then now = m.time.NowIso()
+        item = m.stremioCodec.BuildLibraryChangeItem(m.sessionType, m.stremioLibrary, now, metaId, metaType, name, poster, added)
+        m.CommitStremioItem(item)
+        return item
+    end function
+
+    ' Build the LibraryItem a watched-mark/unmark push sends. Stremio sessions
+    ' only; stamps now when left to default. The bitfield is authored here from
+    ' WatchedSetFor (local + account, minus unwatch overrides) so the union
+    ' lands, then handed to BuildWatchedItem with the last-watched id. The packet
+    ' carries the ordered video ids — the panel's current list, the same one the
+    ' account bitfield indexes and the badges are painted from — plus the meta
+    ' identity, so a series the account has never seen still lands as a
+    ' well-formed entry (which the later add-to-library push then clones).
+    function BuildWatchedStateItem(packet as dynamic, now = "" as string) as dynamic
+        if m.sessionType <> "stremio" then return invalid
+        if packet = invalid then return invalid
+        metaId = packet.metaId
+        if metaId = invalid or metaId = "" then return invalid
+        orderedEpisodeIds = packet.orderedVideoIds
+        if orderedEpisodeIds = invalid or Type(orderedEpisodeIds) <> "roArray" or orderedEpisodeIds.Count() = 0 then return invalid
+        if now = "" then now = m.time.NowIso()
+        set = m.WatchedSetFor(metaId, orderedEpisodeIds)
+        lastVideoId = m.LastWatchedId(set, orderedEpisodeIds, packet.videoId)
+        bitfield = ""
+        if m.codec <> invalid then bitfield = m.codec.WatchedEncode(orderedEpisodeIds, set, lastVideoId)
+        item = m.stremioCodec.BuildWatchedItem(m.sessionType, m.stremioLibrary, now, packet, bitfield, lastVideoId)
+        m.CommitStremioItem(item)
+        return item
+    end function
+
+    ' The single commit every account write funnels through: the built item
+    ' replaces the cached copy with the same _id (or is appended when the account
+    ' library had never seen it). stremio-core keeps its local bucket current
+    ' this way in update_and_push_items_to_storage, and it is what makes the
+    ' write-back correct across push types — each build starts from what the last
+    ' commit left, so a position write cannot revert a watched mark, or vice
+    ' versa. A refused write (guest session, invalid packet) builds invalid and
+    ' commits nothing.
+    sub CommitStremioItem(item as dynamic)
+        if item = invalid or item._id = invalid or item._id = "" then return
+        if m.stremioLibrary = invalid then m.stremioLibrary = []
+        for i = 0 to m.stremioLibrary.Count() - 1
+            cached = m.stremioLibrary[i]
+            if cached <> invalid and Type(cached) = "roAssociativeArray" and cached._id = item._id
+                m.stremioLibrary[i] = item
+                return
+            end if
+        end for
+        m.stremioLibrary.Push(item)
+    end sub
+
+    ' Guest/stremio sessions persist under different keys so one session can
+    ' never surface the other's saved content or continue-watching positions.
+    function RegistryKey() as string
+        if m.sessionType = "stremio" then return "stremio_library"
+        return "library"
+    end function
+
+    ' Repoint the store at another session's data. A same-session switch is a
+    ' no-op; everything is reloaded fresh so the in-memory state always mirrors
+    ' the active session's persisted key.
+    sub SwitchSession(sessionType as string)
+        if sessionType <> "guest" and sessionType <> "stremio" then return
+        if m.sessionType = sessionType then return
+        m.sessionType = sessionType
+        m.saved = {}
+        m.savedOrder = []
+        m.positions = []
+        m.stremioLibrary = []
+        m.watched = {}
+        m.accountWatched = {}
+        m.unwatched = {}
+        m.Load()
+    end sub
+
+    sub Save()
+        if m.registry = invalid then return
+        data = { continueWatching: m.positions }
+        if m.sessionType <> "stremio"
+            data.saved = m.saved
+            data.savedOrder = m.savedOrder
+            data.watched = m.watched
+        end if
+        m.registry.Write(m.RegistryKey(), FormatJson(data))
+        m.registry.Flush()
+    end sub
+
+    sub Load()
+        if m.registry = invalid then return
+        raw = m.registry.Read(m.RegistryKey())
+        if raw = "" then return
+        parsed = invalid
+        try
+            parsed = ParseJson(raw)
+        catch e
+            return
+        end try
+        if parsed = invalid then return
+        if m.sessionType <> "stremio"
+            if parsed.saved <> invalid and Type(parsed.saved) = "roAssociativeArray" then m.saved = parsed.saved
+            if parsed.savedOrder <> invalid and Type(parsed.savedOrder) = "roArray" then m.savedOrder = parsed.savedOrder
+            if parsed.watched <> invalid and Type(parsed.watched) = "roAssociativeArray" then m.watched = parsed.watched
+        end if
+        if parsed.continueWatching <> invalid and Type(parsed.continueWatching) = "roArray" then m.positions = parsed.continueWatching
+    end sub
+end class

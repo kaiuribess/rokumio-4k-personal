@@ -1,0 +1,11 @@
+1
+00:00:00,000 --> 00:00:03,000
+Esta es la pista de subtítulos en español.
+
+2
+00:00:03,500 --> 00:00:07,000
+Cada subtítulo tiene su propio intervalo.
+
+3
+00:00:08,000 --> 00:00:12,000
+Cambia de pista cuando quieras con el menú *.

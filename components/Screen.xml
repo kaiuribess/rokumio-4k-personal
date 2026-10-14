@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="Screen" extends="Group">
+    <!-- The base every screen extends. It owns the one contract every screen
+         shares — the ScreenStack lifecycle + the store hand-off — so a screen
+         only declares what it adds, and the stack's callFunc calls are always
+         answered (by a screen override or by these defaults).
+
+         Screens keep their own script implementations for whatever they
+         actually do (OnEnter/OnExit/OnBackPressed overrides stay declared in
+         the child's interface, exactly as before this base existed); functions
+         a child never implements fall through to the defaults here. -->
+    <interface>
+        <!-- Screen contract: called by ScreenStack for show/hide/focus/back.
+             callFunc only runs for functions declared in the interface.
+
+             SetStores takes two nodes from the Scene: the StoreHost, which owns
+             every store instance and answers with plain data over callFunc, and
+             the Scene itself, which owns the fault strip. Store CLASSES cannot
+             cross a component boundary at all — an instance is an
+             roAssociativeArray of function references, and Roku copies that array
+             as an argument, a return or a declared field, dropping every
+             function member — so the host node is the only thing handed over and
+             a node is the one thing Roku passes by reference.
+
+             screenActive is owned by the stack: true while this screen is the
+             interactive top. Async task result handlers must only grab focus
+             while it holds, or a late landing on a covered screen would steal
+             focus from whatever is on top. -->
+        <field id="screenActive" type="boolean" value="false" />
+        <function name="SetStores" />
+        <function name="OnEnter" />
+        <function name="OnExit" />
+        <function name="OnBackPressed" />
+        <function name="BlurFocus" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/components/Screen.brs" />
+</component>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="LinkStremioTask" extends="Task">
+    <interface>
+        <field id="code" type="string" value="" alwaysNotify="true" />
+        <field id="link" type="string" value="" alwaysNotify="true" />
+        <field id="qrcode" type="string" value="" alwaysNotify="true" />
+        <field id="result" type="assocarray" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/source/stores/Transport.bs" />
+    <script type="text/brightscript" uri="pkg:/components/LinkStremioTask.brs" />
+</component>

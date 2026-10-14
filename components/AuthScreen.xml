@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="AuthScreen" extends="Screen">
+    <!-- Optional Stremio sync or a local profile. Playback sources are added
+         separately; neither profile choice claims a movie is ready to play. -->
+    <interface>
+        <!-- The one action AuthScreen reports upward: a choice request the
+             Scene routes. -->
+        <field id="pushRequest" type="assocarray" alwaysNotify="true" />
+
+        <!-- Screen contract: called by ScreenStack for show/hide/focus/back.
+             Stores are class instances and cannot cross components through a
+             field, so they arrive via callFunc. -->
+        <function name="OnEnter" />
+        <function name="OnExit" />
+        <function name="OnBackPressed" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/components/AuthScreen.brs" />
+    <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
+
+    <children>
+        <Rectangle id="authBg" width="1920" height="1080" color="0x0" />
+        <Label
+            id="authTitle"
+            translation="[80, 300]"
+            width="1760"
+            height="70"
+            text="Rokumio 4K Personal"
+            font="font:LargeBoldSystemFont" />
+        <Label
+            id="authSub"
+            translation="[80, 390]"
+            width="1760"
+            height="60"
+            text="Browse with your Roku remote. Connect a stream source once to start playback."
+            font="font:MediumSystemFont" />
+
+        <RowList
+            id="authList"
+            translation="[80, 500]"
+            numRows="2"
+            itemSize="[1000, 118]"
+            itemSpacing="[0, 8]"
+            rowItemSize="[[1000, 110]]"
+            showRowLabel="[false]"
+            drawFocusFeedback="true"
+            itemComponentName="PrefRow"
+            vertFocusAnimationStyle="floatingFocus"/>
+        <Label
+            id="authHint"
+            translation="[80, 810]"
+            width="1760"
+            height="80"
+            wrap="true"
+            text="Stremio sign-in is optional. Your configured add-on supplies playable sources; Cinemeta supplies title search."
+            font="font:SmallSystemFont" />
+    </children>
+</component>

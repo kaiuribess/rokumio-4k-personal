@@ -1,0 +1,91 @@
+' AsyncTask — the one choreography every off-the-UI-thread load used to
+' hand-roll: create a <X>Task node, append it, set its fields, observe result,
+' run it, then reap it (drop the observer, STOP the worker, remove the node)
+' once the observer fires or the load is cancelled.
+'
+' Usage, matching the pre-refactor shape exactly:
+'
+'   task = AsyncTask_Launch(m.top, "MetaLoaderTask", "onMetaLoaded", {
+'       addonAddress: address
+'       metaType: meta.type
+'       metaId: meta.id
+'   }, "detailsMetaLoader")
+'   m.loadTask = task
+'
+' Reaping a finished task in the observer handler:
+'
+'   if m.loadTask = invalid then return
+'   task = m.loadTask
+'   m.loadTask = invalid
+'   AsyncTask_Reap(task, m.top, false)
+'
+' Cancelling a possibly-still-running task:
+'
+'   AsyncTask_Reap(task, m.top, true)   ' STOP must come first — removing a
+'                                       ' running Task node does not kill its
+'                                       ' worker thread.
+'
+' Components must include this file to see it:
+'   <script type="text/brightscript" uri="pkg:/source/core/AsyncTask.bs" />
+
+' Launch a task node and run it. Returns the node so the caller can slot it for
+' stale-result guards. parent is the screen node the task child is appended to;
+' callback is the observer for the task's "result" field; fields is the
+' interface values to set before the run; id is an optional node identity.
+'
+' doneCallback is optional and only for tasks that carry a "finished" sentinel
+' field (see AddonSyncTask). Pass it when "result = invalid" is AMBIGUOUS for the
+' caller — an alwaysNotify field with no value can notify before the worker has
+' written anything, and a handler that treats that as "the task produced
+' nothing" destroys the real answer: AsyncTask_Reap unobserves the field and
+' removes the node, and removing a running Task does NOT kill its worker thread,
+' so the genuine result lands on a node nobody is watching. With a sentinel the
+' caller can decline to act on an empty result and let the done-callback be the
+' authority on whether the worker really finished without one. Both observers are
+' attached before control = "RUN", which is the only point at which the worker
+' can possibly start, so neither can miss its first notification.
+'
+' `fields` is assigned key by key, and THAT is a typed boundary: roSGNode's
+' index-set goes through AddReplace, which enforces the field's declared type and
+' raises at runtime on anything else. So the declared type in the task's XML is
+' not documentation — an array assigned to a `type="assocarray"` field is a hard
+' "Type mismatch" on the device, and a float into `type="integer"` is the same
+' hazard one step removed.
+'
+' Two things follow, and both cost a deploy to learn the hard way:
+'
+'   Nesting is not a loophole. A list inside the `stream` assocarray would be
+'   fine, and a list assigned to a field declared assocarray is not — the check
+'   is on the top-level value, not on what it contains. When a task needs more
+'   than one scalar, add fields.
+'
+'   Nothing in the test suite sees this. The brs interpreter does not enforce
+'   field types, so a mismatched assignment is green here and broken on the
+'   device. A declared type can only be checked by reading the XML against the
+'   call site, which no test currently does.
+function AsyncTask_Launch(parent as object, taskName as string, callback as string, fields as object, id as dynamic, doneCallback = "" as string) as object
+    task = CreateObject("roSGNode", taskName)
+    if id <> invalid and id <> "" then task.id = id
+    parent.AppendChild(task)
+    if fields <> invalid
+        for each key in fields
+            task[key] = fields[key]
+        end for
+    end if
+    task.ObserveField("result", callback)
+    if doneCallback <> "" then task.ObserveField("finished", doneCallback)
+    task.control = "RUN"
+    return task
+end function
+
+' Tear a task down: drop the observers so a late result can never land, then
+' (when stop) send STOP so a still-running worker's read-loop exits before the
+' node is freed, then remove it from the tree. "finished" is unobserved too; for
+' the thirteen tasks with no sentinel that is a no-op.
+sub AsyncTask_Reap(task as object, parent as object, doStop as boolean)
+    if task = invalid then return
+    task.UnobserveField("result")
+    task.UnobserveField("finished")
+    if doStop then task.control = "STOP"
+    if task.getParent() <> invalid then parent.RemoveChild(task)
+end sub

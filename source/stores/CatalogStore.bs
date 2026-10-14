@@ -1,0 +1,148 @@
+' CatalogStore — on-demand catalog, manifest and search against an add-on
+' server. Pure transport, no state: nothing is saved, every call hits the
+' add-on's HTTP API (Cinemeta and friends). Search is the add-on's search
+' catalog for one type: /catalog/{type}/top/search={query}.json.
+
+class CatalogStore
+    transport as object
+
+    sub new(http as object)
+        m.transport = http
+    end sub
+
+    ' Fetch and normalize {address}/manifest.json. Validates identity fields so
+    ' a catalog-less or broken add-on is rejected early.
+    function Manifest(addonAddress as string) as object
+        result = { ok: false, manifest: invalid, error: "" }
+        if addonAddress = ""
+            result.error = "no addon address"
+            return result
+        end if
+
+        response = m.transport.Get(m.transport.EndpointUrl(addonAddress, "/manifest.json"))
+        if not response.ok or response.json = invalid
+            result.error = response.error
+            if result.error = invalid or result.error = "" then result.error = "manifest response was empty"
+            return result
+        end if
+
+        json = response.json
+        if Type(json) <> "roAssociativeArray"
+            result.error = "manifest must be a JSON object"
+            return result
+        end if
+        if not m.IsNonemptyString(json.id) or not m.IsNonemptyString(json.name)
+            result.error = "manifest missing id or name"
+            return result
+        end if
+        if Type(json.types) <> "roArray" or Type(json.resources) <> "roArray"
+            result.error = "manifest types and resources must be lists"
+            return result
+        end if
+
+        catalogs = []
+        if Type(json.catalogs) = "roArray"
+            for each descriptor in json.catalogs
+                if Type(descriptor) <> "roAssociativeArray" then continue for
+                if not m.IsNonemptyString(descriptor.id) or not m.IsNonemptyString(descriptor.type) then continue for
+                if not m.IsNonemptyString(descriptor.name) then descriptor.name = descriptor.id
+                catalogs.Push(descriptor)
+            end for
+        end if
+
+        result.manifest = {
+            id: json.id
+            name: json.name
+            version: json.version
+            types: json.types
+            idPrefixes: json.idPrefixes
+            catalogs: catalogs
+            resources: json.resources
+        }
+        result.ok = true
+        return result
+    end function
+
+    ' Fetch one catalog row: GET {address}/catalog/{type}/{catalogId}/{extra}.json
+    ' with the extra segment defaulting to "skip=0". hasMore (the Stremio "there
+    ' is another skip page" flag) rides along for clients that paginate; a
+    ' response without it reports false.
+    function Catalog(addonAddress as string, metaType as string, catalogId as string, extra = "skip=0" as string) as object
+        result = { ok: false, metas: invalid, hasMore: false, error: "" }
+        if addonAddress = ""
+            result.error = "no addon address"
+            return result
+        end if
+        if metaType = "" or catalogId = ""
+            result.error = "catalog type or id missing"
+            return result
+        end if
+
+        endpoint = "/catalog/" + m.transport.EncodeQueryValue(metaType) + "/" + m.transport.EncodeQueryValue(catalogId)
+        if extra <> "" then endpoint = endpoint + "/" + extra
+        url = m.transport.EndpointUrl(addonAddress, endpoint + ".json")
+        response = m.transport.Get(url)
+
+        ' Cinemeta's CDN sometimes wraps a real payload in a gateway status
+        ' (502/503/504) — the search endpoint in particular returns valid results
+        ' on HTTP 504 from a browser, and 200 vs 504 can flip per edge + UA. A
+        ' JSON body behind a gateway status is still used; a genuine failure (a
+        ' non-gateway status, or an HTML error body json can't parse) fails
+        ' below.
+        gatewayWrapped = response.json <> invalid and (response.status = 502 or response.status = 503 or response.status = 504)
+        if not response.ok and not gatewayWrapped
+            result.error = response.error
+            return result
+        end if
+
+        if response.json = invalid or Type(response.json) <> "roAssociativeArray"
+            result.error = "catalog response missing metas"
+            return result
+        end if
+        metas = response.json.metas
+        if metas = invalid or Type(metas) <> "roArray"
+            result.error = "catalog response missing metas"
+            return result
+        end if
+
+        ' An invalid row must not stop every other title from rendering. Keep
+        ' valid metadata in server order and fill the requested type when omitted.
+        validMetas = []
+        for each meta in metas
+            if Type(meta) <> "roAssociativeArray" then continue for
+            if not m.IsNonemptyString(meta.id) or not m.IsNonemptyString(meta.name) then continue for
+            if not m.IsNonemptyString(meta.type) then meta.type = metaType
+            validMetas.Push(meta)
+        end for
+        result.metas = validMetas
+        ' Explicit boolean read of the server's flag — the chained
+        ' `result.hasMore = response.json.hasMore = true` idiom is unambiguous
+        ' to mishandle (it IS a comparison), so state it plainly.
+        if response.json.hasMore = invalid
+            ' Standard Stremio catalogs indicate another page by returning a
+            ' full 100-item page; hasMore is an optional provider extension.
+            result.hasMore = metas.Count() >= 100
+        else
+            result.hasMore = (response.json.hasMore = true)
+        end if
+        result.ok = true
+        return result
+    end function
+
+    ' Search is a catalog call against one of the add-on's search-capable
+    ' catalogs. Cinemeta resolves a query as
+    ' /catalog/{type}/top/search={query}.json — the "top" catalog id with
+    ' "search=" as the extra segment — so the query is percent-encoded before it
+    ' becomes a URL path segment. The catalog id defaults to "top" for the
+    ' Cinemeta shape but is a caller argument because a search fan-out now asks
+    ' each search-capable catalog the same query. Nothing is stored locally.
+    function Search(addonAddress as string, metaType as string, query as string, catalogId = "top" as string) as object
+        return m.Catalog(addonAddress, metaType, catalogId, "search=" + m.transport.EncodeQueryValue(query))
+    end function
+
+    private function IsNonemptyString(value as dynamic) as boolean
+        if Type(value) <> "roString" and Type(value) <> "String" then return false
+        return value.Trim() <> ""
+    end function
+end class
+

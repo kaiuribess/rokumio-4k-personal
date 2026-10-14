@@ -1,0 +1,146 @@
+' SettingsStore — the app's persisted settings, pure logic on a registry seam.
+'
+' A real store is constructed with an roRegistrySection (session scope) and
+' Load()s its values on construction; tests pass a fake registry (or nothing,
+' which means in-memory only).
+'
+' The setters persist themselves. That is not tidiness: the setters were once
+' memory-only and every caller was trusted to call Save() afterwards, and one of
+' them did not. The deep-link/import entry point set the streaming server
+' address and stopped there, so an address linked over ECP was used for the rest
+' of the session and then gone on the next launch — a wipe with nothing on screen
+' and nothing in the log, and the one report of it came long after the change
+' that caused it. A setting that forgets to save is indistinguishable from a
+' setting that was never set, so the saving is a property of the store rather
+' than a rule every call site has to remember.
+'
+' Save() reports whether the registry took the write (see SaveFailed), because
+' roRegistrySection.Write answers with a boolean that used to be discarded.
+
+' saveRefused, not saveFailed: BrightScript identifiers are case-insensitive, so
+' a field called saveFailed IS the SaveFailed() method below and the compiler
+' rejects the class with BS1026.
+class SettingsStore
+    registry as dynamic
+    serverAddress as string
+    language as string
+    audioMode as string
+    saveRefused as boolean
+
+    sub new(registry = invalid as dynamic)
+        m.registry = registry
+        m.serverAddress = ""
+        m.language = "en"
+        m.audioMode = "projector"
+        m.saveRefused = false
+        m.Load()
+    end sub
+
+    ' Accept an http(s)://host[:port] address (optionally with a trailing slash
+    ' or a path prefix), normalized to drop trailing slashes. Returns false and
+    ' leaves the stored address untouched when the input is not a valid server
+    ' URL.
+    function SetServerAddress(url as string) as boolean
+        candidate = url.Trim()
+        while candidate.Right(1) = "/"
+            candidate = candidate.Left(candidate.Len() - 1)
+        end while
+        if candidate = "" then return false
+
+        parts = candidate.Split("://")
+        if parts.Count() < 2 then return false
+        if parts[0] <> "http" and parts[0] <> "https" then return false
+
+        rest = parts[1]
+        if rest = "" then return false
+        host = rest
+        colon = rest.InStr(":")
+        if colon >= 0
+            host = rest.Left(colon)
+            portStr = rest.Mid(colon + 1)
+            if portStr = "" then return false
+            for i = 0 to portStr.Len() - 1
+                ch = portStr.Mid(i, 1)
+                if ch < "0" or ch > "9" then return false
+            end for
+        end if
+        if host = "" then return false
+
+        m.serverAddress = candidate
+        m.Save()
+        return true
+    end function
+
+    function GetServerAddress() as string
+        return m.serverAddress
+    end function
+
+    function ServerAddressSet() as boolean
+        return m.serverAddress <> ""
+    end function
+
+    ' Blank the streaming server address (the Settings screen's Clear action).
+    function ClearServerAddress() as void
+        m.serverAddress = ""
+        m.Save()
+    end function
+
+    function SetLanguage(value as string) as boolean
+        if value = "" then return false
+        m.language = value
+        m.Save()
+        return true
+    end function
+
+    function GetLanguage() as string
+        return m.language
+    end function
+
+    function SetAudioMode(value as string) as boolean
+        if value <> "projector" and value <> "surround" then return false
+        m.audioMode = value
+        m.Save()
+        return true
+    end function
+
+    function GetAudioMode() as string
+        return m.audioMode
+    end function
+
+    ' Writes every field through the registry and flushes. roRegistrySection.Write
+    ' answers with a boolean saying whether it took the value, and that answer
+    ' used to be thrown away: a write the registry refused then flushed nothing
+    ' and the setting quietly reverted on the next launch, with nothing anywhere
+    ' recording that it had ever been refused. Kept as a result instead of
+    ' dropped, so a caller with somewhere to show it can.
+    '
+    ' A missing registry is not a failure. There is nowhere to write to, which is
+    ' the in-memory-only mode the store tests exercise, not an error to report.
+    function Save() as boolean
+        if m.registry = invalid then return true
+        ok = m.registry.Write("serverAddress", m.serverAddress)
+        if not m.registry.Write("language", m.language) then ok = false
+        if not m.registry.Write("audioMode", m.audioMode) then ok = false
+        m.registry.Flush()
+        m.saveRefused = not ok
+        return ok
+    end function
+
+    ' Whether the most recent Save() was refused by the registry. Reset by the
+    ' next successful save rather than latched, so a transient refusal does not
+    ' report itself for the rest of the session — the setting really is safe
+    ' again once a write lands.
+    function SaveFailed() as boolean
+        return m.saveRefused
+    end function
+
+    sub Load()
+        if m.registry = invalid then return
+        address = m.registry.Read("serverAddress")
+        if address <> "" then m.serverAddress = address
+        language = m.registry.Read("language")
+        if language <> "" then m.language = language
+        audioMode = m.registry.Read("audioMode")
+        if audioMode = "projector" or audioMode = "surround" then m.audioMode = audioMode
+    end sub
+end class

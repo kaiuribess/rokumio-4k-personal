@@ -1,0 +1,75 @@
+<component name="FilterBar" extends="Group">
+
+    <!-- FilterBar — a filter-chip row with a pull-down option menu, shared by
+         DiscoverScreen and LibraryScreen. The chips are one row of ChipTiles;
+         OK on a chip opens the dropdown for it under that chip; Up/Down move
+         inside the menu, OK picks, Back/options dismisses without changing
+         anything. The screen supplies the option data and the commit effect;
+         the component owns the row, the dropdown geometry, the focus
+         hand-off, and the menu-open key guard.
+
+         Interface:
+           chipActivated (int)   — fires with the chip index when OK is
+                                   pressed on a chip; the screen answers with
+                                   ShowMenu(options, currentIndex).
+           optionPicked (AA)     — fires {chip, index} when OK is pressed on a
+                                   menu row; the screen resolves the raw value
+                                   and commits its effect.
+           SetChips(entries)     — rebuild the chip row {raw,label} list,
+                                   preserving the focused chip.
+           ShowMenu(options, run)
+           HideMenu()            — dismiss + refocus the chips.
+           FocusChips()          — keyboard-navigation escape to the chips.
+           FocusIsOnChips()      — the chips hold focus (screen arrow grants).
+           IsMenuOpen()          — guard for entry-time resets.
+         Geometry is rooted at the component itself, which each screen places
+         where its chips row lives (translation [150,232]); the dropdown hangs
+         68px below (absolute y 300). -->
+
+    <interface>
+        <field id="chipActivated" type="int" value="-1" alwaysNotify="true" />
+        <field id="optionPicked" type="assocarray" alwaysNotify="true" />
+        <function name="SetChips" />
+        <function name="ShowMenu" />
+        <function name="HideMenu" />
+        <function name="FocusChips" />
+        <function name="FocusIsOnChips" />
+        <function name="IsMenuOpen" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/components/FilterBar.brs" />
+    <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
+
+    <children>
+        <RowList
+            id="chips"
+            numRows="1"
+            itemSize="[1760, 56]"
+            itemSpacing="[0, 8]"
+            rowItemSize="[[260, 56]]"
+            rowItemSpacing="[[12, 0]]"
+            showRowLabel="false"
+            drawFocusFeedback="true"
+            itemComponentName="ChipTile" />
+
+        <!-- The dropdown: a panel below the chips listing one chip's options in
+             a single-column RowList (vertical clipping free). Opens on chip OK;
+             the group is positioned under the activating chip and paints over
+             whatever sits under it (the screen declares FilterBar after its own
+             grid for that reason). -->
+        <Group id="menuGroup" visible="false">
+            <Rectangle id="menuBackdrop" width="260" height="56" />
+            <RowList
+                id="menu"
+                numRows="1"
+                itemSize="[260, 56]"
+                itemSpacing="[0, 6]"
+                rowItemSize="[[260, 56]]"
+                rowItemSpacing="[[4, 0]]"
+                showRowLabel="false"
+                drawFocusFeedback="true"
+                itemComponentName="ChipTile"
+                vertFocusAnimationStyle="floatingFocus"/>
+        </Group>
+    </children>
+</component>

@@ -1,0 +1,67 @@
+' Theme.bs — the app's single source of truth for colors.
+'
+' Every component that paints custom colors reads them from Theme() instead of
+' hardcoding hex literals, so the whole look is driven from this one file. The
+' palette is cached on the caller's m (each component keeps its own copy), and
+' the values are byte-identical to the literals they replace.
+'
+' XML cannot call code, so XML color attributes are migrated into each
+' component's init() and assigned from here. The transparent "0x0" backdrops
+' are the absence of color, not a theme, and stay literal in the XML.
+'
+' The native dialogs keep Roku's RSGPalette shape; AppPalette() builds that
+' node from the same palette so the dialogs share the app's look.
+'
+' danger is the one color that is not part of the app's look: it marks a broken
+' invariant (see MainScene's ReportStoreFault) rather than styling content, and
+' it lives here anyway so nothing in the codebase has to hardcode a hex literal.
+function Theme() as object
+    if m._theme = invalid
+        m._theme = {
+            accent: "0x2BD675FF"
+            accentFocus: "0x5BEF95FF"
+            accentClear: "0x2BD67500"
+            accentDim: "0x2BD6754D"
+            accentFaint: "0x2BD67533"
+            accentWarm: "0xFFCE6BFF"
+            accentInfo: "0x5BCBF4FF"
+            textPrimary: "0xE9F2ECFF"
+            textSecondary: "0x8FA399FF"
+            textWhite: "0xFFFFFFFF"
+            danger: "0xC0392BFF"
+            screenBg: "0x0A0F0CFF"
+            tileFace: "0x0B110DFF"
+            tileFaceFocus: "0x18231CFF"
+            itemFace: "0x233329FF"
+            dropdownBg: "0x101813FF"
+            playerBg: "0x000000FF"
+            railTint: "0xFFFFFF06"
+            scrim: "0x00000099"
+            progressTrack: "0x00000073"
+            progressFill: "0x46E0A3FF"
+            glyphPlate: "0x000000A6"
+            segmentIdle: "0x2A3530FF"
+        }
+    end if
+    return m._theme
+end function
+
+' The RSGPalette for the native StandardDialogs, assembled from the app palette
+' so the dialogs restyle with the rest of the app.
+function AppPalette() as object
+    c = Theme()
+    palette = CreateObject("roSGNode", "RSGPalette")
+    palette.colors = {
+        DialogBackgroundColor: c.dropdownBg
+        DialogItemColor: c.accent
+        DialogTextColor: c.textPrimary
+        DialogFocusColor: c.accent
+        DialogFocusItemColor: c.screenBg
+        DialogSecondaryTextColor: c.textSecondary
+        DialogSecondaryItemColor: c.accentDim
+        DialogInputFieldColor: c.dropdownBg
+        DialogKeyboardColor: c.dropdownBg
+        DialogFootprintColor: c.accentFaint
+    }
+    return palette
+end function

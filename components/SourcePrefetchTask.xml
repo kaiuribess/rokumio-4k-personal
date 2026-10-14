@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="SourcePrefetchTask" extends="Task">
+    <interface>
+        <field id="metaType" type="string" value="" />
+        <field id="videoId" type="string" value="" />
+        <field id="addonAddress" type="string" value="" />
+        <field id="providerIndex" type="integer" value="-1" />
+        <field id="providerName" type="string" value="" />
+        <field id="providerId" type="string" value="" />
+        <field id="audioMode" type="string" value="projector" />
+        <field id="loadToken" type="string" value="" />
+        <field id="result" type="assocarray" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/source/stores/Transport.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/PlaybackStore.bs" />
+    <script type="text/brightscript" uri="pkg:/source/util/CinemaStreams.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/SourceMemory.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/SourcePrefetch.brs" />
+    <script type="text/brightscript" uri="pkg:/components/SourcePrefetchTask.brs" />
+</component>

@@ -1,0 +1,11 @@
+1
+00:00:00,000 --> 00:00:03,000
+Das ist die deutsche Untertitelspur.
+
+2
+00:00:03,500 --> 00:00:07,000
+Jeder Untertitel steht auf einem eigenen Cue.
+
+3
+00:00:08,000 --> 00:00:12,000
+Wechsle jederzeit die Spur über das *-Menü.

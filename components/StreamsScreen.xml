@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="StreamsScreen" extends="Screen">
+    <!-- Stream picker for a movie or episode, pushed with
+         { addonAddress, metaType, metaId, videoId, season, episode, position,
+           name, poster, logo, background } plus the panel's data the pusher
+           holds (description + runtime for a movie; episodeName +
+           episodeOverview for a series from EpisodesScreen). Two panes:
+           - left: title (series + episode line), synopsis, and the Cinemeta
+             background artwork (no poster), all from the params;
+           - right: one selectable stream card per candidate, collected from
+             every installed add-on that advertises the "stream" resource in
+             parallel â€” one StreamsLoaderTask per provider, so cards appear as
+             each provider resolves instead of after all of them finish.
+         OK on a card resolves playback and pushes the PlayerScreen; resolution
+         failures (e.g. torrent streams without a streaming server) surface in
+         the status line. -->
+    <interface>
+        <field id="pushRequest" type="assocarray" alwaysNotify="true" />
+
+        <function name="OnEnter" />
+        <function name="OnExit" />
+        <function name="OnBackPressed" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/components/StreamsScreen.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/SourcePrefetch.brs" />
+    <script type="text/brightscript" uri="pkg:/source/core/AsyncTask.bs" />
+    <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
+    <script type="text/brightscript" uri="pkg:/source/util/CinemaStreams.brs" />
+
+    <children>
+        <Rectangle id="streamBg" width="1920" height="1080" />
+        <Poster id="bgPoster" width="1920" height="1080" loadDisplayMode="scaleToZoom" />
+        <Rectangle id="bgScrim" width="1920" height="1080" />
+
+        <!-- Left: title + optional episode line + synopsis. No poster. -->
+        <Label
+            id="headTitle"
+            translation="[80, 150]"
+            width="620"
+            height="160"
+            maxLines="3"
+            horizAlign="left"
+            wrap="true"
+            font="font:LargeBoldSystemFont" />
+        <Label
+            id="headSub"
+            translation="[80, 326]"
+            width="620"
+            height="40"
+            font="font:MediumSystemFont" />
+        <Label
+            id="synopsis"
+            translation="[80, 390]"
+            width="600"
+            height="552"
+            wrap="true"
+            horizAlign="left"
+            vertAlign="top"
+            font="font:SmallSystemFont" />
+        <Label
+            id="status"
+            translation="[80, 975]"
+            width="600"
+            height="60"
+            wrap="true"
+            horizAlign="left"
+            vertAlign="top"
+            font="font:SmallSystemFont" />
+
+        <!-- Right: provider header (arrows + name + segment dots) above the
+             selectable stream list. The arrows appear only for directions the
+             user can actually move; the segments mark the position among the
+             providers. -->
+        <Poster
+            id="arrowLeft"
+            translation="[760, 92]"
+            width="48"
+            height="48"
+            uri="pkg:/images/arrow-left.png"
+            visible="false" />
+        <Label
+            id="providerName"
+            translation="[824, 96]"
+            width="920"
+            height="40"
+            horizAlign="left"
+            wrap="true"
+            font="font:MediumBoldSystemFont" />
+        <Poster
+            id="arrowRight"
+            translation="[1768, 92]"
+            width="48"
+            height="48"
+            uri="pkg:/images/arrow-right.png"
+            visible="false" />
+        <Group
+            id="providerSegments"
+            translation="[760, 156]" />
+        <RowList
+            id="streamsList"
+            translation="[760, 180]"
+            numRows="3"
+            itemSize="[1080, 222]"
+            itemSpacing="[0, 12]"
+            rowItemSize="[[1080, 210]]"
+            rowItemSpacing="[[0, 0]]"
+            showRowLabel="false"
+            drawFocusFeedback="false"
+            itemComponentName="StreamTile" />
+        <Label
+            id="streamsPlaceholder"
+            translation="[760, 300]"
+            width="1040"
+            height="120"
+            wrap="true"
+            horizAlign="left"
+            vertAlign="top"
+            font="font:MediumSystemFont"
+            visible="false" />
+        <Label id="qualityHint" translation="[760, 964]" width="1080" height="76" wrap="true"
+            font="font:SmallSystemFont" text="4K source labels first + 1080p | * 4K only" />
+    </children>
+</component>

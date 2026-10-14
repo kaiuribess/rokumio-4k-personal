@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="AddonSyncTask" extends="Task">
+    <interface>
+        <field id="authKey" type="string" value="" />
+        <field id="result" type="assocarray" alwaysNotify="true" />
+        <!-- How far sync() got, so a fault can name the hop that died instead of
+             shrugging. Written as the worker advances; the value at the moment
+             of failure is the diagnosis. -->
+        <field id="stage" type="string" value="new" />
+        <!-- Set as the VERY LAST statement of sync(), on both the success and
+             the catch path, so a handler can tell "the worker is done" from
+             "the worker has not started yet" — which is not the same thing.
+             An alwaysNotify field ALSO notifies once at ObserveField time
+             carrying its current value, and that notification is dispatched on
+             the event loop rather than at attach, so it arrives while the worker
+             is already running. A handler must therefore test this field's VALUE
+             (true means done) and never treat the notification's arrival as the
+             fact. See MainScene.onAddonSyncFinished. -->
+        <field id="finished" type="boolean" value="false" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/source/stores/Transport.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/StremioApiStore.bs" />
+    <script type="text/brightscript" uri="pkg:/components/AddonSyncTask.brs" />
+</component>

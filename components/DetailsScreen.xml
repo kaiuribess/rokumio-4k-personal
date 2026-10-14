@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="DetailsScreen" extends="Screen">
+    <interface>
+        <!-- The one action Details reports upward: a push request (movie Play,
+             series Resume / "Episodes" → EpisodesScreen). The Scene observes
+             it and routes to the stack. Stores are class instances and cannot
+             cross components through a field, so they arrive via callFunc. -->
+        <field id="pushRequest" type="assocarray" alwaysNotify="true" />
+
+        <!-- Write-back packet from an add/remove toggle (stremio sessions
+             only): { metaId, metaType, name, poster, added }. MainScene
+             observes it and pushes to the account. -->
+        <field id="libraryChange" type="assocarray" alwaysNotify="true" />
+
+        <!-- Screen contract: called by ScreenStack for show/hide/focus/back. -->
+        <function name="OnEnter" />
+        <function name="OnExit" />
+        <function name="OnBackPressed" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/components/DetailsScreen.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/SourcePrefetch.brs" />
+    <script type="text/brightscript" uri="pkg:/source/core/AsyncTask.bs" />
+    <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
+
+    <children>
+        <Timer id="detailsPrefetchDelay" duration="0.5" repeat="false" />
+        <!-- Background: flat theme base, then the Cinemeta `background` artwork
+             (when provided) cropped to fill, dimmed by a scrim so the hero and
+             text stay readable. -->
+        <Rectangle id="detailsBg" width="1920" height="1080" />
+        <Poster id="bgPoster" width="1920" height="1080" loadDisplayMode="scaleToZoom" />
+        <Rectangle id="bgScrim" width="1920" height="1080" />
+
+        <!-- Hero: left poster, right name/type/description. -->
+        <!-- Capped to its own canvas size, same rule as PosterTile: hero artwork
+             arrives around 500x750, so uncapped it costs 1.43MB of texture to
+             fill a 340x510 node, and it is alive at the same time as the
+             uncapped 1920x1080 background above. The 2:3 slab below is the default
+             for everything; ApplyHeroSize swaps the node (and its load caps) to
+             420x420 for channel-family metas, whose posters are 1:1. -->
+        <Poster id="heroPoster" translation="[80, 120]" width="340" height="510" loadWidth="340" loadHeight="510" loadDisplayMode="scaleToFit" />
+        <Label
+            id="detailName"
+            translation="[520, 140]"
+            width="1320"
+            height="120"
+            wrap="true"
+            maxLines="2"
+            font="font:LargeBoldSystemFont" />
+        <Label
+            id="detailType"
+            translation="[520, 276]"
+            width="1320"
+            height="40"
+            font="font:MediumSystemFont" />
+        <Label
+            id="detailDesc"
+            translation="[520, 330]"
+            width="1160"
+            height="260"
+            wrap="true"
+            vertAlign="top"
+            font="font:SmallSystemFont" />
+
+        <!-- One shared chip row below the hero poster. Series load Resume / "Play
+             S1E1" + "Episodes"; movies load Play / add-to-library. The chips
+             change per content kind; the plumbing does not. -->
+        <RowList
+            id="chipsRow"
+            translation="[80, 662]"
+            itemSize="[1760, 56]"
+            itemSpacing="[0, 8]"
+            numRows="1"
+            rowItemSize="[[260, 56]]"
+            rowItemSpacing="[[12, 0]]"
+            showRowLabel="false"
+            drawFocusFeedback="true"
+            itemComponentName="ChipTile" />
+        <Label id="detailSourceHint" translation="[80, 750]" width="1760" height="44"
+            text="Choose a stream to see available 4K and 1080p options."
+            font="font:SmallSystemFont" />
+        <Label id="detailHelp" translation="[80, 984]" width="1760" height="44"
+            text="Left / Right  Choose action     OK  Select     Back  Return"
+            font="font:SmallSystemFont" />
+    </children>
+</component>

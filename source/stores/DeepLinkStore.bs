@@ -1,0 +1,158 @@
+' DeepLinkStore — parse and validate the ECP deep-link payload (args.rkio).
+'
+' External clients push data to the channel through Roku's External Control
+' Protocol (see reference/ecp-integration.md): a POST /launch/dev carrying a
+' contentId marker and a rkio query param with URL-encoded JSON. Roku delivers
+' both to Main(args); this store turns them into a validated import request.
+' Pure logic — no transport, no registry, so FTL tests run it directly.
+'
+' The OS may hand query params back percent-decoded or still raw; the store
+' accepts either (ParseJson first, percent-decode only when that fails).
+'
+' Payload contract (schema 1):
+'   { "schema": 1, "addons": ["https://.../manifest.json", ...],
+'     "settings": { "serverAddress": "http://host[:port]" } }
+' schema is required; addons and settings are optional but must be the right
+' shape when present. This store rejects shape errors only — full URL/address
+' validation happens downstream (add-ons through AddonsStore.Install,
+' serverAddress through SettingsStore.SetServerAddress), so a bad value reports
+' itself where it is stored, exactly like hand-typed input.
+'
+' File-scope consts (BrightScript does not allow `const` inside a class body) —
+' same pattern AddonsStore uses for its addresses.
+
+const ROKUMIO_PREFIX = "rokumio-"
+const IMPORT_VERB = "import"
+const CURRENT_SCHEMA = 1
+
+class DeepLinkStore
+
+    ' Turn Main(args) into a discriminated result for the caller:
+    '   kind "none"    — not a rokumio deep link; launch normally (Home).
+    '   kind "unknown" — a rokumio-<verb> marker with an unregistered verb.
+    '   kind "import"  — rokumio-import; ok reflects payload validity.
+    function Parse(args as object) as object
+        result = {
+            kind: "none"
+            ok: false
+            verb: ""
+            schema: 0
+            addons: []
+            settings: invalid
+            error: ""
+        }
+
+        contentId = m.Key(args, "contentid")
+        if contentId <> invalid and LCase(contentId).Left(8) = ROKUMIO_PREFIX
+            result.verb = LCase(contentId).Mid(8)
+            result.kind = "unknown"
+            if result.verb = IMPORT_VERB then result.kind = "import"
+        end if
+
+        if result.kind = "none" then return result
+
+        if result.kind = "unknown"
+            result.error = "unknown rokumio verb '" + result.verb + "'"
+            return result
+        end if
+
+        raw = m.Key(args, "rkio")
+        if raw = invalid or raw = "" or raw.Trim() = ""
+            result.error = "missing rkio payload"
+            return result
+        end if
+        if Type(raw) <> "roString" and Type(raw) <> "String"
+            result.error = "invalid rkio payload"
+            return result
+        end if
+
+        parsed = ParseJson(raw)
+        if parsed = invalid and raw.InStr("%") >= 0
+            parsed = ParseJson(m.DecodePercent(raw))
+        end if
+        if parsed = invalid or Type(parsed) <> "roAssociativeArray"
+            result.error = "invalid rkio payload"
+            return result
+        end if
+
+        if parsed.schema = invalid
+            result.error = "missing payload schema"
+            return result
+        end if
+        if parsed.schema <> CURRENT_SCHEMA
+            result.error = "unsupported payload schema " + parsed.schema.ToStr()
+            return result
+        end if
+        result.schema = parsed.schema
+
+        if parsed.addons <> invalid
+            if Type(parsed.addons) <> "roArray"
+                result.error = "addons must be an array of URLs"
+                return result
+            end if
+            addons = []
+            for each entry in parsed.addons
+                if (Type(entry) <> "roString" and Type(entry) <> "String") or entry.Trim() = ""
+                    result.error = "addons must be an array of URLs"
+                    return result
+                end if
+                addons.Push(entry)
+            end for
+            result.addons = addons
+        end if
+
+        if parsed.settings <> invalid
+            if Type(parsed.settings) <> "roAssociativeArray"
+                result.error = "settings must be an object"
+                return result
+            end if
+            result.settings = parsed.settings
+        end if
+
+        result.ok = true
+        return result
+    end function
+
+    ' Case-insensitive lookup into an AA. Deep-link arg keys arrive lowercased
+    ' on device; keying by lowercase and duck-typing around the interpreter's
+    ' key semantics keeps this correct everywhere.
+    function Key(aa as object, lowerName as string) as dynamic
+        if aa = invalid then return invalid
+        if aa[lowerName] <> invalid then return aa[lowerName]
+        for each key in aa
+            if (Type(key) = "roString" or Type(key) = "String") and LCase(key) = lowerName then return aa[key]
+        end for
+        return invalid
+    end function
+
+    ' Percent-decode %XX into bytes. The launch path is ASCII-only (see the
+    ' integration doc): the client ships the whole JSON through
+    ' encodeURIComponent, whose escapes are exactly %HH, and the v1 payload
+    ' transport never needs full UTF-8 reconstruction.
+    function DecodePercent(encoded as string) as string
+        out = ""
+        i = 0
+        while i < encoded.Len()
+            ch = encoded.Mid(i, 1)
+            if ch = "%" and i + 2 < encoded.Len()
+                hi = m.HexDigit(encoded.Mid(i + 1, 1))
+                lo = m.HexDigit(encoded.Mid(i + 2, 1))
+                if hi >= 0 and lo >= 0
+                    out = out + Chr(hi * 16 + lo)
+                    i = i + 3
+                    continue while
+                end if
+            end if
+            out = out + ch
+            i = i + 1
+        end while
+        return out
+    end function
+
+    function HexDigit(ch as string) as integer
+        if ch >= "0" and ch <= "9" then return Asc(ch) - Asc("0")
+        if ch >= "a" and ch <= "f" then return Asc(ch) - Asc("a") + 10
+        if ch >= "A" and ch <= "F" then return Asc(ch) - Asc("A") + 10
+        return -1
+    end function
+end class

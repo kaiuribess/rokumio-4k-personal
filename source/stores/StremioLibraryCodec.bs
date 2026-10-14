@@ -1,0 +1,300 @@
+' StremioLibraryCodec — the Stremio datastoreGet/datastorePut wire shape,
+' extracted from LibraryStore so the store keeps state and persistence while
+' every server-format rule lives in one pure, directly-testable class.
+'
+' Everything the class knows is either a parameter or a pure function of its
+' inputs: ParseLibraryItem and SortByMtimeDesc feed the pull side
+' (SyncFromStremio), and BuildWatchStateItem / BuildWatchedItem /
+' BuildLibraryChangeItem feed the push side. The three builders share one write
+' model (ResolveLibraryItem + CloneLibraryItem + Identity) that mirrors
+' stremio-core: start from the freshest cached copy of the item — or a
+' well-formed new entry drawn from the meta's identity — then apply the single
+' change the push is about. They are cache-read-only: the store commits the
+' built item back into its library (LibraryStore.CommitStremioItem, the
+' update_and_push_items_to_storage step), which is what keeps one push type
+' from reverting another's fields. Because the builders read store state, that
+' state is injected as parameters (sessionType, library, now) instead of m.*;
+' the store guards the session gate and stamps the clock, and the "for tests"
+' injection is then explicit rather than a defaulted arg. The one instance
+' field is the episode id translator VideoIdCodec, so ParseLibraryItem never
+' re-implements the "{metaId}:{season}:{episode}" format.
+'
+' Pure data mapping plus parameterized reads of an injected cache, so it behaves
+' identically in the interpreter test harness and on a device. Constructed once
+' by LibraryStore while the StoreHost layer is built under MainScene scope, like
+' WatchedCodec — never built inside a method invoked under another component's
+' scope, or the per-component scope of user-defined globals would make the
+' constructor resolve to invalid.
+
+class StremioLibraryCodec
+
+    sub new()
+        m.videoId = VideoIdCodec()
+    end sub
+
+    ' Classify one datastoreGet library item and pre-map it into the store's
+    ' shape. An item that cannot be resolved to a video id (or is not a valid
+    ' item at all) comes back invalid so it never becomes a continue-watching
+    ' entry; it still lives in the raw stremioLibrary since that keeps everything
+    ' the API returned.
+    '
+    ' Continue watching: timeOffset > 0 && type != "other" && (!removed || temp).
+    ' Saved: removed == false && temp == false. Position/duration are the raw ms
+    ' values — the player tracks time in milliseconds too, so no conversion.
+    '
+    ' The account watched layer rides on the same item's state: flaggedWatched
+    ' (an explicit "mark all watched" toggle) or timesWatched means the whole
+    ' item is watched on the account; timeOffset > 0 means it is in progress;
+    ' the raw state.watched bitfield (if any) is kept whole for precise per-
+    ' episode decoding on EpisodesScreen. None of it is recalculated here — it
+    ' is read off the server exactly as Stremio stores it.
+    function ParseLibraryItem(item as dynamic) as dynamic
+        if item = invalid or Type(item) <> "roAssociativeArray" then return invalid
+        if item._id = invalid or item._id = "" then return invalid
+        metaId = item._id
+        metaType = item.type
+        if metaType = invalid or metaType = "" then metaType = "movie"
+        name = item.name
+        if name = invalid then name = ""
+        poster = item.poster
+        if poster = invalid then poster = ""
+        posterShape = ""
+        if item.posterShape <> invalid and (Type(item.posterShape) = "roString" or Type(item.posterShape) = "String") then posterShape = item.posterShape
+        removed = item.removed = true
+        temp = item.temp = true
+
+        position = 0
+        duration = 0
+        videoId = metaId
+        watchedFlag = false
+        bitfield = ""
+        state = item.state
+        if state <> invalid and Type(state) = "roAssociativeArray"
+            if state.timeOffset <> invalid then position = state.timeOffset
+            if state.duration <> invalid then duration = state.duration
+            if state.video_id <> invalid and state.video_id <> "" then videoId = state.video_id
+            if state.flaggedWatched <> invalid and state.flaggedWatched > 0 then watchedFlag = true
+            if state.timesWatched <> invalid and state.timesWatched > 0 then watchedFlag = true
+            if state.watched <> invalid and (Type(state.watched) = "roString" or Type(state.watched) = "String") then bitfield = state.watched
+        end if
+        inProgress = position > 0
+
+        season = 0
+        episode = 0
+        parsed = m.videoId.Parse(videoId)
+        if parsed <> invalid
+            season = parsed.season
+            episode = parsed.episode
+        else if Instr(1, videoId, ":") > 0
+            return invalid
+        end if
+
+        mtime = item._mtime
+        if mtime = invalid then mtime = ""
+        return {
+            cw: position > 0 and metaType <> "other" and (not removed or temp)
+            saved: not removed and not temp
+            metaId: metaId
+            metaType: metaType
+            name: name
+            poster: poster
+            posterShape: posterShape
+            videoId: videoId
+            season: season
+            episode: episode
+            position: position
+            duration: duration
+            mtime: mtime
+            watchedFlag: watchedFlag
+            inProgress: inProgress
+            bitfield: bitfield
+        }
+    end function
+
+    ' Newest first by _mtime (ISO timestamps sort lexicographically). An
+    ' insertion sort keeps it interpreter-safe; roArray.Sort's function
+    ' comparator is not guaranteed in the brs interpreter.
+    sub SortByMtimeDesc(entries as object)
+        for i = 1 to entries.Count() - 1
+            temp = entries[i]
+            j = i
+            while j > 0 and entries[j - 1].mtime < temp.mtime
+                entries[j] = entries[j - 1]
+                j = j - 1
+            end while
+            entries[j] = temp
+        end for
+    end sub
+
+    ' ---- the account-library write model ---------------------------------------
+    '
+    ' Every write authors ONE full LibraryItem the same way, mirroring
+    ' stremio-core: start from the freshest copy the account library holds (or a
+    ' well-formed new entry drawn from the meta's identity), then apply the one
+    ' change the push is about. LibraryStore then commits the result back into
+    ' its cached library (LibraryStore.CommitStremioItem, its
+    ' update_and_push_items_to_storage step), so the next push of ANY kind
+    ' starts from what the server is about to have — never from the stale launch
+    ' copy. That commit is what keeps a position write and a watched write from
+    ' reverting each other's fields.
+    '
+    ' The identity fields (name/type/poster/posterShape) come from the meta the
+    ' call site already has. They seed a brand-new entry; a cached copy keeps its
+    ' own (the server's) values.
+
+    ' Normalize the meta identity into the four LibraryItem fields. Missing
+    ' name/poster become "", a missing type becomes "movie" (Stremio's default),
+    ' and a missing posterShape stays "".
+    function Identity(name as dynamic, metaType as dynamic, poster as dynamic, posterShape as dynamic) as object
+        identity = { name: "", type: "movie", poster: "", posterShape: "" }
+        if name <> invalid then identity.name = name
+        if metaType <> invalid and metaType <> "" then identity.type = metaType
+        if poster <> invalid then identity.poster = poster
+        if posterShape <> invalid then identity.posterShape = posterShape
+        return identity
+    end function
+
+    ' A writable clone of one cached item: the top-level fields copied and state
+    ' deep-copied, so a builder can patch either without touching the cached AA
+    ' the store still holds.
+    function CloneLibraryItem(original as object) as object
+        clone = {}
+        for each key in original
+            clone[key] = original[key]
+        end for
+        state = {}
+        oldState = original.state
+        if oldState <> invalid and Type(oldState) = "roAssociativeArray"
+            for each key in oldState
+                state[key] = oldState[key]
+            end for
+        end if
+        clone.state = state
+        return clone
+    end function
+
+    ' The item an account write starts from: the freshest cached copy of metaId,
+    ' cloned, or a well-formed new entry (removed+temp, so the server records the
+    ' change without promoting it to the permanent library, and a fresh _ctime)
+    ' when the account library has never seen the id.
+    function ResolveLibraryItem(library as object, metaId as string, now as string, identity as object) as object
+        if library <> invalid
+            for each item in library
+                if item <> invalid and Type(item) = "roAssociativeArray" and item._id = metaId
+                    return m.CloneLibraryItem(item)
+                end if
+            end for
+        end if
+        return {
+            _id: metaId
+            name: identity.name
+            type: identity.type
+            poster: identity.poster
+            posterShape: identity.posterShape
+            removed: true
+            temp: true
+            _ctime: now
+            _mtime: now
+            state: {}
+        }
+    end function
+
+    ' The LibraryItem a position write-back sends. It resolves the freshest copy
+    ' and overwrites only the watch-state fields the player knows — video_id,
+    ' timeOffset, duration, lastWatched — plus _mtime. Server-authored fields
+    ' (timesWatched, the watched bitfield, flaggedWatched, behaviorHints) survive
+    ' untouched, so a position save never overwrites a watched mark. An item the
+    ' account library has never seen (played before the first sync landed, or
+    ' added on another device between sync and push) lands as a temp entry.
+    '
+    ' The removed/temp flags then follow stremio-core's player TimeChanged rule:
+    ' a time change on a removed item marks it temp, so it re-enters Continue
+    ' Watching — is_in_continue_watching = (!removed || temp) && timeOffset > 0 —
+    ' without being saved; and a temp item that has never been watched to the end
+    ' stays removed. That is what lets a title the user added then removed
+    ' resurface in CW once watched again, on every device and after a fresh sync.
+    ' Guest sessions never write back, so it is refused for any sessionType other
+    ' than "stremio" (mirrors SyncFromStremio). `now` is the caller-stamped ISO
+    ' timestamp (the store mints it via TimeUtil).
+    function BuildWatchStateItem(sessionType as string, library as object, now as string, packet as dynamic) as dynamic
+        if sessionType <> "stremio" then return invalid
+        if packet = invalid then return invalid
+        metaId = packet.metaId
+        if metaId = invalid or metaId = "" then return invalid
+        videoId = packet.videoId
+        if videoId = invalid or videoId = "" then videoId = metaId
+        position = 0
+        if packet.position <> invalid then position = packet.position
+        duration = 0
+        if packet.duration <> invalid then duration = packet.duration
+        identity = m.Identity(packet.name, packet.metaType, packet.poster, packet.posterShape)
+
+        item = m.ResolveLibraryItem(library, metaId, now, identity)
+        item.state.video_id = videoId
+        item.state.timeOffset = position
+        item.state.duration = duration
+        item.state.lastWatched = now
+        item._mtime = now
+
+        timesWatched = 0
+        if item.state.timesWatched <> invalid then timesWatched = item.state.timesWatched
+        temp = item.temp = true
+        removed = item.removed = true
+        if temp and timesWatched = 0 then removed = true
+        if removed then temp = true
+        item.removed = removed
+        item.temp = temp
+        return item
+    end function
+
+    ' The LibraryItem a watched-mark/unmark push sends. It resolves the freshest
+    ' copy and overwrites only the watch state: state.watched becomes the
+    ' bitfield the store already encoded against the series' ordered episode
+    ' list, and flaggedWatched is zeroed (the bitfield now carries the
+    ' fine-grained truth and the two flags must not fight). video_id/lastWatched
+    ' point at the last watched episode; timeOffset/duration are left untouched
+    ' since this is a watched-status edit, not a playback position. bitfield must
+    ' be a valid "{id}:{len}:{payload}" string (the store never sends "");
+    ' lastVideoId is its non-empty "last watched" slot. The packet carries the
+    ' meta identity so a series the account library has never seen still lands as
+    ' a well-formed entry — which is what the add-to-library push then clones.
+    function BuildWatchedItem(sessionType as string, library as object, now as string, packet as dynamic, bitfield as string, lastVideoId as string) as dynamic
+        if sessionType <> "stremio" then return invalid
+        if packet = invalid then return invalid
+        metaId = packet.metaId
+        if metaId = invalid or metaId = "" then return invalid
+        videoId = packet.videoId
+        if lastVideoId = invalid or lastVideoId = "" then lastVideoId = videoId
+        if lastVideoId = invalid or lastVideoId = "" then lastVideoId = metaId
+        identity = m.Identity(packet.name, packet.metaType, packet.poster, packet.posterShape)
+
+        item = m.ResolveLibraryItem(library, metaId, now, identity)
+        item.state.video_id = lastVideoId
+        item.state.lastWatched = now
+        item.state.flaggedWatched = 0
+        item.state.watched = bitfield
+        item._mtime = now
+        return item
+    end function
+
+    ' The LibraryItem an add/remove toggle sends. It resolves the freshest copy
+    ' — so a watched bitfield or resume position the account already holds
+    ' survives the toggle — or a well-formed new record when the account library
+    ' has never seen the id (toggled before the first sync landed). Membership is
+    ' the whole story: an add is removed:false/temp:false, a remove is
+    ' removed:true/temp:false — the id stays in the account library marked
+    ' removed, so re-adding later is the same item with removed:false. `now` is
+    ' the caller-stamped ISO timestamp (the store mints it via TimeUtil).
+    function BuildLibraryChangeItem(sessionType as string, library as object, now as string, metaId as string, metaType as string, name as string, poster as string, added as boolean) as dynamic
+        if sessionType <> "stremio" then return invalid
+        if metaId = "" then return invalid
+        identity = m.Identity(name, metaType, poster, "")
+
+        item = m.ResolveLibraryItem(library, metaId, now, identity)
+        item.removed = not added
+        item.temp = false
+        item._mtime = now
+        return item
+    end function
+
+end class

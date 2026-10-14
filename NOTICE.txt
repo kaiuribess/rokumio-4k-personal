@@ -1,0 +1,23 @@
+Rokumio 4K Personal 0.5.12
+
+Based on gpratoe/rokumio-client, MIT licensed.
+Upstream: https://github.com/gpratoe/rokumio-client
+Base commit: 24d3e74bb29bdd94223710e25cd77ab40fca2b36 (2026-10-11)
+The upstream copyright and MIT license are included in LICENSE.
+
+This personal fork adds 4K-first direct HTTPS stream selection, 1080p choices,
+voice search/playback wiring, native playback diagnostics, and addon protocol
+fixes. It is not the Skz/wesleyfreii Discord build and is not an official Roku,
+Stremio, TorBox, or Hisense product.
+
+No movies, series, subscription accounts, or stream-provider credentials are
+bundled. Cinemeta provides metadata; installed providers supply playable URLs.
+
+Open Sans fonts: Copyright 2020 The Open Sans Project Authors
+(https://github.com/googlefonts/opensans), SIL Open Font License 1.1.
+The complete license is included in fonts/OFL.txt.
+
+EmojiOnRoku: Copyright (c) 2020 Kasper Gammeltoft and other contributors.
+emoji-regex: Copyright Mathias Bynens and other contributors.
+Twemoji-derived code: Copyright Twitter, Inc. and other contributors.
+Their MIT licenses are included in licenses/. Original source notices remain.

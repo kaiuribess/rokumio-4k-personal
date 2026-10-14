@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Check encoded 4K</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{background:#0a0f0c;color:#e9f2ec;font:17px system-ui;margin:0;padding:40px 24px}main{max-width:880px;margin:auto}h1{font-size:38px;margin:0 0 12px}h2{font-size:24px;margin-top:0}p{line-height:1.6;color:#b9c9bf}.panel{padding:28px;background:#142019;border:1px solid #344f3f;border-radius:14px;margin:24px 0}label{display:block;margin:18px 0 8px}input,select{width:100%;padding:14px;background:#0a0f0c;color:white;border:1px solid #799284;border-radius:8px;font:16px system-ui}button{background:#5bef95;color:#082212;border:0;border-radius:8px;padding:14px 20px;font:700 16px system-ui;cursor:pointer;margin-top:16px}button:disabled{opacity:.5;cursor:wait}.secondary{background:#233329;color:#e9f2ec}.muted{font-size:14px}.card{padding:15px;border-top:1px solid #344f3f}.card button{margin-top:8px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:15px/1.6 system-ui;margin:0}#result{min-height:100px}.badge{color:#5bef95;font-weight:bold}details>summary{cursor:pointer;font-weight:600}.row{display:flex;gap:12px;align-items:end}.row>div{flex:1}a{color:#5bef95}
+</style></head><body><main>
+<h1>Check encoded 4K</h1>
+<p>Inspect the video’s actual container metadata. A “4K” filename or a 2160p HDMI signal is not enough.</p>
+<section class="panel"><h2>Check before buying anything</h2>
+<p>Check Microsoft’s public UHD test file without an account. This reads the actual video metadata; it does not play the film on Roku.</p>
+<button id="sample">Inspect public 4K sample now</button>
+<button id="adaptive" class="secondary">Check adaptive 4K example</button>
+<button id="surround" class="secondary">Check separate 1080p surround sample</button>
+<p class="muted"><a href="https://learn.microsoft.com/en-us/playready/advanced/testcontent/playready-3x-test-content" target="_blank" rel="noreferrer">Microsoft’s published CLEAR test content</a> · 3840 × 2160 HEVC, 24 fps. This sample uses stereo audio.</p>
+<p class="muted">A successful public sample check proves that sample’s encoded dimensions. Paid-provider delivery, an original non-upscaled master, and your Roku/surround output remain separate checks.</p></section>
+<section class="panel"><h2>Check a specific movie source</h2>
+<p>When you have a configured add-on, enter it privately here. Choose a movie, load its source list, then inspect an existing direct media candidate.</p>
+<form id="form" autocomplete="off">
+<label for="url">Configured HTTPS manifest URL</label><input id="url" type="password" autocomplete="off" spellcheck="false" placeholder="https://…/manifest.json">
+<div class="row"><div><label for="title">Movie title</label><input id="title" autocomplete="off" placeholder="Search a movie"></div><button type="button" id="find" class="secondary">Find movie</button></div>
+<label for="movie">Movie to check</label><select id="movie"><option value="tt0017136">Metropolis (public catalog diagnostic)</option></select>
+<button id="check">Check add-on and load sources</button></form>
+<button id="public" class="secondary">Check public Cinemeta metadata</button>
+<div id="candidates"></div>
+<p class="muted">Private URLs and headers remain in memory and are omitted from reports. Known torrent/account resolver routes are blocked because a GET can create downloads. No keys need to be sent in chat.</p></section>
+<details class="panel"><summary>Inspect an existing direct file link</summary>
+<form id="media-form" autocomplete="off"><label for="media-url">Existing HTTPS MP4, MKV, HLS or DASH media URL</label>
+<input id="media-url" type="password" autocomplete="off" spellcheck="false" placeholder="Direct media URL, not a torrent resolver">
+<button id="media">Inspect encoded dimensions</button></form>
+<p class="muted">The inspector enforces byte and time limits. If dimensions cannot be read reliably, the result stays unverified.</p></details>
+<section class="panel" aria-live="polite"><h2>Result</h2><pre id="result">Ready. No subscription is required for the public sample.</pre>
+<button id="save" class="secondary" disabled>Save redacted report</button></section>
+</main><script>
+let report;
+const result=document.getElementById('result'),save=document.getElementById('save');
+function busy(on){for(const button of document.querySelectorAll('button'))button.disabled=on;save.disabled=on||!report;}
+async function post(route,body){const response=await fetch(route,{method:'POST',headers:{'Content-Type':'application/json','X-Check-Key':'__CHECK_KEY__'},body:JSON.stringify(body)});const data=await response.json();if(!response.ok)throw new Error(data.error||'Request failed');return data;}
+function display(data){
+  report=data;
+  if(data.checks){
+    result.textContent=data.checks.map(c=>c.status+' — '+c.name+'\n'+c.detail).join('\n\n')+
+      (data.streamCounts?'\n\nSource labels only: '+JSON.stringify(data.streamCounts,null,2):'')+'\n\n'+data.scope;
+  }else{
+    const names={ENCODED_2160P_CONFIRMED:'Confirmed encoded raster: 3840 × 2160',
+      ENCODED_2160P_RENDITION_CONFIRMED:'Confirmed 2160p rendition; adaptive selection remains unverified',
+      NOT_3840x2160:'Inspected video is not encoded at 3840 × 2160',
+      UHD_WIDTH_BELOW_2160:'3840-pixel width; height below 2160',
+      MIXED_VIDEO_RESOLUTIONS:'Multiple video resolutions; default track unverified',UNVERIFIED:'Resolution unverified'};
+    const lines=[names[data.status]||'Unverified',data.verdict||''];
+    for(const track of data.tracks||[]){
+      if(track.kind==='video'){
+        lines.push('\nVideo: '+(track.width?track.width+' × '+track.height:'dimensions unknown')+' · '+track.codec);
+        const facts=[track.hevcProfile,track.hevcTier?'Tier '+track.hevcTier:'',track.hevcLevel?'Level '+track.hevcLevel:'',track.bitDepth?track.bitDepth+'-bit':'',track.transfer||''].filter(Boolean);
+        if(facts.length)lines.push(facts.join(' · '));
+      }else if(track.kind==='audio'){
+        lines.push('\nAudio: '+track.codec+(track.channelLayout?' · '+track.channelLayout:track.channels?' · '+track.channels+' declared channels':' · channel layout unverified'));
+      }
+    }
+    if(data.playlist&&data.playlist.mixed1080And2160)lines.push('\nThis playlist includes both 1080p and 2160p renditions.');
+    if(data.adaptivePlayback)lines.push(data.adaptivePlayback);
+    if(data.rokuEncodingAssessment)lines.push('\nRoku encoding check: '+data.rokuEncodingAssessment);
+    lines.push('\nActual Roku playback and speaker output: unverified.');
+    lines.push('Original master / prior upscaling: unverified.');
+    lines.push('\nRead '+(data.bytesRead||0).toLocaleString()+' bytes in '+(data.requests||0)+' bounded requests. No full movie downloaded.');
+    result.textContent=lines.filter(Boolean).join('\n');
+  }
+  save.disabled=false;
+}
+async function inspect(body,route='/media'){busy(true);result.textContent='Inspecting bounded video metadata…';try{display(await post(route,body));}catch(e){result.textContent=e.message;report=null;}finally{document.getElementById('media-url').value='';busy(false);}}
+document.getElementById('sample').onclick=()=>inspect({publicSample:true});
+document.getElementById('adaptive').onclick=()=>inspect({publicAdaptive:true});
+document.getElementById('surround').onclick=()=>inspect({publicSurround:true});
+document.getElementById('media-form').onsubmit=e=>{e.preventDefault();inspect({url:document.getElementById('media-url').value});};
+document.getElementById('find').onclick=async()=>{report=null;busy(true);try{const data=await post('/titles',{query:document.getElementById('title').value});const select=document.getElementById('movie');select.replaceChildren();for(const movie of data.movies){const option=document.createElement('option');option.value=movie.id;option.textContent=movie.name;select.append(option);}result.textContent=data.movies.length?'Choose the movie, then load its sources.':'No matching movie found.';}catch(e){result.textContent=e.message;}finally{busy(false);}};
+async function run(url){busy(true);result.textContent='Checking manifest and selected movie’s source list…';document.getElementById('candidates').replaceChildren();try{const data=await post('/check',{url,movieId:document.getElementById('movie').value});display(data);for(const candidate of data.candidates||[]){const card=document.createElement('div');card.className='card';const text=document.createElement('div');text.textContent=candidate.label;const button=document.createElement('button');button.textContent='Inspect this source';button.onclick=()=>inspect({id:candidate.id},'/candidate');card.append(text,button);document.getElementById('candidates').append(card);}}catch(e){result.textContent=e.message;report=null;}finally{document.getElementById('url').value='';busy(false);}}
+document.getElementById('form').onsubmit=e=>{e.preventDefault();run(document.getElementById('url').value);};
+document.getElementById('public').onclick=()=>run('https://v3-cinemeta.strem.io/manifest.json');
+save.onclick=()=>{if(!report)return;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));a.download='roku-source-check.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);};
+</script></body></html>

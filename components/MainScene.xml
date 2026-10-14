@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="MainScene" extends="Scene">
+    <interface>
+        <field id="exitApp" type="boolean" alwaysNotify="true" value="false" />
+        <!-- Every dialog in the app is shown by assigning it here and dismissed
+             by assigning invalid. The Scene only renders this slot if the field
+             is DECLARED: m.top.dialog = node on its own writes an undeclared
+             dynamic field, which nothing observes, so the dialog never appears.
+             wasClosed is built into the Dialog interface, not declared here. -->
+        <field id="dialog" type="node" />
+        <function name="Start" />
+        <function name="RunPlaybackDiagnostic" />
+        <function name="ReadPlaybackDiagnostic" />
+        <function name="HandleDeepLink" />
+        <function name="HandleVoiceTransport" />
+        <!-- The local setup page (source/util/SetupPage.brs) publishes the
+             address a phone must open. main() calls this once after Start, and
+             the address rides a declared function rather than a node field:
+             the Add-ons screen is where it displays, and an undeclared field
+             write is invisible (see the dialog field comment). -->
+        <function name="ShowSetupAddress" />
+        <!-- One manifest URL submitted by that page. Returns false while an
+             import is already running so the page can answer 409. Shares the
+             single import slot with HandleDeepLink via BeginImport. -->
+        <function name="ImportFromSetup" />
+        <!-- A screen whose store bind came up short reports the failing hop
+             here (Screen.brs's SetStores) and the Scene paints it, so a broken
+             store layer can never be mistaken for an empty catalog. -->
+        <function name="ReportStoreFault" />
+    </interface>
+
+    <!-- Core + stores are declared here and inherited by the whole subtree, so
+         every screen and task component can construct the store classes it
+         needs. The SESSION-AWARE instances do not live here: they are built once
+         by StoreHost below and reached as a node, because a class instance
+         cannot survive a component boundary. What the subtree builds for itself
+         is stateless per-request wrappers (CatalogStore, PlaybackStore,
+         SubtitlesStore), which is why sharing them is not needed. -->
+    <script type="text/brightscript" uri="pkg:/source/core/ScreenStack.bs" />
+    <script type="text/brightscript" uri="pkg:/components/PlaybackDiagnostics.brs" />
+    <script type="text/brightscript" uri="pkg:/source/core/AsyncTask.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/Transport.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/SettingsStore.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/AuthStore.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/AddonsStore.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/CatalogStore.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/DeepLinkStore.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/EpisodesStore.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/WatchedCodec.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/VideoIdCodec.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/TimeUtil.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/WatchStateBuffer.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/StremioLibraryCodec.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/LibraryStore.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/PlaybackStore.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/SubtitlesStore.bs" />
+    <script type="text/brightscript" uri="pkg:/source/util/VoiceTransport.brs" />
+    <script type="text/brightscript" uri="pkg:/components/MainScene.brs" />
+    <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
+
+    <children>
+        <SourcePrefetchCoordinator id="sourcePrefetch" />
+        <Group id="uiRoot">
+            <!-- Everything inside uiRoot is authored in 1920x1080 design space.
+                 Screens are children of uiRoot; the stack shows one at a time. -->
+            <Rectangle id="background" width="1920" height="1080" />
+
+            <HomeScreen id="homeScreen" visible="false" />
+            <AuthScreen id="authScreen" visible="false" />
+            <LinkStremioScreen id="linkStremioScreen" visible="false" />
+            <DetailsScreen id="detailsScreen" visible="false" />
+            <EpisodesScreen id="episodesScreen" visible="false" />
+            <StreamsScreen id="streamsScreen" visible="false" />
+            <SettingsScreen id="settingsScreen" visible="false" />
+            <AddonsScreen id="addonsScreen" visible="false" />
+            <SearchScreen id="searchScreen" visible="false" />
+            <DiscoverScreen id="discoverScreen" visible="false" />
+            <LibraryScreen id="libraryScreen" visible="false" />
+            <PlayerScreen id="playerScreen" visible="false" />
+        </Group>
+
+        <!-- One tick of delay between the player reporting a position and the
+             write-back worker being created. The report arrives from inside the
+             player's Video "state" observer, and building a Task node on that
+             stack wedges playback; see ScheduleWatchStatePush in MainScene.brs.
+             One-shot and restarted per publish, so a burst of position reports
+             coalesces into a single launch. -->
+        <Timer id="watchStatePump" duration="1" repeat="false" />
+    </children>
+</component>

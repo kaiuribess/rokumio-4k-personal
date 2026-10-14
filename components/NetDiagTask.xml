@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="NetDiagTask" extends="Task">
+    <!-- TEMPORARY diagnostic, not part of the app.
+
+         It exists to locate the intermittent outbound-connect failures
+         (status=-7) that hit every domain the app talks to while plain HTTP to
+         the LAN streaming server's IP never fails. It compares a DNS-free IP
+         literal against the same request by hostname, measures resolution
+         directly, reads the radio and resolver from roDeviceInfo, then tests
+         concurrency head-on: a sequential soak, a burst-size sweep, and the
+         same burst under AUTO / http2 / 1.1. The certificate hypothesis is one
+         rung of that ladder (probe E against probe D), not the whole purpose.
+
+         Each probe builds its own roUrlTransfer instead of reusing Transport, so
+         that measuring the platform cannot perturb the production path. Delete
+         this component together with the Settings row that launches it once the
+         answer is known. -->
+    <interface>
+        <field id="serverAddress" type="string" value="" />
+        <!-- Set by the screen before STOP, so the probe loop can bail between
+             probes instead of running to completion into a reaped node. -->
+        <field id="cancelRequested" type="boolean" value="false" />
+        <!-- alwaysNotify so the screen can render each probe as it lands. The
+             report is republished per probe and carries done = false until the
+             last one, which is what lets the observer tell a finished run from
+             a partial one. -->
+        <field id="result" type="assocarray" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/NetDiagTask.brs" />
+</component>

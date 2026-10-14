@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="PlayerScreen" extends="Screen">
+    <!-- Minimal player pushed from StreamsScreen with { stream, serverAddress,
+         metaType, metaId, videoId, season, episode, position, name, poster,
+         logo, ... }. The stream is resolved here (logo pulse while the torrent
+         engine warms up), then playback runs on Roku's native player chrome —
+         the pause screen, seek/trick-play, and Options/captions dialog belong
+         to the platform. Pops on Back and records the watched position through
+         LibraryStore.SetPosition. The buffering logo is the one branded piece
+         that stays.
+         A static child of MainScene, reused across plays: OnBackPressed only
+         records the position and declines, the stack pops, and OnExit cancels
+         the resolve and sends the Video node a plain stop. The node survives the
+         pop, so the next play re-arms it in CreateVideo. -->
+    <interface>
+        <function name="OnEnter" />
+        <function name="OnExit" />
+        <function name="OnBackPressed" />
+        <function name="PlaybackStatus" />
+        <function name="CanAdvanceEpisode" />
+        <!-- Called by MainScene from the two points the add-on registry actually
+             moves (the sync install loop, and a Rokumio import), so a subtitle
+             provider that lands after this screen entered is still asked. See
+             EnsureSubtitleProviders. -->
+        <function name="EnsureSubtitleProviders" />
+        <field id="watchStateUpdate" type="assocarray" alwaysNotify="true" />
+        <field id="nextEpisodeRequest" type="assocarray" alwaysNotify="true" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/stores/SubtitlesStore.bs" />
+    <script type="text/brightscript" uri="pkg:/components/PlayerScreen.brs" />
+    <script type="text/brightscript" uri="pkg:/source/core/AsyncTask.bs" />
+    <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
+    <script type="text/brightscript" uri="pkg:/source/util/PlaybackInfo.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/EnglishAudio.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/AudioCapabilities.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/CinemaStreams.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/AutoPlayback.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/NativeMedia.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/SourceMemory.brs" />
+    <script type="text/brightscript" uri="pkg:/components/PlayerSourceMemory.brs" />
+    <script type="text/brightscript" uri="pkg:/components/PlayerAudioRecovery.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/NextEpisode.brs" />
+    <script type="text/brightscript" uri="pkg:/components/PlayerNextEpisode.brs" />
+
+    <children>
+        <Rectangle id="playerBg" width="1920" height="1080" />
+        <Video
+            id="video"
+            width="1920"
+            height="1080"
+            enableUI="true"
+            enableTrickPlay="true" />
+        <Label
+            id="playerStatus"
+            translation="[100, 825]"
+            width="1720"
+            height="160"
+            wrap="true"
+            numLines="3"
+            font="font:MediumSystemFont"
+            horizAlign="center" />
+
+        <!-- UI coordinates do not impose a video decode resolution. Details
+             show encoded HLS/DASH segment dimensions only when Roku supplies
+             them, never the HDMI output mode or the source's quality label. -->
+        <Group id="playbackInfoGroup" visible="false" translation="[60, 60]">
+            <Rectangle id="playbackInfoPlate" width="1120" height="520" color="0x10151DEE" />
+            <Label id="playbackInfoTitle" text="Playback details" translation="[28, 18]"
+                width="1064" height="50" font="font:MediumBoldSystemFont" color="0xFFFFFFFF" />
+            <Label id="playbackInfoText" translation="[28, 76]" width="1064" height="420"
+                wrap="true" numLines="13" font="font:SmallSystemFont" color="0xFFFFFFFF" />
+        </Group>
+
+        <Group id="bufferingGroup" visible="false" translation="[510, 287]">
+            <Poster
+                id="logoBack"
+                uri=""
+                width="900"
+                height="506"
+                opacity="0.22"
+                loadDisplayMode="scaleToFit" />
+            <Poster
+                id="logoFront"
+                uri=""
+                width="900"
+                height="506"
+                opacity="1.0"
+                loadDisplayMode="scaleToFit"
+                clippingRect="[0, 0, 0, 506]" />
+        </Group>
+
+        <!-- The Stremio-style pre-buffer pulse: while the stream resolves, the
+             logo behind the (empty) reveal clip beats from almost invisible to
+             solid. Stopped and reset to solid the moment resolution reports in;
+             the same pair then carries the buffering reveal (logoFront clipping
+             from left to right as % arrives). -->
+        <!-- No easeFunction: the running Roku OS has no such field on
+             FloatFieldInterpolator and rejects the attribute outright
+             ("Tried to set nonexistent field"), so the one that was here did
+             nothing but print a warning on every player screen. The default
+             easing is what a logo pulse wants anyway. -->
+        <Animation id="resolvePulse" duration="3" repeat="true">
+            <FloatFieldInterpolator
+                id="resolvePulseOpacity"
+                fieldToInterp="logoBack.opacity"
+                key="[0.0, 0.35, 0.5, 0.65, 1.0]"
+                keyValue="[0.15, 0.35, 1.0, 0.35, 0.15]" />
+        </Animation>
+
+        <!-- A transient warning, for the one thing playback cannot fix itself:
+             captions that could not be fetched. Rides above the video on a
+             translucent plate so the text reads over any frame, holds for two
+             seconds, then fades. Not a status line: playerStatus below is the
+             play state, and a failed caption fetch would overwrite that.
+
+             The fade is an Animation on toastGroup.opacity, which cascades to
+             both children — RailTile dims its whole subtree the same way, so
+             the field is one this app has already proven on device. And because
+             a FloatFieldInterpolator on an OS that lacks the field would fail
+             SILENTLY (the easeFunction attribute that did nothing but print a
+             warning is the precedent above), toastHideTimer is armed for the
+             same window and force-hides the group regardless, so a no-op
+             interpolator cannot strand the label on screen over the video. -->
+        <Group id="toastGroup" visible="false" translation="[210, 860]">
+            <Rectangle id="toastPlate" width="1500" height="64"/>
+            <Label
+                id="toastLabel"
+                width="1500"
+                height="64"
+                font="font:MediumSystemFont"
+                horizAlign="center"
+                vertAlign="center" />
+            <Animation id="toastFade" delay="2" duration="0.5" repeat="false">
+                <FloatFieldInterpolator
+                    id="toastFadeOpacity"
+                    fieldToInterp="toastGroup.opacity"
+                    key="[0.0, 1.0]"
+                    keyValue="[1.0, 0.0]" />
+            </Animation>
+        </Group>
+
+        <!-- The Animation's own end is not trusted to hide anything: see above.
+             2s hold + 0.5s fade + margin. Armed by ShowToast alongside the fade. -->
+        <Timer id="toastHideTimer" duration="2.6" repeat="false" />
+
+        <!-- Not cosmetic: StartPlayback hands the Video node its content and
+             asks it to play from separate ticks, and this is the boundary. See
+             StartPlayback for why the same tick is not good enough. -->
+        <Timer id="playKick" duration="0.25" repeat="false" />
+        <Timer id="englishAudioCheck" duration="10" repeat="false" />
+        <Timer id="audioProgressTick" duration="1" repeat="true" />
+        <Timer id="audioTrackRepair" duration="0.1" repeat="false" />
+        <Timer id="autoSourceRetry" duration="0.5" repeat="false" />
+        <Timer id="sourceStartupLimit" duration="35" repeat="false" />
+        <Timer id="sourceProofTick" duration="5" repeat="true" />
+        <Timer id="sourceMemoryPump" duration="0.1" repeat="false" />
+        <Timer id="nextEpisodeSetup" duration="0.1" repeat="false" />
+        <Timer id="nextEpisodeCountdown" duration="1" repeat="true" />
+    </children>
+</component>

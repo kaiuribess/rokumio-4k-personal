@@ -1,0 +1,54 @@
+# Rokumio 4K Personal
+
+A native Roku client for browsing Stremio-compatible catalogs, searching movies and shows, and playing compatible direct streams with the Roku remote. This community derivative adds English audio selection, projector/surround presets, clearer source cards, automatic source recovery, and automatic next-episode playback.
+
+**Version 0.5.12 is an experimental community release.** Software tests and package validation pass; its next-episode behavior has not yet been tested on a physical Roku. It cannot guarantee that every provider file plays, has English audio, or is genuine 4K.
+
+[Download the install ZIP](https://github.com/kaiuribess/rokumio-4k-personal/releases/latest) · [Installation](docs/INSTALL.md) · [Playback and 4K](docs/PLAYBACK.md) · [Development](docs/DEVELOPMENT.md) · [Changes](CHANGELOG.md)
+
+## What you can do
+
+- Browse online catalogs, search titles, and open series seasons/episodes.
+- Use remote navigation and native Roku keyboard voice dictation where your device, remote, language and region support it.
+- Play direct HTTPS MP4/MKV or HLS/DASH streams that your Roku supports. The direct path needs no PC or external streaming server during playback.
+- Choose labelled 4K or 1080p sources. Press **\*** on the source screen to toggle **4K-only / all qualities**.
+- Let automatic playback rank source candidates, try compatible alternatives, and remember previously successful file identities.
+- Use **Projector speakers** or **AX700 surround** audio preferences. Audio compatibility still depends on the actual track and connected equipment.
+- Continue shows automatically after an accepted episode ends: a **five-second countdown** names the next episode; **Back cancels**. The next episode gets fresh sources and retains the quality filter/audio mode. Regular seasons roll forward without jumping into specials.
+- Save resume positions locally; optional Stremio pairing provides account synchronization.
+
+The built-in Cinemeta catalog supplies title metadata. **Playable movies, shows, provider accounts and configured stream add-ons are not bundled.** Install your own compatible provider manifest and use content you are authorized to access. Searching a title does not establish that a playable 4K source exists.
+
+## Quick start
+
+1. Download the release **`rokumio-4k-personal-0.5.12.zip`**; do not extract it before installing.
+2. Enable Roku developer mode and upload that ZIP through the local Development Application Installer. See the [full steps](docs/INSTALL.md).
+3. Choose **Browse movies & shows**, then **Add-ons**. Leave Add-ons open and use the local setup address displayed there to import your configured HTTPS `manifest.json` URL.
+4. Select the app's audio preset, search for a title, and press Play. Compatible direct providers play on Roku itself. If you enable 4K-only, the app will not silently fall back to a labelled HD source.
+
+You need a computer/phone for installation or convenient initial configuration. It does not need to remain running for compatible direct-stream playback. Raw torrent/hash-only streams require a separate streaming server; this app is not a torrent engine or audio transcoder.
+
+## What “4K” means here
+
+A filename or source label saying 2160p is a **hint**. Genuine UHD requires the actual encoded video to have UHD dimensions and the Roku to decode it. A 3840-wide cinema crop can still be UHD. A TV/projector displaying a 4K HDMI signal does not prove the source is 4K.
+
+Pause to view available native playback facts. Adaptive HLS/DASH segments can change resolution. Progressive MKV/MP4 dimensions may be unavailable; unknown remains unknown. The app rejects completely inspected, known below-UHD MKV video in explicit 4K-only mode, but cannot certify all containers and encodings. Read [the evidence and limits](docs/PLAYBACK.md) before buying a service for this app.
+
+## Build your own / fork this repo
+
+```sh
+git clone https://github.com/kaiuribess/rokumio-4k-personal.git
+cd rokumio-4k-personal
+npm ci
+npm test
+npm run build
+python scripts/verify-package.py
+```
+
+The installable output is **`dist/rokumio-4k-personal.zip`**. GitHub's automatically generated source ZIP is not the install package. See [development and architecture](docs/DEVELOPMENT.md) for the test boundaries and a contribution guide.
+
+## Attribution
+
+Based on [gpratoe/rokumio-client](https://github.com/gpratoe/rokumio-client), base commit `24d3e74bb29bdd94223710e25cd77ab40fca2b36`. The original copyright and [MIT license](LICENSE) are preserved. Open Sans is distributed under its [SIL Open Font License](fonts/OFL.txt). EmojiOnRoku, emoji-regex and Twemoji-derived code retain their notices and [MIT licenses](licenses/). See [NOTICE.txt](NOTICE.txt).
+
+This is a separately maintained derivative, not the Skz/wesleyfreii Discord ZIP, and is not affiliated with Roku, Stremio, TorBox or Hisense.

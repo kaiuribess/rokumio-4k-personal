@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="EpisodesScreen" extends="Screen">
+    <!-- The dedicated episode browser for a series. Pushed from DetailsScreen
+         ("Episodes") with { addonAddress, meta, resume }. A Home-style RowList
+         shows one row per season (tiles are episodes); the top header tracks the
+         focused episode's "S#E# name" and synopsis. OK on an episode reports a
+         stream-push request upward. -->
+    <interface>
+        <field id="pushRequest" type="assocarray" alwaysNotify="true" />
+        <field id="watchedChange" type="assocarray" alwaysNotify="true" />
+
+        <function name="OnEnter" />
+        <function name="OnExit" />
+        <function name="OnBackPressed" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/components/EpisodesScreen.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/SourcePrefetch.brs" />
+    <script type="text/brightscript" uri="pkg:/source/core/AsyncTask.bs" />
+    <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
+
+    <children>
+        <Timer id="episodePrefetchDelay" duration="0.5" repeat="false" />
+        <Rectangle id="epBg" width="1920" height="1080" color="0x0" />
+        <Poster id="bgPoster" width="1920" height="1080" loadDisplayMode="scaleToZoom" />
+        <Rectangle id="bgScrim" width="1920" height="1080" />
+        <!-- scaleToFill, not scaleToZoom. images/mask.png is a vertical alpha ramp
+             that is uniform along x, so preserving its aspect ratio buys nothing —
+             it only decides which slice of the gradient survives the crop. At
+             8x256 against a 1920x1080 node, scaleToZoom scales 240x and crops to
+             a 4-row window at the middle of the ramp, which is alpha ~247 and
+             renders as a flat opaque black background. scaleToFill stretches the
+             ramp across the node, which is what the 1918x1079 original was already
+             getting by accident (its aspect matched the node to within 0.1%). -->
+        <Poster id="bgMask" width="1920" height="1080" loadDisplayMode="scaleToFill" uri="pkg:/images/mask.png" />
+        <!-- Header: series name, then the focused episode's label and synopsis. -->
+        <Label
+            id="epName"
+            translation="[80, 48]"
+            width="1760"
+            height="70"
+            horizAlign="left"
+            font="font:LargeBoldSystemFont" />
+        <!-- The focused episode's "S#E#  name" (green) with the air date hung
+             right off it. One MultiStyleLabel renders both as a single line:
+             the date span switches font + color via drawingStyles markup (aired
+             warm gold, not-yet-aired sky blue), so no part can desync from the
+             title's width. -->
+        <MultiStyleLabel
+            id="epHeaderLine"
+            translation="[80, 128]"
+            width="1760"
+            height="40"
+            horizAlign="left"
+            vertAlign="center"
+            maxLines="1" />
+        <Label
+            id="epDesc"
+            translation="[80, 172]"
+            width="1760"
+            height="118"
+            wrap="true"
+            horizAlign="left"
+            vertAlign="top"
+            font="font:SmallSystemFont" />
+
+        <!-- Episode rows: one row per season, tiles are landscape EpisodeTiles.
+             Content is built in code from the series meta. -->
+        <RowList
+            id="epList"
+            translation="[80, 406]"
+            numRows="2"
+            itemSize="[1760, 230]"
+            itemSpacing="[0, 8]"
+            rowItemSize="[[320, 180]]"
+            rowItemSpacing="[[12, 0]]"
+            showRowLabel="[true]"
+            rowLabelOffset="[[0, 0]]"
+            rowLabelFont="font:MediumBoldSystemFont"
+            drawFocusFeedback="true"
+            itemComponentName="EpisodeTile"
+            vertFocusAnimationStyle="fixedFocusWrap"
+          wrapDividerBitmapUri="pkg:/images/divider.9.png"/>
+        <Label id="epHelp" translation="[80, 984]" width="1760" height="44"
+            text="Arrow keys  Browse     OK  Choose stream     *  Watched status     Back  Return"
+            font="font:SmallSystemFont" />
+    </children>
+</component>

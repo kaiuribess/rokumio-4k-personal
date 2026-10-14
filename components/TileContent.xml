@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TileContent — the ContentNode type for grid/list poster tiles that carry
+     watched-state overlays.
+
+     Roku only forwards a plain ContentNode's standard Content Meta-Data
+     attributes (title, hdPosterUrl, ...) to a MarkupGrid/RowList item
+     component through `itemContent`; fields added with dot-notation to a bare
+     "ContentNode" are dropped, so the tile reads them as invalid on device
+     (the PosterTile overlays stayed invisible for that reason). Declaring them
+     here as interface element fields makes them real attributes the grid can
+     forward, and the tile can read with dot-notation. -->
+<component name="TileContent" extends="ContentNode">
+    <interface>
+        <!-- PosterTile / ChipTile: continue-watching bar fraction (0..1). -->
+        <field id="progress" type="float" />
+        <!-- PosterTile: watched badge, "eye" | "clock". -->
+        <field id="watchedGlyph" type="string" />
+        <!-- EpisodeTile: per-episode watched flag. -->
+        <field id="watched" type="boolean" />
+        <!-- EpisodeTile: per-episode air state; false dims the tile. -->
+        <field id="aired" type="boolean" />
+        <!-- SearchScreen loading state consumed by PosterTile's spinner. -->
+        <field id="loadState" type="string" />
+    </interface>
+</component>

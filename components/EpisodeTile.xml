@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="EpisodeTile" extends="Group">
+    <!-- Landscape episode cell for EpisodesScreen's season rows. RowList and
+         MarkupGrid only update item components through the read-only interface
+         fields itemContent / itemHasFocus / rowHasFocus (they never touch
+         `content` or `focused`). Artwork comes from the episode thumbnail; with
+         no art the S#E#/name text shows through so the cell is never blank. -->
+    <interface>
+        <field id="itemContent" type="node" />
+        <field id="itemHasFocus" type="boolean" />
+        <field id="rowHasFocus" type="boolean" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/components/EpisodeTile.brs" />
+    <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
+
+    <children>
+        <!-- The artless unit: the face plus the title. Shown while there is no
+             artwork, and HIDDEN the moment the thumbnail reports it has
+             painted, so the face genuinely stops rendering rather than sitting
+             behind the artwork.
+
+             No width/height on this Group: Group is a RenderableNode and has
+             neither field, so Roku warns and discards them. The children carry
+             the cell's size.
+
+             There is no border rect: a full-tile tileBorder was completely
+             covered by the same-size tileBg and so had been invisible, while
+             costing a rect per cell. -->
+        <Group id="artless">
+            <Rectangle id="tileBg" width="320" height="180"/>
+            <Label id="titleText" width="296" height="164" translation="[12, 8]" horizAlign="center" vertAlign="middle" wrap="true" font="font:MediumSystemFont" />
+        </Group>
+        <!-- Never hide this poster: it paints nothing until it has a bitmap.
+             Declaring it visible="false" deadlocked the load — see
+             PosterTile.xml.
+
+             Capped to the cell like PosterTile. EpisodesScreen realizes a whole
+             row per season, so a 20-episode season is ~25-30 live cells; at an
+             uncapped source that is 1.5MB each for a 500x750 still and 8.3MB for a
+             full 1920x1080 one, against a 64MB texture budget shared with Home.
+
+             The cost is that limitSize fits the source inside the bounds
+             preserving aspect, so an off-ratio thumbnail decodes narrower than
+             the cell and leaves an uncovered strip. Acceptable here because
+             episode stills are overwhelmingly 16:9 and the cells sit over a
+             60%-opaque scrim (Theme.scrim = 0x00000099) rather than bare art, so
+             a gap reads as dark fill instead of a hole. Note that artless is
+             hidden once the poster paints, so tileBg is NOT behind the strip. -->
+        <Poster id="poster" width="320" height="180" loadWidth="320" loadHeight="180" loadDisplayMode="scaleToFit"/>
+        <!-- Optional watched badge (40px check on a translucent plate,
+             top-right) so the white glyph reads against any thumbnail.
+             Hidden until a screen passes itemContent.watched. -->
+        <Group id="watchedBadgeGroup" translation="[266, 4]" visible="false">
+            <Rectangle id="watchedPlate" width="52" height="52" />
+            <Poster id="watchedBadge" width="40" height="40" loadWidth="40" loadHeight="40" loadDisplayMode="limitSize" translation="[6, 6]" />
+        </Group>
+    </children>
+</component>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="SupportDialog" extends="StandardDialog" initialFocus="buttonArea">
+    <interface>
+        <!-- Preserve the upstream scene's Configure call; this dialog is help. -->
+        <function name="Configure" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/components/SupportDialog.brs" />
+    <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
+
+    <children>
+        <StdDlgTitleArea primaryTitle="Search, choose, play" />
+        <StdDlgContentArea>
+          <StdDlgTextItem id="supportIntro" text="Search: type with the remote, or hold the microphone while the search keyboard is open."/>
+          <StdDlgTextItem text="Choose: 4K sources appear first, with 1080p below. Press * to switch between all qualities and 4K only." />
+          <StdDlgTextItem text="Play: OK starts the selected source. Pause shows playback details. The source's 4K label is separate from the decoded resolution." />
+          <StdDlgTextItem text="Setup: add a stream source in Add-ons. For 5.1, connect Roku to the AX700 HDMI input and choose DD+ or Dolby Digital audio." />
+        </StdDlgContentArea>
+        <StdDlgButtonArea id="buttonArea">
+            <StdDlgButton text="Close" />
+        </StdDlgButtonArea>
+    </children>
+</component>

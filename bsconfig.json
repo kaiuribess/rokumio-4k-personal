@@ -1,0 +1,17 @@
+{
+    "rootDir": ".",
+    "files": [
+        "manifest",
+        "LICENSE",
+        "NOTICE.txt",
+        "licenses/**/*.*",
+        "source/**/*.*",
+        "components/**/*.*",
+        "images/**/*.*",
+        "fonts/**/*.*"
+    ],
+    "stagingDir": "out",
+    "createPackage": true,
+    "outFile": "dist/rokumio-4k-personal.zip",
+    "sourceMap": false
+}

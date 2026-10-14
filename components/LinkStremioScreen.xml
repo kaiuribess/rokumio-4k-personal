@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="LinkStremioScreen" extends="Screen">
+    <!-- Link-code pairing screen: a centered column that shows the QR code,
+         the scan URL in accent green and a countdown to the pairing deadline
+         while the user completes pairing on their phone. A spinner covers the
+         QR fetch; "Request new code" restarts the flow. Publishes cancelLogin
+         on Back and completeLogin when the task succeeds. -->
+    <interface>
+        <field id="pushRequest" type="assocarray" alwaysNotify="true" />
+        <field id="taskNode" type="node" value="" />
+
+        <function name="OnEnter" />
+        <function name="OnExit" />
+        <function name="OnBackPressed" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/components/LinkStremioScreen.brs" />
+    <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
+
+    <children>
+        <Rectangle id="pairBg" width="1920" height="1080" color="0x0" />
+
+        <BusySpinner
+            id="pairSpinner"
+            translation="[832, 400]"
+            visible="true"
+            control="RUN" />
+
+        <!-- The full-width vertical group centers every child by its own
+             measured size, so wider translations stay centered with no manual
+             math. Starts hidden; ShowLink flips it on as soon as the scan URL
+             arrives, which is deliberately NOT gated on the QR image: a slow or
+             failed PNG must not hold the screen behind a spinner.
+             No width here: LayoutGroup has no such field, and feeding the
+             attribute produced a group whose children were laid out at a
+             broken extent — Labels still painted their glyphs, the Poster
+             painted nothing. That is why only the QR was missing. -->
+        <LayoutGroup
+            id="pairColumn"
+            layoutDirection="vert"
+            horizAlignment="center"
+            itemSpacings="[24]"
+            translation="[960, 150]"
+            visible="false">
+            <Label
+                id="pairTitle"
+                text="Link Rokumio to your Stremio account"
+                font="font:LargeBoldSystemFont" />
+            <Poster
+                id="pairQr"
+                width="360"
+                height="360" />
+            <Label
+                id="pairQrFallback"
+                width="700"
+                height="40"
+                horizAlign="center"
+                text="QR code unavailable — use the link below"
+                font="font:MediumSystemFont"
+                visible="false" />
+            <MultiStyleLabel
+                id="pairStep1Line" />
+            <Label
+                id="pairStep2"
+                text="2 - Log in to your Stremio account"
+                font="font:MediumSystemFont" />
+            <Label
+                id="pairTimer"
+                text="Code expires in 5:00"
+                font="font:SmallSystemFont" />
+            <Label
+                id="pairRefreshHint"
+                text="Press OK to get a new code"
+                font="font:MediumSystemFont" />
+            <Label
+                id="pairStatus"
+                text=""
+                font="font:MediumSystemFont" />
+        </LayoutGroup>
+
+        <Timer id="pairTicker" duration="1" repeat="true" />
+    </children>
+</component>

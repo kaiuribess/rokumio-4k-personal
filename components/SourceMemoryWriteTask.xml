@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="SourceMemoryWriteTask" extends="Task">
+    <interface>
+        <field id="events" type="array" />
+        <field id="result" type="assocarray" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/source/util/SourceMemory.brs" />
+    <script type="text/brightscript" uri="pkg:/components/SourceMemoryWriteTask.brs" />
+</component>

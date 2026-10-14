@@ -1,0 +1,6 @@
+#EXTM3U
+#EXT-X-VERSION:7
+#EXT-X-INDEPENDENT-SEGMENTS
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aaclc-48-160",NAME="English",LANGUAGE="en-US",AUTOSELECT=YES,DEFAULT=YES,CHANNELS="2",URI="https://devstreaming-cdn.apple.com/videos/streaming/examples/adv_dv_atmos/Job932393e2-1e4f-4fdb-ab59-0d201f752656-107660254-Transcode_audio_en_stereo160_audio/prog_index.m3u8"
+#EXT-X-STREAM-INF:AVERAGE-BANDWIDTH=12452019,BANDWIDTH=26321918,VIDEO-RANGE=SDR,CODECS="hvc1.2.20000000.H150.B0,mp4a.40.2",RESOLUTION=3840x2160,FRAME-RATE=23.976,AUDIO="aaclc-48-160"
+https://devstreaming-cdn.apple.com/videos/streaming/examples/adv_dv_atmos/Job2dae5735-d6ca-48ca-91be-0ec0bead535c-107702578-hls_bundle_hevchls597/prog_index.m3u8

@@ -1,0 +1,28 @@
+' WatchStateBuffer — the player → MainScene watch-state mailbox.
+'
+' PlayerScreen publishes each position update here (memory-only) as well as
+' through its own node field, so MainScene can still read the last packet after
+' the player node is torn down — its async field observer races the pop that
+' releases the component (and the video node it holds). Reading from this shared
+' instance has no node-lifetime dependency.
+'
+' A last-value stash with no clearing: MainScene dedups repeated updates by
+' videoId + position, so "latest" is all it needs. Constructed once under
+' MainScene scope and shipped through the stores map (like TimeUtil and
+' WatchedCodec), never built inside a method.
+class WatchStateBuffer
+    sub new()
+        m.packet = invalid
+    end sub
+
+    ' Keep the newest packet. invalid publishes are ignored.
+    sub Record(packet as dynamic)
+        if packet = invalid then return
+        m.packet = packet
+    end sub
+
+    ' The most recent packet, invalid before the first Record.
+    function Latest() as dynamic
+        return m.packet
+    end function
+end class

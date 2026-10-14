@@ -1,0 +1,111 @@
+' TileSize.bs — shared helpers to determine poster tile cell/item sizes.
+'
+' The Stremio posterShape field is the source of truth when a catalog ships it:
+' "landscape" (16:9) posters need wide cells or limitSize letterboxes them into
+' a 2:3 slab, "square" (1:1) posters get square cells, and "poster"/"regular"
+' (1:0.675, the default) get the standard 2:3 poster slab. Only when a row
+' reports no shape does the content-type fallback apply (channel/tv -> square,
+' everything else -> the 2:3 slab). RowList sizes rows independently, so a
+' landscape row is just another rowItemSize entry — no mixed row needed.
+
+' PosterShapeName normalizes one Stremio posterShape value to the canonical
+' "landscape"/"square"/"poster" names — the spec spells 1:0.675 as "regular",
+' the SDK as "poster", so both fold to "poster" — or "" when the value is absent
+' or not a recognized shape. Non-string values are ignored so JSON garbage can
+' never crash the LCase.
+function PosterShapeName(value as dynamic) as string
+    if value = invalid then return ""
+    vtype = Type(value)
+    if vtype <> "String" and vtype <> "roString" then return ""
+    lower = LCase(value)
+    if lower = "landscape" then return "landscape"
+    if lower = "square" then return "square"
+    if lower = "poster" or lower = "regular" then return "poster"
+    return ""
+end function
+
+' The cell size for one grid row: [width, height]. The row's own shape wins when
+' there is one, otherwise the content-type fallback. Landscape rows use a wide
+' 480x270 cell (~16:9, ~0.52MB of texture per tile against 0.42MB for the 2:3
+' slab) so 16:9 artwork breathes instead of shrinking into a letterboxed strip.
+function TileCellSize(metaType as dynamic, posterShape = "" as dynamic) as object
+    shape = PosterShapeName(posterShape)
+    if shape = "landscape" then return [480, 270]
+    if shape = "square" then return [270, 270]
+    if shape = "poster" then return [270, 405]
+    if metaType <> invalid and metaType <> ""
+        lower = LCase(metaType)
+        if lower = "channel" or lower = "tv" then return [270, 270]
+    end if
+    return [270, 405]
+end function
+
+' The single posterShape a row of metas should size to. Catalog responses carry
+' posterShape per meta; this folds the row into one name by majority vote so a
+' whole row adapts together (add-ons ship one shape per catalog — a mixed row is
+' rare, and a row cannot mix tile sizes anyway). Unrecognized or missing shapes
+' are ignored; a row with none comes back "" so the caller's type fallback
+' applies.
+function TilePosterShape(metas as dynamic) as string
+    counts = {}
+    if metas <> invalid and Type(metas) = "roArray"
+        for each meta in metas
+            if meta <> invalid and Type(meta) = "roAssociativeArray"
+                shape = PosterShapeName(meta.posterShape)
+                if shape <> ""
+                    if counts.DoesExist(shape) then counts[shape] = counts[shape] + 1 else counts[shape] = 1
+                end if
+            end if
+        end for
+    end if
+    best = ""
+    bestCount = 0
+    for each key in counts
+        if counts[key] > bestCount
+            bestCount = counts[key]
+            best = key
+        end if
+    end for
+    return best
+end function
+
+' The number of tiles of cellWidth that fit across a grid row of gridWidth,
+' counting the spacingX gap between them:
+'   cols*cellWidth + (cols-1)*spacingX <= gridWidth
+' Discover uses this so a wide (16:9) catalog places fewer tiles per row instead
+' of overflowing the row into per-row horizontal scrolling — a RowList row that
+' fits its width reads as a grid; one that overflows reads as a Home-style strip.
+' Always at least one tile so an oversized cell still renders.
+function TileColumns(gridWidth as integer, cellWidth as integer, spacingX as integer) as integer
+    if cellWidth <= 0 then return 1
+    stride = cellWidth + spacingX
+    if stride <= 0 then return 1
+    cols = Int((gridWidth + spacingX) / stride)
+    if cols < 1 then cols = 1
+    return cols
+end function
+
+' The values RowList.rowHeights needs, one per row, drawn from a rowItemSize
+' array. RowList sizes a row's SLOT from itemSize.y — a single fixed height for
+' every row — and the tile from rowItemSize, so a tile shorter than that slot (a
+' landscape/square row against the 2:3 itemSize height) leaves phantom space
+' between rows. rowHeights overrides the slot per row: mirror each row's tile
+' height and the gap is exactly itemSpacing. Rows with different shapes stay
+' tight in one grid instead of only the 2:3 rows being right.
+function TileRowHeights(sizes as dynamic) as object
+    heights = []
+    if sizes <> invalid and Type(sizes) = "roArray"
+        for each s in sizes
+            if s <> invalid then heights.Push(s[1])
+        end for
+    end if
+    return heights
+end function
+
+function TileItemWidth(metaType as dynamic) as integer
+    if metaType <> invalid and metaType <> ""
+        lower = LCase(metaType)
+        if lower = "channel" or lower = "tv" then return 405
+    end if
+    return 270
+end function

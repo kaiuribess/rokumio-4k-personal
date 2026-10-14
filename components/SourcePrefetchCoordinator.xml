@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="SourcePrefetchCoordinator" extends="Node">
+    <interface>
+        <field id="revision" type="integer" value="0" alwaysNotify="true" />
+        <function name="Prepare" />
+        <function name="Snapshot" />
+        <function name="Cancel" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/source/core/AsyncTask.bs" />
+    <script type="text/brightscript" uri="pkg:/components/SourcePrefetchCoordinator.brs" />
+    <children><Timer id="prefetchExpiry" duration="60" repeat="false" /></children>
+</component>

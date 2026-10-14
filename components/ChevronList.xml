@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="ChevronList" extends="Group">
+    <!-- Single-column RowList with a fixed visible window plus chevron-up/down
+         markers above and below that appear when items sit hidden outside the
+         window. The window (numRows rows, floatingFocus scroll) is tracked as
+         state and only shifts when focus actually crosses an edge, so the
+         chevrons reflect hidden content rather than the focused row. Consumers
+         feed row content (ContentNode root with one child per row), pick the
+         geometry, and read the rowItemFocused/rowItemSelected pairs. -->
+    <interface>
+        <field id="numRows" type="integer" value="5" />
+        <field id="itemWidth" type="integer" value="1000" />
+        <field id="rowHeight" type="integer" value="110" />
+        <field id="rowComponent" type="string" value="PrefRow" />
+        <field id="showChevrons" type="boolean" value="true" />
+        <field id="content" type="node" />
+        <field id="rowItemFocused" type="array" />
+        <field id="rowItemSelected" type="array" />
+        <function name="SetListFocus" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/components/ChevronList.brs" />
+    <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
+
+    <children>
+        <RowList
+            id="rowList"
+            numRows="5"
+            itemSize="[1000, 118]"
+            itemSpacing="[0, 8]"
+            rowItemSize="[[1000, 110]]"
+            showRowLabel="[false]"
+            drawFocusFeedback="true"
+            itemComponentName="PrefRow"
+            vertFocusAnimationStyle="floatingFocus" />
+        <Poster
+            id="chevronUp"
+            uri="pkg:/images/chevron-up.png"
+            visible="false" />
+        <Poster
+            id="chevronDown"
+            uri="pkg:/images/chevron-down.png"
+            visible="false" />
+    </children>
+</component>

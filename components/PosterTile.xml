@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="PosterTile" extends="Group">
+    <!-- MarkupGrid and RowList only update item components through these
+         read-only interface fields (they never touch `content` or `focused`):
+         itemContent carries the tile's ContentNode, itemHasFocus marks the
+         focused item, and rowHasFocus tells a whole row that its list row has
+         focus. -->
+    <interface>
+        <field id="itemContent" type="node" />
+        <field id="itemHasFocus" type="boolean" />
+        <field id="rowHasFocus" type="boolean" />
+        <!-- RowList writes these with the item's cell size, one per row (the
+             standard width/height item-component fields, updated before index).
+             Home gives channel/tv rows square cells, so the tile must size
+             itself from them rather than assume the fixed 2:3 slab below. -->
+        <field id="width" type="float" onChange="ApplyTileSize" />
+        <field id="height" type="float" onChange="ApplyTileSize" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/components/PosterTile.brs" />
+    <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
+
+    <children>
+        <!-- The artless unit: the face plus the title. Shown while there is no
+             artwork, and HIDDEN the moment the poster reports it has painted, so
+             the face genuinely stops rendering rather than sitting behind the
+             artwork where it still shows through on unfocused rows.
+
+             No width/height on this Group: Group is a RenderableNode and has
+             neither field. Roku warns and discards them — and a group with a
+             bogus extent is what silently broke the LayoutGroup on
+             LinkStremioScreen (see the note there). The children carry the
+             tile's size.
+
+             tileBg carries no focus state — the grid's native focus ring is the
+             only focus indicator — and is never painted with an accent color:
+             an accent-filled full-tile rect showed as a solid mint slab on a
+             focused tile whose art had not rendered yet. -->
+        <Group id="artless">
+            <Rectangle id="tileBg" width="270" height="405" />
+            <Label id="titleText" width="246" height="389" translation="[12, 8]" horizAlign="center" vertAlign="center" wrap="true" font="font:MediumSystemFont" />
+        </Group>
+        <!-- Never hide this poster. It stays visible from the start and paints
+             nothing until it has a bitmap. Gating its visibility on loadStatus
+             deadlocks: the gate waits on the thing the gate prevents, so
+             loadStatus never arrives and every tile stays artless.
+
+             loadWidth/loadHeight are the node's OWN canvas size, and limitSize
+             applies them while the bitmap is decoded into texture memory. This
+             is not cosmetic. Home builds a tile for every meta in every catalog
+             row — a few hundred — and add-on posters arrive at 500x750, which
+             costs 500*750*4 = 1.43MB of texture each even though the node is
+             270x405. That put total demand around 570MB against a budget no
+             device has, so the memory manager evicted continuously and every
+             evicted tile refetched: the poster flashing on the way down and back
+             up the grid. Capped to the node, each is 0.42MB instead.
+
+             The size must come from the node, never from GetUIResolution or
+             GetDisplaySize, and never from the UI resolution. ui_resolutions=fhd
+             means the canvas is 1920x1080 on every device and Roku scales the
+             whole canvas to whatever panel it finds, so a texture the size of
+             its node is already correct on a 720p device that then upscales.
+             Capping to the UI resolution instead made things worse: Roku
+             downsampled the source at load and the canvas upscale resampled it
+             again, and the artwork visibly degraded.
+
+             limitSize rather than scaleToFill because only limitSize caps the
+             texture at load; the others scale at draw time and leave the full
+             bitmap resident. It preserves aspect ratio, and add-on posters are
+             2:3 against this 2:3 tile, so nothing is cropped or letterboxed.
+             The one residual: an add-on that served an off-ratio poster would
+             now letterbox where scaleToFill used to crop, exposing the row
+             behind the tile edges. -->
+        <Poster id="poster" width="270" height="405" loadWidth="270" loadHeight="405" loadDisplayMode="scaleToFit" />
+        <BusySpinner
+            id="loadSpinner"
+            translation="[113, 163]"
+            control="stop" />
+        <!-- Keep the actual title readable even when the artwork has no lettering.
+             This plate follows every cell size and sits above the progress strip. -->
+        <Group id="titleCaption" translation="[0, 325]" visible="false">
+            <Rectangle id="captionBg" width="270" height="72" opacity="0.95" />
+            <Label id="captionText" translation="[12, 6]" width="246" height="60"
+                wrap="true" maxLines="2" horizAlign="left" vertAlign="center">
+                <Font role="font" uri="pkg:/fonts/OpenSans-Bold.ttf" size="24" />
+            </Label>
+        </Group>
+<!-- Optional continue-watching progress bar, painted on top of
+             the poster's bottom edge (8px strip spanning the tile). The dark
+             track is the full tile width and sits flush at x=0; the mint fill's
+             width is scaled in code from itemContent.progress (0..1). Both stay
+             hidden until a screen passes progress. -->
+        <Rectangle id="progressTrack" width="270" height="8" translation="[0, 397]" visible="false" />
+        <Rectangle id="progressFill" width="270" height="8" translation="[0, 397]" visible="false" />
+        <!-- Optional watched-state glyph (eye = done, clock = in
+              progress) on a translucent plate, ~60px top-right above the
+              bar. The plate gives the white glyph something to sit on
+              whatever the artwork under it happens to be. The uri is set in
+              code from itemContent.watchedGlyph; hidden until a screen asks
+              for a badge. -->
+        <Group id="watchedBadge" translation="[208, 8]" visible="false">
+            <Rectangle id="watchedPlate" width="60" height="60" />
+            <Poster id="watchedGlyph" width="48" height="48" loadWidth="48" loadHeight="48" loadDisplayMode="limitSize" translation="[6, 6]" />
+        </Group>
+    </children>
+</component>

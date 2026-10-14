@@ -1,0 +1,149 @@
+' StremioApiStore — the one contact point for account operations at
+' api.strem.io.
+'
+' Every account call the client makes goes through here: library pull
+' (datastoreGet), library write (datastorePut), addon collection pull
+' (addonCollectionGet) and server-side logout. The five sync/push worker tasks
+' used to hand-roll the same dance each in its own scope — construct a fresh
+' Transport on the worker thread, POST to one of these endpoints, then unwrap
+' the response envelope and synthesize a result record. That unwrapping is the
+' subtle part (success is `result` for a get, `result.success = true` for a
+' put, and failures arrive as an `error.message` envelope), so it lives here
+' once, injected with a transport so it is unit-testable in the interpreter.
+'
+' A store is built fresh inside a task's worker (a Transport instance is a
+' class, so it cannot cross the interface as a field, and the request must run
+' on the worker thread anyway):
+'
+'   store = StremioApiStore(Transport(), m.top.authKey)
+'   m.top.result = store.LibraryGet()
+'
+' The envelope messages the UI shows fall back to the human wording passed for
+' each call where the API did not answer an error envelope.
+
+const STREMIO_API_BASE = "https://api.strem.io"
+
+class StremioApiStore
+    sub new(http as object, authKey as string)
+        m.http = http
+        m.authKey = authKey
+    end sub
+
+    ' Pull the account's library items. Returns { ok, items, error }, with items
+    ' as the raw datastoreGet array on success and a failure record otherwise.
+    function LibraryGet() as object
+        res = m.Post("/api/datastoreGet", { authKey: m.authKey, collection: "libraryItem", all: true })
+        items = invalid
+        if res.ok and res.json <> invalid then items = res.json.result
+        if items = invalid or Type(items) <> "roArray"
+            return { ok: false, items: [], error: m.EnvelopeError(res, "Could not sync library"), revokedSession: m.IsSessionRevoked(res) }
+        end if
+        return { ok: true, items: items, error: "", revokedSession: false }
+    end function
+
+    ' Write one full library item back (watch-state or add/remove change; the
+    ' caller's wording is preserved for the failure case). Returns { ok, error }.
+    function LibraryPut(item as object, fallbackError as string) as object
+        res = m.Post("/api/datastorePut", { authKey: m.authKey, collection: "libraryItem", changes: [item] })
+        if m.Success(res)
+            return { ok: true, error: "" }
+        end if
+        return { ok: false, error: m.EnvelopeError(res, fallbackError) }
+    end function
+
+    ' Pull the account's addon collection. Returns { ok, descriptors, error },
+    ' with one { transportUrl, manifest } packet per entry.
+    '
+    ' This is the one call in the client with an unbounded response: the API
+    ' answers with the WHOLE collection and every manifest embedded, and
+    ' update:true asks the server to refresh that collection before it replies.
+    ' It therefore rides the long-timeout path (see Transport.LONG_REQUEST_TIMEOUT_MS,
+    ' added for the streaming-server create call for exactly this reason — a
+    ' default-sized request aborts mid-response and the caller cannot tell an
+    ' abort from an empty account).
+    '
+    ' That distinction cost a device cycle to find. A collection pull that ran
+    ' out of time returned { ok: false } exactly like a real API refusal, the
+    ' caller counted zero adds, and MainScene skipped RebuildRows — so the
+    ' screen kept rendering the pre-login rows and the app looked healthy. The
+    ' library pull beside it is small and always fit, which is what made the
+    ' failure look like a Stremio-session problem rather than a timeout.
+    function AddonCollectionGet() as object
+        res = m.PostLong("/api/addonCollectionGet", { type: "AddonCollectionGet", authKey: m.authKey, update: true })
+        result = invalid
+        if res.ok and res.json <> invalid then result = res.json.result
+        if result = invalid or result.addons = invalid or Type(result.addons) <> "roArray"
+            return { ok: false, descriptors: [], error: m.EnvelopeError(res, "Could not sync addons"), revokedSession: m.IsSessionRevoked(res) }
+        end if
+        descriptors = []
+        for each addon in result.addons
+            packet = { transportUrl: "", manifest: invalid }
+            if addon.transportUrl <> invalid then packet.transportUrl = addon.transportUrl
+            if addon.manifest <> invalid then packet.manifest = addon.manifest
+            descriptors.Push(packet)
+        end for
+        return { ok: true, descriptors: descriptors, error: "", revokedSession: false }
+    end function
+
+    ' Whether an error envelope means the authKey no longer maps to a live
+    ' session — deleted from the account's session list, or expired. This is the
+    ' signal MainScene uses to bounce a dead account session back to the guest
+    ' gate. Mirrors EnvelopeError's guard (a transport failure never yields an
+    ' envelope anyway), and the message match is conservative: "session" must
+    ' pair with one of the revoke-style phrases, so generic server failures can
+    ' never trip a logout. Matches case-insensitively.
+    function IsSessionRevoked(res as object) as boolean
+        if res = invalid or not res.ok or res.json = invalid or res.json.error = invalid or res.json.error.message = invalid then return false
+        message = res.json.error.message
+        if Type(message) <> "roString" and Type(message) <> "String" then return false
+        text = LCase(message)
+        if Instr(1, text, "session") = 0 then return false
+        revokePhrases = ["does not exist", "not found", "invalid", "expired", "revoked", "logged out"]
+        for each phrase in revokePhrases
+            if Instr(1, text, phrase) > 0 then return true
+        end for
+        return false
+    end function
+
+    ' Best-effort server-side logout. A blank authKey short-circuits to success —
+    ' there is nothing to revoke. Returns { ok, error }.
+    function Logout() as object
+        if m.authKey = invalid or m.authKey = ""
+            return { ok: true, error: "" }
+        end if
+        res = m.Post("/api/logout", { type: "Logout", authKey: m.authKey })
+        if m.Success(res)
+            return { ok: true, error: "" }
+        end if
+        return { ok: false, error: m.EnvelopeError(res, "Could not log out of the account") }
+    end function
+
+    ' POST one endpoint under the API base. The transport instance is injected,
+    ' so tests drive these calls through ScriptedTransport like every store.
+    private function Post(endpoint as string, body as object) as object
+        return m.http.Post(STREMIO_API_BASE + endpoint, body)
+    end function
+
+    ' The long-window twin of Post, for the calls whose response can be large or
+    ' whose server-side work runs long. Only AddonCollectionGet uses it today.
+    private function PostLong(endpoint as string, body as object) as object
+        return m.http.PostLong(STREMIO_API_BASE + endpoint, body)
+    end function
+
+    ' A datastorePut/logout response is a success when the envelope carries
+    ' result.success. Reads only platform globals and m, so it resolves from any
+    ' scope the store is constructed in.
+    private function Success(res as object) as boolean
+        return res <> invalid and res.json <> invalid and res.json.result <> invalid and res.json.result.success = true
+    end function
+
+    ' The error envelope's message when the API answered one, else the caller's
+    ' fallback wording. The res.ok guard mirrors every pre-refactor task: an
+    ' HTTP failure never surfaces an error envelope even when a body parsed.
+    private function EnvelopeError(res as object, fallback as string) as string
+        if res <> invalid and res.ok and res.json <> invalid and res.json.error <> invalid and res.json.error.message <> invalid
+            return res.json.error.message
+        end if
+        return fallback
+    end function
+end class

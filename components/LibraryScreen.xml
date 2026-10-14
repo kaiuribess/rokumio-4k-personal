@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="LibraryScreen" extends="Screen">
+    <!-- Library: the saved items for the current session. Two chips (Type · Sort)
+         sit above a poster grid, the same dropdown pattern DiscoverScreen uses:
+         OK on a chip opens the menu of that chip's options — Up/Down to move,
+         OK to pick, Back to dismiss. Type filters the whole library by
+         All/Movies/Series; Sort orders it by Recently added / A-Z / Z-A /
+         Watched (items with a resume point first — most recent first — then the
+         rest by name). All data is local to LibraryStore, so nothing is fetched;
+         a filter change only re-slices what is already there. OK on a result
+         publishes a pushRequest the Scene routes to Details. -->
+    <interface>
+        <!-- The one action Library reports upward: a push request. -->
+        <field id="pushRequest" type="assocarray" alwaysNotify="true" />
+
+        <!-- Screen contract: called by ScreenStack for show/hide/focus/back.
+             RefreshRows is the Scene's poke to re-slice after a background
+             library sync lands while this screen is top. -->
+        <function name="OnEnter" />
+        <function name="OnExit" />
+        <function name="OnBackPressed" />
+        <function name="RefreshRows" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/components/LibraryScreen.brs" />
+    <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
+    <script type="text/brightscript" uri="pkg:/source/core/TileSize.bs" />
+
+    <children>
+        <Rectangle id="libraryBg" width="1920" height="1080" color="0x0" />
+        <Label
+            id="libraryTitle"
+            translation="[150, 48]"
+            width="1660"
+            height="70"
+            text="Library"
+            font="font:LargeBoldSystemFont" />
+        <Label
+            id="librarySub"
+            translation="[150, 128]"
+            width="1660"
+            height="40"
+            text="OK on a chip to open its menu · Up/Down to reach the results · Back to exit · * Focus filters"
+            font="font:SmallSystemFont" />
+
+        <Label
+            id="libraryStatus"
+            translation="[150, 176]"
+            width="1660"
+            height="40"
+            font="font:SmallSystemFont" />
+
+        <!-- Current filter summary, e.g. "All · Recently added". -->
+        <Label
+            id="libraryHeader"
+            translation="[150, 300]"
+            width="1660"
+            height="40"
+            font="font:MediumSystemFont" />
+
+        <!-- Saved items chunked into poster rows of 5 so the RowList
+             clips/scrolls vertically. Same PosterTile contract as Home and
+             Discover. One row per chunk; the grid is rebuilt only when a filter
+             or sort changes, so the RowList keeps its own scroll while the
+             library (and the rest of the state) stays put. -->
+        <RowList
+            id="libraryGrid"
+            translation="[150, 352]"
+            numRows="1"
+            itemSize="[1660, 405]"
+            itemSpacing="[0, 18]"
+            rowItemSize="[[270, 405]]"
+            rowItemSpacing="[[18, 0]]"
+            showRowLabel="false"
+            drawFocusFeedback="true"
+            itemComponentName="PosterTile" />
+
+        <!-- The filter chips + dropdown (FilterBar). The component owns the chip
+             row, the option menu and their geometry; the screen supplies the
+             chip options and the commit effect. Declared last (a custom
+             component renders in its own pass, in declaration order) so the
+             dropdown paints over the results grid; the chip row at y 232 does
+             not overlap the grid at y 342, so ordering it after is harmless. -->
+        <FilterBar id="filterBar" translation="[150, 232]" />
+    </children>
+</component>

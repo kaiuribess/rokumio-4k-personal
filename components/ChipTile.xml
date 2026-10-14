@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="ChipTile" extends="Group">
+    <!-- Focusable label tile used by single-row RowLists: season chips and the
+         movie action buttons. RowList drives it through the same read-only
+         interface fields as PosterTile (itemContent / itemHasFocus /
+         rowHasFocus). Text comes from itemContent.title. -->
+    <interface>
+        <field id="itemContent" type="node" />
+        <field id="itemHasFocus" type="boolean" />
+        <field id="rowHasFocus" type="boolean" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/components/ChipTile.brs" />
+    <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
+
+    <children>
+        <!-- chipBorder is the frame, chipFace the inset face so focus draws a
+             border instead of painting over the chip. -->
+        <Rectangle id="chipFace" width="232" height="48" translation="[4, 4]" />
+        <Label
+            id="chipText"
+            width="224"
+            height="40"
+            translation="[8, 8]"
+            horizAlign="center"
+            vertAlign="center"
+            font="font:MediumSystemFont" />
+    </children>
+</component>

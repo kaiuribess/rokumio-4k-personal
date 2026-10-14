@@ -1,0 +1,6 @@
+<component name="ChipContent" extends="ContentNode">
+    <interface>
+        <field id="width" type="int" />
+        <field id="height" type="int" />
+    </interface>
+</component>
