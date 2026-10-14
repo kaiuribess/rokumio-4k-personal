@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component name="MainScene" extends="Scene">
     <interface>
+        <field id="accountGeneration" type="integer" value="0" />
         <field id="exitApp" type="boolean" alwaysNotify="true" value="false" />
         <!-- Every dialog in the app is shown by assigning it here and dismissed
              by assigning invalid. The Scene only renders this slot if the field
@@ -56,6 +57,7 @@
     <script type="text/brightscript" uri="pkg:/source/stores/SubtitlesStore.bs" />
     <script type="text/brightscript" uri="pkg:/source/util/VoiceTransport.brs" />
     <script type="text/brightscript" uri="pkg:/components/MainScene.brs" />
+    <script type="text/brightscript" uri="pkg:/components/AccountWork.brs" />
     <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
 
     <children>
@@ -88,5 +90,6 @@
              One-shot and restarted per publish, so a burst of position reports
              coalesces into a single launch. -->
         <Timer id="watchStatePump" duration="1" repeat="false" />
+        <Timer id="persistenceTick" duration="10" repeat="true" />
     </children>
 </component>

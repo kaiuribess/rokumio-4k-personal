@@ -75,6 +75,8 @@ sub init()
     m.segments = []
     m.epMetaTask = invalid
     m.selectionTask = invalid
+    m.recoveryExcluded = []
+    m.recoveryRound = 0
     m.autoPlayEnabled = false
     m.autoPlaySent = false
     m.prefetchNode = invalid
@@ -98,6 +100,7 @@ function OnEnter(params as object) as void
     ' Re-entry after the player pops: params is invalid and the Group was given
     ' focus by the stack. The stream list must take it back.
     if params = invalid
+        if m.accountGeneration <> invalid and AccountEpoch_Read(m.top) <> m.accountGeneration then return
         m.sourcesSuspended = false
         if m.reloadNeeded = true
             m.reloadNeeded = false
@@ -146,7 +149,10 @@ function OnEnter(params as object) as void
 
     CancelStreamsLoad()
     CancelEpisodeLoad()
+    m.accountGeneration = AccountEpoch_Read(m.top)
     m.params = params
+    m.recoveryExcluded = []
+    m.recoveryRound = 0
     m.fourKOnly = PlaybackPreferences(m.stores,params).fourKOnly
     m.autoPlayEnabled = params.autoPlay = true
     m.autoPlaySent = false
@@ -315,7 +321,8 @@ sub LaunchProviderSources(index as integer)
     m.loadTasks[index] = AsyncTask_Launch(m.top, "StreamsLoaderTask", "onStreamsLoaded", {
         metaType:ParamString(m.params.metaType), videoId:ParamString(m.params.videoId),
         addonAddress:provider.address, providerIndex:index, providerName:provider.name,
-        providerId:provider.id, loadToken:m.loadToken, audioMode:m.audioMode
+        providerId:provider.id, loadToken:m.loadToken, audioMode:m.audioMode,
+        candidateLimit:CinemaProviderCountBudget(m.providers.Count()),candidateByteLimit:CinemaProviderByteBudget(m.providers.Count())
     }, "streamsLoader" + m.loadToken + "_" + index.ToStr())
 end sub
 
@@ -355,6 +362,7 @@ sub ApplyProviderSources(index as integer, result as dynamic)
 end sub
 
 sub onSourcePrefetchChanged()
+    if m.accountGeneration <> invalid and AccountEpoch_Read(m.top) <> m.accountGeneration then return
     if m.loadToken = "" or m.prefetchNode = invalid or m.prefetchContext = invalid then return
     context = SourcePrefetch_Context(m.stores, m.params)
     if context = invalid or context.key <> m.prefetchContext.key
@@ -405,18 +413,17 @@ sub onAutomaticGrace()
 end sub
 
 sub MaybeStartAutomaticPlayback()
+    if m.accountGeneration <> invalid and AccountEpoch_Read(m.top) <> m.accountGeneration then return
     if not m.top.screenActive or m.sourcesSuspended = true then return
     if m.autoPlayEnabled <> true or m.autoPlaySent = true then return
     if m.selectionTask <> invalid then return
     if m.selectionRevision = m.sourceRevision then return
-    pool = []
+    groups = []
     readyCount = 0
     if m.providers <> invalid
         for each provider in m.providers
             if Type(provider.streams) = "roArray"
-                for each stream in provider.streams
-                    pool.Push(stream)
-                end for
+                groups.Push(provider.streams)
             end if
             if Type(provider.readyStreams) = "roArray" then readyCount = readyCount + CinemaFilterReadyStreams(provider.readyStreams,m.fourKOnly).Count()
         end for
@@ -439,7 +446,7 @@ sub MaybeStartAutomaticPlayback()
     m.selectionRevision = m.sourceRevision
     if m.selectionSequence = invalid then m.selectionSequence = 0
     m.selectionSequence = m.selectionSequence + 1
-    m.selectionTask = AsyncTask_Launch(m.top, "SourceSelectionTask", "onAutomaticSourcesReady", {streams:pool,videoId:ParamString(m.params.videoId),audioMode:CurrentAudioMode(),fourKOnly:m.fourKOnly,loadToken:m.loadToken}, "automaticSources" + m.loadToken + "_" + ParamString(m.selectionSequence))
+    m.selectionTask = AsyncTask_Launch(m.top, "SourceSelectionTask", "onAutomaticSourcesReady", {providerGroups:groups,excludedUrls:m.recoveryExcluded,videoId:ParamString(m.params.videoId),audioMode:CurrentAudioMode(),fourKOnly:m.fourKOnly,loadToken:m.loadToken}, "automaticSources" + m.loadToken + "_" + ParamString(m.selectionSequence))
 end sub
 
 sub onAutomaticSourcesReady(event as object)
@@ -470,7 +477,7 @@ sub PushAutomaticPlayer(first as object, candidates as object, remembered = fals
     serverAddress = ""
     prefs = PlaybackPreferences(m.stores,m.params)
     if m.stores <> invalid then serverAddress = m.stores.settings.callFunc("SettingsGetServerAddress")
-    m.top.pushRequest = {screen:"playerScreen",params:{stream:first,candidates:candidates,rememberedSource:remembered,fourKOnly:m.fourKOnly = true,serverAddress:serverAddress,audioMode:CurrentAudioMode(),diagnostic:m.params.diagnostic = true,metaType:m.params.metaType,metaId:m.params.metaId,videoId:m.params.videoId,season:m.params.season,episode:m.params.episode,position:m.params.position,name:m.headTitle.text,poster:m.params.poster,posterShape:m.params.posterShape,logo:m.params.logo,background:m.params.background,addonAddress:m.params.addonAddress,seriesMeta:m.params.seriesMeta,autoNextEpisode:prefs.autoNextEpisode,autoSourceRetry:prefs.autoSourceRetry,waitForProviders:prefs.waitForProviders}}
+    m.top.pushRequest = {screen:"playerScreen",params:{stream:first,candidates:candidates,excludedUrls:m.recoveryExcluded,recoveryRound:m.recoveryRound,rememberedSource:remembered,fourKOnly:m.fourKOnly = true,serverAddress:serverAddress,audioMode:CurrentAudioMode(),diagnostic:m.params.diagnostic = true,metaType:m.params.metaType,metaId:m.params.metaId,videoId:m.params.videoId,season:m.params.season,episode:m.params.episode,position:m.params.position,name:m.headTitle.text,poster:m.params.poster,posterShape:m.params.posterShape,logo:m.params.logo,background:m.params.background,addonAddress:m.params.addonAddress,seriesMeta:m.params.seriesMeta,autoNextEpisode:prefs.autoNextEpisode,autoSourceRetry:prefs.autoSourceRetry,waitForProviders:prefs.waitForProviders}}
 end sub
 
 ' A single provider's stream list landed (or failed). The task reports which
@@ -950,6 +957,8 @@ end sub
 ' for automatic Play must not interrupt it; provider results can keep loading.
 sub DisableAutomaticForManualBrowse()
     CancelAutomaticGrace()
+    m.recoveryExcluded = []
+    m.recoveryRound = 0
     m.autoPlayEnabled = false
     m.autoPlaySent = true
     if m.selectionTask <> invalid
@@ -1294,3 +1303,21 @@ end sub
 sub BlurFocus()
     SuspendSourceLoading()
 end sub
+
+' Prepare while Player is still shown. Stack re-entry resumes queued work;
+' only an exhausted provider batch is refreshed, with at most two auto rounds.
+function PrepareSourceRecovery(request as dynamic) as boolean
+    if Type(request) <> "roAssociativeArray" or m.params = invalid then return false
+    if request.videoId <> m.params.videoId then return false
+    if request.round < 1 or request.round > 2 then return false
+    m.recoveryRound = request.round
+    m.recoveryExcluded = request.excludedUrls
+    if request.manual = true then m.recoveryExcluded = []
+    m.params.position = request.position
+    m.autoPlayEnabled = true
+    m.autoPlaySent = false
+    m.selectionRevision = -1
+    CancelAutomaticGrace()
+    if m.pendingCount = 0 or request.manual = true then m.reloadNeeded = true
+    return true
+end function

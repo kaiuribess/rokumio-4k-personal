@@ -31,7 +31,7 @@ assert.match(read('components/SourcePrefetchTask.xml'), /id="providerIndex" type
 const isolated = path.join(root,'out-test','source-prefetch');
 fs.mkdirSync(isolated,{recursive:true});
 const file = path.join(isolated,'source-prefetch.brs');
-fs.writeFileSync(file,[read('tests/harness.brs'),read('source/util/CinemaStreams.brs') + '\n' + read('source/util/AddonDiagnostics.brs'), read('source/util/PlaybackPreferences.brs'),read('source/util/SourceMemory.brs'),read('source/util/ProviderPriority.brs'),read('source/util/SourcePrefetch.brs').replace('ProviderPriority_Key(addon, hashFn)', 'ProviderPriority_Key(addon, PrefetchTest_PriorityHash)'),coordinator,screen,details,episodes,task,normalLoader,read('tests/source-prefetch.test.brs')].join('\n'));
+fs.writeFileSync(file,[read('tests/harness.brs'),read('source/util/AccountEpoch.brs'),read('source/util/CinemaStreams.brs') + '\n' + read('source/util/AddonDiagnostics.brs'), read('source/util/PlaybackPreferences.brs'),read('source/util/SourceMemory.brs'),read('source/util/ProviderPriority.brs'),read('source/util/SourcePrefetch.brs').replace('ProviderPriority_Key(addon, hashFn)', 'ProviderPriority_Key(addon, PrefetchTest_PriorityHash)'),coordinator,screen,details,episodes,task,normalLoader,read('tests/source-prefetch.test.brs')].join('\n'));
 const result = spawnSync(process.execPath,[path.join(root,'node_modules/@rokucommunity/brs/bin/cli.js'),'--root',isolated,file],{cwd:isolated,encoding:'utf8'});
 process.stdout.write(result.stdout||''); process.stderr.write(result.stderr||'');
 process.exit(result.status===0 && !(result.stderr||'').trim() && /RESULT: PASS/.test(result.stdout||'') ? 0 : 1);

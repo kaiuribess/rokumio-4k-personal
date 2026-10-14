@@ -2,13 +2,13 @@
 
 A native Roku client with a dark red interface for browsing Stremio-compatible catalogs, searching movies and shows, and playing compatible direct streams with the Roku remote. This community derivative adds English audio selection, projector/surround preferences, clearer source cards, automatic source recovery, next-episode playback, and add-on checks. The repository and ZIP filename remain `rokumio-4k-personal` so existing links and build instructions continue to work.
 
-**Version 0.5.17 is an experimental community release.** Software tests and package validation pass. The new screens have authoring previews, but this version has not been installed or tested on a physical Roku. It cannot guarantee that every provider file plays, has English audio, or is genuine 4K.
+**Version 0.5.18 is an experimental community release.** Software tests and package validation pass. The new screens have authoring previews, but this version has not been installed or tested on a physical Roku. It cannot guarantee that every provider file plays, has English audio, or is genuine 4K.
 
-**[Download the Roku install ZIP — 0.5.17](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.17/rokumio-4k-personal-0.5.17.zip)**
+**[Download the Roku install ZIP — 0.5.18](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.18/rokumio-4k-personal-0.5.18.zip)**
 
 Upload that ZIP without extracting it. GitHub's green Code button and “Source code” archives are for developers; they are not the Roku install package.
 
-[Release notes and checksum](https://github.com/kaiuribess/rokumio-4k-personal/releases/tag/v0.5.17) · [Installation](docs/INSTALL.md) · [Add-on checks](docs/ADDON_CHECKS.md) · [Playback and 4K](docs/PLAYBACK.md) · [Development](docs/DEVELOPMENT.md) · [Changes](CHANGELOG.md)
+[Release notes and checksum](https://github.com/kaiuribess/rokumio-4k-personal/releases/tag/v0.5.18) · [Installation](docs/INSTALL.md) · [Add-on checks](docs/ADDON_CHECKS.md) · [Playback and 4K](docs/PLAYBACK.md) · [Development](docs/DEVELOPMENT.md) · [Changes](CHANGELOG.md)
 
 ## What you can do
 

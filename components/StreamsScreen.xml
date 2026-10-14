@@ -15,11 +15,13 @@
          OK on a card resolves playback and pushes the PlayerScreen; resolution
          failures (e.g. torrent streams without a streaming server) surface in
          the status line. -->
+    <script type="text/brightscript" uri="pkg:/source/util/AccountEpoch.brs" />
     <interface>
         <field id="pushRequest" type="assocarray" alwaysNotify="true" />
 
         <function name="OnEnter" />
         <function name="OnExit" />
+        <function name="PrepareSourceRecovery" />
         <function name="OnBackPressed" />
     </interface>
 

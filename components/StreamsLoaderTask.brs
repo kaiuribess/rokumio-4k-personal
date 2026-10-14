@@ -19,7 +19,7 @@ sub load()
         error = ""
         answer = playback.Streams(m.top.addonAddress, m.top.metaType, m.top.videoId)
         if answer.ok and answer.streams <> invalid
-            for each stream in answer.streams
+            for each stream in CinemaBudgetStreams(answer.streams,m.top.candidateLimit,m.top.candidateByteLimit)
                 if Type(stream) <> "roAssociativeArray" then continue for
                 ' A public provider identity, never its configured secret path.
                 host = LCase(m.top.addonAddress).Split("://")
@@ -43,7 +43,7 @@ sub load()
         m.top.result = {
             streams: []
             readyStreams: []
-            error: e.message
+            error: "Source response could not be processed"
             providerIndex: m.top.providerIndex
             providerName: m.top.providerName
         }

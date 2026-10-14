@@ -134,7 +134,10 @@ class StremioApiStore
     ' result.success. Reads only platform globals and m, so it resolves from any
     ' scope the store is constructed in.
     private function Success(res as object) as boolean
-        return res <> invalid and res.json <> invalid and res.json.result <> invalid and res.json.result.success = true
+        if Type(res) <> "roAssociativeArray" or res.ok <> true then return false
+        if Type(res.json) <> "roAssociativeArray" then return false
+        if Type(res.json.result) <> "roAssociativeArray" then return false
+        return res.json.result.success = true
     end function
 
     ' The error envelope's message when the API answered one, else the caller's

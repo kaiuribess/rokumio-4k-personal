@@ -156,6 +156,7 @@ sub PrefetchPump()
         task = AsyncTask_Launch(m.top,kind,"onPrefetchLoaded",{
             metaType:m.context.metaType,videoId:m.context.videoId,audioMode:m.context.audioMode,
             addonAddress:provider.address,providerId:provider.id,providerName:provider.name,
+            candidateLimit:CinemaProviderCountBudget(m.context.providers.Count()),candidateByteLimit:CinemaProviderByteBudget(m.context.providers.Count()),
             providerIndex:i,loadToken:token
         },"sourceLookup"+token+"_"+i.ToStr()+"_"+m.workerSequence.ToStr())
         m.tasks[i] = task

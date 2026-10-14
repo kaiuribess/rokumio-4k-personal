@@ -27,6 +27,7 @@ async function writeCombinedScript() {
         'tests/transport.test.brs',
         'tests/settingsstore.test.brs',
         'tests/authstore.test.brs',
+        'tests/reliability-stores.test.brs',
         'tests/addonsstore.test.brs',
         'tests/addonsync.test.brs',
         'tests/stremioauthstore.test.brs',
@@ -64,6 +65,7 @@ const transpiled = [
     path.join(stagingDir, 'source', 'bslib.brs'),
     path.join(stagingDir, 'source', 'core', 'ScreenStack.brs'),
     path.join(stagingDir, 'source', 'stores', 'Transport.brs'),
+    path.join(stagingDir, 'source', 'stores', 'RegistryIO.brs'),
     path.join(stagingDir, 'source', 'stores', 'SettingsStore.brs'),
     path.join(stagingDir, 'source', 'stores', 'AuthStore.brs'),
     path.join(stagingDir, 'source', 'stores', 'AddonsStore.brs'),
@@ -340,7 +342,7 @@ function checkStoreHandoffContract() {
     const STORES = ['addons', 'auth', 'episodes', 'library', 'settings', 'time', 'watch'];
     const defined = new Set([...hostBrs.matchAll(/^(?:function|sub)\s+(\w+)\s*\(/gm)].map(m => m[1]));
     const declared = new Set([...hostXml.matchAll(/<function\s+name="([^"]+)"/g)].map(m => m[1]));
-    const own = new Set(['EffectiveSessionType', 'SwitchSession', 'LibrarySessionType']);
+    const own = new Set(['EffectiveSessionType', 'SwitchSession', 'LibrarySessionType', 'RetryPersistence', 'SettingsSetPlaybackOption']);
     for (const m of hostBrs.matchAll(/^function\s+(\w+)\s*\([^)]*\)(?: as \w+)?\s*$/gm)) {
         const name = m[1];
         if (own.has(name)) continue;
@@ -1023,7 +1025,7 @@ function checkStremioProvisioningContract() {
     let ok = true;
 
     const subBody = (source, name) => {
-        const start = source.indexOf(`sub ${name}()`);
+        const start = source.indexOf(`sub ${name}(`);
         if (start === -1) return '';
         const next = source.indexOf('\nsub ', start + 1);
         return next === -1 ? source.slice(start) : source.slice(start, next);
@@ -1302,7 +1304,7 @@ function checkTransportRetryContract() {
     if (!/const\s+MAX_TRANSPORT_ATTEMPTS\s*=\s*\d+/.test(transport)) {
         err('Transport.bs has no MAX_TRANSPORT_ATTEMPTS — a retry loop without a ceiling hammers a dead host, and no retry at all lets a connection collision fail the fetch');
     }
-    const policy = /function\s+TransportFailureIsRetryable\s*\(\s*status\s+as\s+integer\s*\)\s*as\s+boolean\s*[\s\S]*?return\s+status\s*<\s*0[\s\S]*?end\s+function/.exec(transport);
+    const policy = /function\s+TransportFailureIsRetryable\s*\(\s*status\s+as\s+integer\s*,[^)]*\)\s*as\s+boolean\s*[\s\S]*?return\s+status\s*<\s*0[\s\S]*?end\s+function/.exec(transport);
     if (!policy) {
         err('Transport.bs TransportFailureIsRetryable must retry only negative (transport-level) statuses — an HTTP 404/500 is a real answer, and retrying a timeout (status 0) multiplies a full wait');
     }
@@ -1314,7 +1316,7 @@ function checkTransportRetryContract() {
         if (!/m\._attempt\(request\)/.test(body)) {
             err('Transport.bs client._execute does not call m._attempt — the single round-trip is the thing being retried');
         }
-        if (!/m\._retryable\(result\.status\)/.test(body) || !/m\._retryAfter\(attempt\)/.test(body)) {
+        if (!/m\._retryable\(result\.status,\s*request\.method\)/.test(body) || !/m\._retryAfter\(attempt\)/.test(body)) {
             err('Transport.bs client._execute does not consult the retry policy and backoff — the retry is unconditional or absent');
         }
         if (!/MAX_TRANSPORT_ATTEMPTS/.test(body)) {
@@ -3620,9 +3622,9 @@ function checkWatchStatePushContract() {
     let ok = true;
     const err = (m) => { console.error(m); ok = false; };
     const code = (src) => src.split('\n').map(line => line.split("'")[0]).join('\n');
-    const brs = code(main);
+    const brs = code(main + "\n" + fs.readFileSync(path.join(projectRoot, "components/AccountWork.brs"), "utf8"));
     const body = (name) => {
-        const m = new RegExp(`^(?:sub|function) ${name}\\(\\)`, 'm').exec(brs);
+        const m = new RegExp(`^(?:sub|function) ${name}\\(`, 'm').exec(brs);
         if (!m) return '';
         const lines = brs.slice(m.index).split('\n');
         for (let i = 0; i < lines.length; i++) {
@@ -3691,7 +3693,7 @@ function checkWatchStatePushContract() {
     if (!/NextLibraryWrite\(\)/.test(body('PumpLibraryWrites') || '')) {
         err('MainScene.brs PumpLibraryWrites does not drain the pending edits through NextLibraryWrite — the three write-back kinds would have no single build path');
     }
-    if (!/packet\s*=\s*m\.pendingWatchState\b/.test(body('NextLibraryWrite') || '')) {
+    if (!/payload\s*=\s*job\.payload\b/.test(body('NextLibraryWrite') || '')) {
         err('MainScene.brs NextLibraryWrite no longer takes its packet from m.pendingWatchState — a deferred pump cannot re-read the player node, it can only use the slot the handler left it');
     }
 

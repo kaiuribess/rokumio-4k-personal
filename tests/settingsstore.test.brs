@@ -44,7 +44,7 @@ sub Test_Settings_PlaybackOptions()
     Harness_Ok(not prefs.fourKOnly and prefs.autoNextEpisode and prefs.autoSourceRetry,"malformed stored values use documented defaults")
     Harness_Ok(not prefs.waitForProviders,"malformed comparison preference cannot restore all-provider barrier")
     registry.failWrites=true
-    Harness_Ok(settings.SetPlaybackOption("fourKOnly",false),"refused write retains usable in-session choice")
+    Harness_Ok(not settings.SetPlaybackOption("fourKOnly",false),"refused write is not a durable acknowledgement")
     Harness_Ok(settings.SaveFailed(),"refused preference write is reported")
 end sub
 

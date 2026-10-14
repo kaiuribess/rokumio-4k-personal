@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component name="SourcePrefetchCoordinator" extends="Node">
+    <script type="text/brightscript" uri="pkg:/source/util/CinemaStreams.brs" />
     <interface>
         <field id="revision" type="integer" value="0" alwaysNotify="true" />
         <function name="Prepare" />
+        <function name="PrefetchClear" />
         <function name="Snapshot" />
         <function name="Adopt" />
         <function name="SetPriority" />

@@ -50,6 +50,7 @@ sub init()
     m.playerScreen = m.top.FindNode("playerScreen")
     m.playerScreen.ObserveField("watchStateUpdate", "onWatchStateUpdate")
     m.playerScreen.ObserveField("nextEpisodeRequest", "onNextEpisodeRequest")
+    m.playerScreen.ObserveField("sourceRecoveryRequest","onSourceRecoveryRequest")
 
     ' SettingsScreen, AddonsScreen and SearchScreen are content-focused (no
     ' pushes of their own; Search pushes Details like the others). SearchScreen
@@ -86,6 +87,7 @@ sub init()
     ' device as an unrecoverable app-wide hang when the player published a
     ' position on pause or on leave, because the throw landed inside the player's
     ' Video "state" observer and could not even paint a debugger prompt.
+    InitAccountWork()
     m.pushingLibraryWrite = false
 
     ' The watch-state push is launched off a timer, not off the publisher that
@@ -93,6 +95,9 @@ sub init()
     ' node created on that stack wedges the player (see ScheduleWatchStatePush).
     m.watchStatePump = m.top.FindNode("watchStatePump")
     m.watchStatePump.ObserveField("fire", "onWatchStatePumpFire")
+    m.persistenceTick = m.top.FindNode("persistenceTick")
+    m.persistenceTick.ObserveField("fire","onPersistenceTick")
+    m.persistenceTick.control = "start"
     ' Settings can start the link-code flow; logout reuses the pairing worker.
     ' Both flags are session-flow state with no store counterpart.
     m.loginFromSettings = false
@@ -187,6 +192,7 @@ sub init()
     ' transport's error text, so a clear-by-same-text would leave a stale line
     ' up whenever the wording changed.
     m.addonSyncFaults = []
+    RestoreAccountWrites()
 
     m.homeScreen.callFunc("SetStores", m.storeHost, m.top)
     m.authScreen.callFunc("SetStores", m.storeHost, m.top)
@@ -329,6 +335,7 @@ sub onSettingsAction()
         end if
     end if
     if request = invalid or request.action = invalid then return
+    if request.action = "retryAccountWrites" then RetryAccountWrites():return
     if request.action = "login"
         m.loginFromSettings = true
         StartLinkCodeFlow()
@@ -367,7 +374,7 @@ end sub
 ' the single write-back pump (see PumpLibraryWrites). Here: gate on a stremio
 ' session (guest never touches the API), drop a repeat of the last accepted
 ' update (same video, same position — nothing new), and record the rest in the
-' pending slot. The packet is read from the shared watch-state buffer, not the
+' per-item queue. The packet is read from the shared watch-state buffer, not the
 ' player node, so the deferred pump can still build after the player is popped.
 sub onWatchStateUpdate()
     if m.storeHost = invalid then return
@@ -379,8 +386,8 @@ sub onWatchStateUpdate()
     if packet.position = invalid then return
     key = videoId + "|" + packet.position.ToStr()
     if m.lastPacketKey = key then return
+    if not QueueAccountEdit("watchState",packet) then return
     m.lastPacketKey = key
-    m.pendingWatchState = packet
     ScheduleWatchStatePush()
 end sub
 
@@ -402,7 +409,7 @@ end sub
 '
 ' So the packet is RECORDED here and the push starts one tick later, off the
 ' timer, after the transition has settled. That is safe to defer: the pump reads
-' the packet out of m.pendingWatchState, which lives past the player node, so a
+' the packet out of the scene-owned queue, which lives past the player node, so a
 ' pump that fires after the player was already torn down still has what it needs.
 sub ScheduleWatchStatePush()
     if m.watchStatePump = invalid then
@@ -425,7 +432,7 @@ sub onLibraryChange()
     if m.storeHost.callFunc("AuthGetSession") <> "stremio" then return
     change = m.detailsScreen.libraryChange
     if change = invalid then return
-    m.pendingLibraryChange = change
+    if not QueueAccountEdit("libraryChange",change) then return
     PumpLibraryWrites()
 end sub
 
@@ -438,85 +445,11 @@ sub onWatchedChange()
     if m.storeHost.callFunc("AuthGetSession") <> "stremio" then return
     change = m.episodesScreen.watchedChange
     if change = invalid then return
-    m.pendingWatchedChange = change
+    if not QueueAccountEdit("watched",change) then return
     PumpLibraryWrites()
 end sub
 
-' ---- the account-library write-back pump ------------------------------------
-'
-' Every stremio account edit — the player's position, the episode browser's
-' watched marks, Details' add/remove toggle — flows through ONE worker and one
-' build path. Two reasons this is a single pipeline and not three:
-'
-'   Serialization. The store commits each built item back into its cached
-'   library (LibraryStore.CommitStremioItem, mirroring stremio-core's
-'   update_and_push_items_to_storage). Two pushes overlapping would both clone
-'   the same stale copy and the later one would revert the earlier — exactly the
-'   bug closed here, where an add-to-library push wiped the watched bitfield a
-'   moment after it was written. One worker at a time means every build reads
-'   what the previous push committed, and it keeps the device's low concurrent-
-'   connection ceiling in view.
-'
-'   Consistency. The three edits differ only in the patch they apply; the
-'   resolve-clone-commit build and the datastorePut worker are identical, so
-'   there is one place to get the write-back right.
-'
-' Position and watched each keep a single pending slot (a newer edit supersedes
-' an unstarted older one); membership keeps the newest toggle. NextLibraryWrite
-' drains them in a fixed order and hands back the built item.
-sub PumpLibraryWrites()
-    if m.pushingLibraryWrite then return
-    if m.storeHost = invalid then return
-    job = NextLibraryWrite()
-    if job = invalid then return
-    task = AsyncTask_Launch(m.top, "LibraryPutTask", "onLibraryWriteResult", {
-        authKey: m.storeHost.callFunc("AuthGetAuthKey")
-        item: job.item
-    }, "libraryPutTask")
-    m.libraryWriteTask = task
-    m.inFlightLibraryWrite = job
-    m.pushingLibraryWrite = true
-end sub
-
-' Consume the next pending edit, highest priority first, and build its
-' LibraryItem through the store (which also commits it into the cached library).
-' Returns { item, kind } or invalid when nothing is pending. A slot whose build
-' comes back invalid (guest session, malformed packet) is simply dropped and the
-' next one tried.
-function NextLibraryWrite() as dynamic
-    if m.pendingWatchState <> invalid
-        packet = m.pendingWatchState
-        m.pendingWatchState = invalid
-        item = m.storeHost.callFunc("LibraryBuildWatchStateItem", packet)
-        if item <> invalid then return { item: item, kind: "watchState" }
-    end if
-    if m.pendingWatchedChange <> invalid
-        change = m.pendingWatchedChange
-        m.pendingWatchedChange = invalid
-        item = m.storeHost.callFunc("LibraryBuildWatchedStateItem", change)
-        if item <> invalid then return { item: item, kind: "watched" }
-    end if
-    if m.pendingLibraryChange <> invalid
-        change = m.pendingLibraryChange
-        m.pendingLibraryChange = invalid
-        item = m.storeHost.callFunc("LibraryBuildLibraryChangeItem", change.metaId, change.metaType, change.name, change.poster, change.added)
-        if item <> invalid then return { item: item, kind: "libraryChange" }
-    end if
-    return invalid
-end function
-
-' One push settled. Free the worker and pump whatever arrived meanwhile.
-' Failures are non-fatal: the store already committed the change to its cached
-' library, so the local view is authoritative and the next account sync
-' re-adopts whatever the server settled on.
-sub onLibraryWriteResult()
-    task = m.libraryWriteTask
-    m.libraryWriteTask = invalid
-    m.pushingLibraryWrite = false
-    if task <> invalid then AsyncTask_Reap(task, m.top, false)
-    m.inFlightLibraryWrite = invalid
-    PumpLibraryWrites()
-end sub
+' AccountWork.brs owns generation checks, the durable outbox and write pump.
 
 ' The exit dialog signals dismissal through wasClosed (Back, Home, or its own
 ' close field). Clear the Scene's dialog slot so the next Back presents it
@@ -609,7 +542,10 @@ end function
 ' forgetting a fan-out here. Guest and stremio stay under separate registry keys
 ' with a clear-and-reload swap, so the two sessions never mix.
 sub ReconcileSession()
+    ResetAccountWork()
     if m.storeHost <> invalid then m.storeHost.callFunc("SwitchSession", EffectiveSessionType())
+    RestoreAccountWrites()
+    if m.homeScreen <> invalid then m.homeScreen.callFunc("RebuildRows")
 end sub
 
 ' The AuthScreen published its first-run choice.
@@ -634,7 +570,7 @@ end sub
 ' screen can (re)bind, resetting its spinner and countdown.
 function NewPairingTask() as object
     task = CreateObject("roSGNode", "LinkStremioTask")
-    task.id = "linkStremioTask"
+    task.id = NextAccountWorkerId("linkStremio")
     m.top.AppendChild(task)
     m.linkStremioTask = task
     m.linkStremioScreen.taskNode = task
@@ -669,6 +605,7 @@ sub onLinkCodeAction()
         return
     end if
     if request.action = "completeLogin"
+        if m.linkStremioTask = invalid or request.taskIdentity <> m.linkStremioTask.id then return
         if m.storeHost <> invalid then m.storeHost.callFunc("AuthLoginStremio", request.authKey, request.user)
         ReconcileSession()
         m.revokedSessionHandled = false
@@ -714,7 +651,7 @@ sub ShowLogoutConfirm()
     dialog = CreateObject("roSGNode", "StandardMessageDialog")
     dialog.id = "logoutConfirmDialog"
     dialog.title = "Log out?"
-    dialog.message = ["This signs the Stremio account out of this device. Your saved items and continue watching stay here; the library re-syncs if you log back in."]
+    dialog.message = ["This signs the Stremio account out of this device. Account caches are removed from this device. Your Stremio library stays on your account; guest data stays separate."]
     dialog.buttons = ["Log out", "Cancel"]
     dialog.observeField("buttonSelected", "onLogoutChoice")
     dialog.observeField("wasClosed", "onLogoutDialogClosed")
@@ -852,20 +789,16 @@ end sub
 ' a title with no poster and no description. The only recovery was to log out
 ' and re-pair the account. One idempotent GET is now the recovery.
 sub StartAddonSync()
-    fields = {}
+    if m.addonSyncTask <> invalid or m.storeHost = invalid then return
+    if m.storeHost.callFunc("AuthGetSession") <> "stremio" then return
+    fields = {accountGeneration:AccountGeneration()}
     if m.storeHost <> invalid then fields.authKey = m.storeHost.callFunc("AuthGetAuthKey")
-    task = AsyncTask_Launch(m.top, "AddonSyncTask", "onAddonSyncResult", fields, "addonSyncTask", "onAddonSyncFinished")
+    task = AsyncTask_Launch(m.top, "AddonSyncTask", "onAddonSyncResult", fields, NextAccountWorkerId("addonSync"), "onAddonSyncFinished")
     m.addonSyncTask = task
 end sub
 
-' One sync settled. Register every descriptor through AddonsStore (duplicates
-' are skipped, so re-syncing is idempotent) and rebuild Home's rows from the
-' new catalog set. Partial failures are non-fatal — whatever synced registers
-' and the session proceeds.
-'
-' Every outcome names itself in the fault strip, carrying the transport's own
-' error text where there is one, so the next occurrence is a diagnosis instead of
-' an inference.
+' Reconcile one validated account snapshot, preserving the last usable state
+' on failure. Changed configurations, removals and ordering apply together.
 '
 ' An empty result is NOT one of those outcomes, and treating it as one is what
 ' broke first login. `result` is alwaysNotify with no value, so it can notify
@@ -881,8 +814,9 @@ end sub
 ' So an empty result is declined here and the node is left alone. The authority
 ' on whether the worker really finished without one is onAddonSyncFinished, which
 ' can only fire once the task's sentinel says the worker is done.
-sub onAddonSyncResult()
+sub onAddonSyncResult(event = invalid as dynamic)
     task = m.addonSyncTask
+    if not AccountResultCurrent(task,event) then return
     if task = invalid then return
     result = task.result
     if result = invalid then return
@@ -907,31 +841,12 @@ sub onAddonSyncResult()
         return
     end if
 
-    added = 0
-    skipped = 0
-    failed = 0
-    if result.descriptors <> invalid
-        for each descriptor in result.descriptors
-            if m.storeHost <> invalid
-                outcome = m.storeHost.callFunc("AddonsInstallFromDescriptor", descriptor.transportUrl, descriptor.manifest)
-                if outcome.ok
-                    added = added + 1
-                else if outcome.error = "addon already installed"
-                    skipped = skipped + 1
-                else
-                    failed = failed + 1
-                end if
-            end if
-        end for
+    outcome = m.storeHost.callFunc("AddonsReconcileAccount",result.descriptors)
+    if Type(outcome) <> "roAssociativeArray" or outcome.ok <> true
+        AddAddonSyncFault("Account add-ons were not updated; the snapshot was invalid")
+        PumpPendingLibrarySync()
+        return
     end if
-    print "[addons] sync landed — registered " ; added ; ", already had " ; skipped ; ", rejected " ; failed
-    ' Unconditional, and the condition is deliberately NOT "did this sync install
-    ' anything new". A re-sync of an unchanged account installs nothing, so that
-    ' predicate was false on every run after the first and Home kept the catalog
-    ' set it walked at launch — which, in a stremio session, is usually just the
-    ' built-in seeds. Home compares the add-on set itself and rebuilds only if it
-    ' moved, so the common case costs one in-memory set comparison and no catalog
-    ' walk. See HomeScreen.EnsureCurrentRows.
     if m.homeScreen <> invalid then m.homeScreen.callFunc("EnsureCurrentRows")
     ' The player snapshotted its subtitle providers when it was entered, which on
     ' a cold launch is before this loop has run. Same predicate, same reason: tell
@@ -939,9 +854,6 @@ sub onAddonSyncResult()
     ' the registry is still asked for captions. Inert when no play is in progress —
     ' the player's own m.subtitleParams guard makes it return.
     if m.playerScreen <> invalid then m.playerScreen.callFunc("EnsureSubtitleProviders")
-    if failed > 0
-        AddAddonSyncFault("addon sync: " + failed.ToStr() + " of " + result.descriptors.Count().ToStr() + " add-ons were rejected")
-    end if
     ' A sync that succeeded and still left the registry empty is the exact state
     ' that used to require re-pairing. Name it, so a launch in that state is a
     ' visible fault rather than a session that mysteriously has no catalogs.
@@ -982,8 +894,9 @@ end sub
 ' error packet never landed. It is written into the fault text AND printed,
 ' because the strip is what a fault found later is read from while the print is
 ' what a fault being watched for is caught by.
-sub onAddonSyncFinished()
+sub onAddonSyncFinished(event = invalid as dynamic)
     task = m.addonSyncTask
+    if not AccountResultCurrent(task,event) then return
     if task = invalid then return
 
     ' The spurious alwaysNotify notification. The worker has not finished; its
@@ -1013,6 +926,7 @@ sub ClearAddonSyncFaults()
         end for
     end if
     m.addonSyncFaults = []
+    RestoreAccountWrites()
 end sub
 
 sub AddAddonSyncFault(reason as string)
@@ -1040,9 +954,11 @@ end sub
 
 ' The actual launch, split out so the deferred path can reuse it unchanged.
 sub LaunchLibrarySync()
-    fields = {}
+    if m.librarySyncTask <> invalid or m.storeHost = invalid then return
+    if m.storeHost.callFunc("AuthGetSession") <> "stremio" then return
+    fields = {accountGeneration:AccountGeneration()}
     if m.storeHost <> invalid then fields.authKey = m.storeHost.callFunc("AuthGetAuthKey")
-    task = AsyncTask_Launch(m.top, "LibrarySyncTask", "onLibrarySyncResult", fields, "librarySyncTask")
+    task = AsyncTask_Launch(m.top, "LibrarySyncTask", "onLibrarySyncResult", fields, NextAccountWorkerId("librarySync"))
     m.librarySyncTask = task
 end sub
 
@@ -1059,26 +975,49 @@ end sub
 ' update Home's Continue Watching row in place — the persisted cache (if any)
 ' keeps rendering until then. Failures are non-fatal: on a login the CW row
 ' just stays empty, on a relaunch the persisted cache keeps rendering.
-sub onLibrarySyncResult()
+sub onLibrarySyncResult(event = invalid as dynamic)
     task = m.librarySyncTask
-    m.librarySyncTask = invalid
+    if not AccountResultCurrent(task,event) then return
     if task = invalid then return
     result = task.result
+    if Type(result) <> "roAssociativeArray" then return
+    m.librarySyncTask = invalid
     AsyncTask_Reap(task, m.top, false)
 
     ' A dead account session (revoked/expired server-side) is authoritative:
     ' drop to the guest gate instead of silently limping on a key that can no
     ' longer sync.
-    if result <> invalid and result.revokedSession
+    if result <> invalid and result.revokedSession = true
         HandleRevokedSession()
         return
     end if
 
-    if result = invalid or not result.ok or result.items = invalid
+    if result.ok <> true or Type(result.items) <> "roArray"
+        ReportStoreFault("Account library could not sync. Retry saved changes in Settings.",true)
         return
     end if
+    ReportStoreFault("Account library could not sync. Retry saved changes in Settings.",false)
     if m.storeHost = invalid then return
+    if m.pushingLibraryWrite = true or (m.accountLibraryReady = true and Type(m.accountWrites) = "roArray" and m.accountWrites.Count() > 0) then return
     m.storeHost.callFunc("LibrarySyncFromStremio", result.items)
+    m.accountLibraryReady = true
+    for each job in m.accountWrites
+        if job.kind = "libraryChange"
+            change = job.payload
+            if change.added = true
+                m.storeHost.callFunc("LibraryAddSaved",change.metaId,change.metaType,change.name,change.poster)
+            else
+                m.storeHost.callFunc("LibraryRemoveSaved",change.metaId)
+            end if
+        else if job.kind = "watchState"
+            packet = job.payload
+            season = 0:episode = 0
+            if packet.season <> invalid then season = packet.season
+            if packet.episode <> invalid then episode = packet.episode
+            m.storeHost.callFunc("LibrarySetPosition",packet.videoId,packet.metaId,packet.metaType,season,episode,packet.name,packet.poster,packet.position,packet.duration)
+        end if
+    end for
+    ScheduleWatchStatePush()
     if m.homeScreen <> invalid then m.homeScreen.callFunc("RefreshContinueWatching")
     ' The relaunched-session case can land the sync while the Library screen is
     ' already up: poke its grid so the freshly synced saved set appears without
@@ -1201,7 +1140,7 @@ sub PumpImport()
     if m.import.task <> invalid then return
     if m.import.pending.Count() > 0
         url = m.import.pending.Shift()
-        task = AsyncTask_Launch(m.top, "AddonsInstallTask", "onImportTaskResult", { address: url }, "deepLinkInstall")
+        task = AsyncTask_Launch(m.top, "AddonsInstallTask", "onImportTaskResult", { address: url, accountGeneration:AccountGeneration(), allowLocalHttp:m.storeHost.callFunc("SettingsGetPlaybackOptions").allowLocalHttp = true }, NextAccountWorkerId("deepLinkInstall"))
         m.import.task = task
         return
     end if
@@ -1212,12 +1151,14 @@ end sub
 ' so an already-installed id still comes back ok — the real duplicate gate runs
 ' here, in AddonsStore.Register. That orders the counts: added, skipped
 ' (duplicate/built-in), or failed.
-sub onImportTaskResult()
+sub onImportTaskResult(event = invalid as dynamic)
     if m.import = invalid then return
     task = m.import.task
+    if not AccountResultCurrent(task,event) then return
     if task = invalid then return
-    m.import.task = invalid
     result = task.result
+    if Type(result) <> "roAssociativeArray" then return
+    m.import.task = invalid
     AsyncTask_Reap(task, m.top, false)
 
     resultId = ""
@@ -1377,3 +1318,13 @@ function onKeyEvent(key as string, press as boolean) as boolean
 
     return false
 end function
+
+sub onSourceRecoveryRequest()
+    request = m.playerScreen.sourceRecoveryRequest
+    if Type(request) <> "roAssociativeArray" then return
+    shown = m.stack.top()
+    if shown = invalid or shown.id <> "playerScreen" then return
+    if m.playerScreen.callFunc("CanRecoverSources",request.videoId) <> true then return
+    if m.streamsScreen.callFunc("PrepareSourceRecovery",request) <> true then return
+    m.stack.pop()
+end sub

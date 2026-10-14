@@ -71,7 +71,7 @@ sub load()
         host = LCase(m.top.addonAddress).Split("://")
         providerHost = ""
         if host.Count() > 1 then providerHost = host[1].Split("/")[0].Split("?")[0].Split("#")[0]
-        for each stream in answer.streams
+        for each stream in CinemaBudgetStreams(answer.streams,m.top.candidateLimit,m.top.candidateByteLimit)
             if Type(stream) <> "roAssociativeArray" then continue for
             stream.sourceMemoryProvider = m.top.providerId + "|" + providerHost
             raw.Push(stream)
@@ -87,7 +87,8 @@ sub load()
         streams = SourcePrefetch_LimitStreams(raw, m.top.audioMode, m.top.videoId, memory, now)
         ' Preserve bounded diagnostic facts, not an unlimited private response.
         diagnostics = CinemaSkippedSources(raw)
-        diagnostics.rawCount = raw.Count()
+        diagnostics.rawCount = answer.streams.Count()
+        diagnostics.budgetSkipped = answer.streams.Count() - raw.Count()
         m.top.result = {ok:true, streams:streams, readyStreams:CinemaChooseStreams(streams, false, m.top.audioMode, false), sourceDiagnostics:diagnostics, error:""}
     catch e
         m.top.result = {ok:false}

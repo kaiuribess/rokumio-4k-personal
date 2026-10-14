@@ -14,6 +14,7 @@
         <function name="OnBackPressed" />
     </interface>
 
+    <script type="text/brightscript" uri="pkg:/source/util/AccountEpoch.brs" />
     <script type="text/brightscript" uri="pkg:/source/util/ProviderPriority.brs" />
     <script type="text/brightscript" uri="pkg:/components/EpisodesScreen.brs" />
     <script type="text/brightscript" uri="pkg:/source/util/SourcePrefetch.brs" />

@@ -1,0 +1,91 @@
+' Acknowledged, transactional writes. Budget is deliberately uncompressed;
+' the native 32KiB compressed limit remains authoritative too.
+class RegistryIO
+    sub new(section as object, sectionName as string, budgetCheck = invalid as dynamic)
+        m.section = section
+        m.sectionName = sectionName
+        m.budgetCheck = budgetCheck
+        m.previous = {}
+        m.existed = {}
+        m.failed = false
+    end sub
+
+    function Read(key as string) as string
+        return m.section.Read(key)
+    end function
+
+    function Exists(key as string) as boolean
+        return m.section.Exists(key)
+    end function
+
+    function Bytes(value as string) as integer
+        bytes = CreateObject("roByteArray")
+        bytes.FromAsciiString(value)
+        return bytes.Count()
+    end function
+
+    function Fits(key as string, value as string) as boolean
+        if m.Bytes(value) > 30720 then return false
+        if m.budgetCheck <> invalid then return m.budgetCheck(m.sectionName,key,value)
+        try
+            registry = CreateObject("roRegistry")
+            total = m.Bytes(m.sectionName) + m.Bytes(key) + m.Bytes(value)
+            for each name in registry.GetSectionList()
+                section = CreateObject("roRegistrySection",name)
+                for each storedKey in section.GetKeyList()
+                    if name = m.sectionName and storedKey = key then continue for
+                    total = total + m.Bytes(name) + m.Bytes(storedKey) + m.Bytes(section.Read(storedKey))
+                    if total > 30720 then return false
+                end for
+            end for
+            return total <= 30720
+        catch e
+            return false
+        end try
+    end function
+
+    sub Remember(key as string)
+        if m.existed.DoesExist(key) then return
+        m.existed[key] = m.section.Exists(key)
+        m.previous[key] = m.section.Read(key)
+    end sub
+
+    function Write(key as string, value as string) as boolean
+        if not m.Fits(key,value)
+            m.failed = true
+            return false
+        end if
+        m.Remember(key)
+        result = m.section.Write(key,value) = true
+        if not result then m.failed = true
+        return result
+    end function
+
+    function Delete(key as string) as boolean
+        if not m.section.Exists(key) then return true
+        m.Remember(key)
+        result = m.section.Delete(key) = true
+        if not result then m.failed = true
+        return result
+    end function
+
+    function Flush() as boolean
+        committed = false
+        if not m.failed then committed = m.section.Flush() = true
+        if not committed
+            ' Restore the last acknowledged buffered values. A later flush by
+            ' another section must not silently commit this failed transaction.
+            for each key in m.existed
+                if m.existed[key]
+                    m.section.Write(key,m.previous[key])
+                else
+                    m.section.Delete(key)
+                end if
+            end for
+        end if
+        m.previous = {}
+        m.existed = {}
+        m.failed = false
+        return committed
+    end function
+end class

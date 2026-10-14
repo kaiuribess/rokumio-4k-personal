@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component name="SourcePrefetchTask" extends="Task">
     <interface>
+        <field id="candidateLimit" type="integer" value="256" />
+        <field id="candidateByteLimit" type="integer" value="262144" />
         <field id="metaType" type="string" value="" />
         <field id="videoId" type="string" value="" />
         <field id="addonAddress" type="string" value="" />

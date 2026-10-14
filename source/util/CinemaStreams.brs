@@ -233,3 +233,79 @@ function CinemaCleanSourceLines(stream as object, audioMode as string) as object
     if lines.Count() < 3 then lines.Push("Automatic fallback if this source cannot play")
     return lines
 end function
+
+' Retain only fields the native HTTPS player uses. Labels may be shortened;
+' delivery URLs/headers are rejected when oversized, never silently truncated.
+function CinemaBudgetStreams(raw as dynamic, countLimit = invalid as dynamic, byteLimit = invalid as dynamic) as object
+    if countLimit = invalid then countLimit = 256
+    if byteLimit = invalid then byteLimit = 262144
+    if countLimit < 1 or countLimit > 256 then countLimit = 256
+    if byteLimit < 1 or byteLimit > 262144 then byteLimit = 262144
+    result = []
+    if Type(raw) <> "roArray" then return result
+    used = 0
+    for each item in raw
+        if Type(item) <> "roAssociativeArray" then continue for
+        stream = {}
+        unsafe = false
+        for each field in ["url","infoHash","sourceMemoryProvider","streamFormat"]
+            value = item[field]
+            if GetInterface(value,"ifString") <> invalid
+                if Len(value) > 8192 then unsafe = true else stream[field] = value
+            end if
+        end for
+        if unsafe then continue for
+        for each field in ["name","title","description","quality"]
+            if GetInterface(item[field],"ifString") <> invalid then stream[field] = Left(item[field],512)
+        end for
+        if Type(item.fileIdx) = "Integer" or Type(item.fileIdx) = "roInt" then stream.fileIdx = item.fileIdx
+        hints = item.behaviorHints
+        if Type(hints) = "roAssociativeArray"
+            safeHints = {}
+            if GetInterface(hints.filename,"ifString") <> invalid and Len(hints.filename) <= 512 then safeHints.filename = hints.filename
+            if Type(hints.videoSize) = "Integer" or Type(hints.videoSize) = "Double" or Type(hints.videoSize) = "Float" or Type(hints.videoSize) = "roInt" or Type(hints.videoSize) = "roDouble" or Type(hints.videoSize) = "roFloat" then safeHints.videoSize = hints.videoSize
+            if Type(hints.proxyHeaders) = "roAssociativeArray"
+                proxy = {}
+                headerBytes = 0
+                for each direction in ["request","response"]
+                    values = hints.proxyHeaders[direction]
+                    if Type(values) <> "roAssociativeArray" then continue for
+                    if values.Count() > 16 then unsafe = true:exit for
+                    clean = {}
+                    for each key in values
+                        value = values[key]
+                        if GetInterface(value,"ifString") = invalid or Len(key) > 128 or Len(value) > 2048 then unsafe = true:exit for
+                        headerBytes = headerBytes + Len(key) + Len(value)
+                        if headerBytes > 4096 then unsafe = true:exit for
+                        clean[key] = value
+                    end for
+                    proxy[direction] = clean
+                end for
+                safeHints.proxyHeaders = proxy
+            end if
+            stream.behaviorHints = safeHints
+        end if
+        if unsafe then continue for
+        bytes = CreateObject("roByteArray")
+        bytes.FromAsciiString(FormatJson(stream))
+        if used + bytes.Count() > byteLimit then continue for
+        result.Push(stream)
+        used = used + bytes.Count()
+        if result.Count() >= countLimit then exit for
+    end for
+    return result
+end function
+
+function CinemaProviderCountBudget(providerCount as integer) as integer
+    if providerCount < 1 then providerCount = 1
+    limit = Int(1024 / providerCount)
+    if limit > 256 then limit = 256
+    return limit
+end function
+
+function CinemaProviderByteBudget(providerCount as integer) as integer
+    if providerCount < 1 then providerCount = 1
+    limit = Int(1048576 / providerCount)
+    if limit > 262144 then limit = 262144
+    return limit
+end function

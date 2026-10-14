@@ -121,6 +121,13 @@ sub BuildRows(preserveFocus = false as boolean)
         value: "Connection check"
     })
     m.rows.Push({action:"about",title:"About",value:"Crimson Cinema"})
+    localLabel = "Off (HTTPS required)"
+    if m.stores <> invalid
+        localPrefs = m.stores.settings.callFunc("SettingsGetPlaybackOptions")
+        if Type(localPrefs) = "roAssociativeArray" and localPrefs.allowLocalHttp = true then localLabel = "On (private addresses only)"
+    end if
+    m.rows.Push({action:"localHttp",title:"Local development HTTP",value:localLabel})
+    if m.stores <> invalid and m.stores.auth.callFunc("AuthGetSession") = "stremio" then m.rows.Push({action:"retryAccountWrites",title:"Retry saved changes",value:"Account sync"})
     ' Advanced diagnostics fit the fourth visible row without covering status.
     if m.showNetDiag
         m.rows.Push({
@@ -182,6 +189,16 @@ sub onRowSelected(event = invalid as dynamic)
     index = data[0]
     if index < 0 or index >= m.rows.Count() then return
     action = m.rows[index].action
+    if action = "localHttp"
+        if m.stores <> invalid
+            enabled = m.stores.settings.callFunc("SettingsGetPlaybackOptions").allowLocalHttp = true
+            m.stores.settings.callFunc("SettingsSetPlaybackOption","allowLocalHttp",not enabled)
+            m.status.text = "Internet add-ons require HTTPS. Local HTTP permits private IPs/localhost only; enter it on Roku."
+            BuildRows(true)
+        end if
+        return
+    end if
+    if action = "retryAccountWrites" then m.top.pushRequest={action:"retryAccountWrites"}:return
     if action = "providerChoice" then ApplyPreferredProvider(m.rows[index].providerKey):return
     if action = "preferredSource" then ShowPreferredProvider():return
     if action = "login"

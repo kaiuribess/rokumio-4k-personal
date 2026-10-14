@@ -7,7 +7,7 @@
 ' every request made. Suites assert against the log and inject via the script.
 
 function MockRegistry() as object
-    registry = { values: {}, failWrites: false }
+    registry = { values: {}, durable:{}, failWrites: false, failFlushes:false }
     registry.Read = function(key as string) as string
         if m.values[key] <> invalid then return m.values[key]
         return ""
@@ -21,7 +21,22 @@ function MockRegistry() as object
         m.values[key] = value
         return true
     end function
-    registry.Flush = function() as void
+    registry.Flush = function() as boolean
+        if m.failFlushes then return false
+        m.durable = {}
+        for each key in m.values
+            m.durable[key] = m.values[key]
+        end for
+        return true
+    end function
+    registry.Exists = function(key as string) as boolean
+        return m.values.DoesExist(key)
+    end function
+    registry.Delete = function(key as string) as boolean
+        return m.values.Delete(key)
+    end function
+    registry.GetKeyList = function() as object
+        return m.values.Keys()
     end function
     return registry
 end function

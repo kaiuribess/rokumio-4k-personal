@@ -20,7 +20,12 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: python scripts/verify-package.py
+      - run: python scripts/release-provenance.py
       - uses: actions/upload-artifact@v4
         with:
           name: rokumio-4k-personal
-          path: dist/rokumio-4k-personal.zip
+          path: |
+            dist/rokumio-4k-personal.zip
+            verification/package-check.json
+            verification/artifact-provenance.json
+            verification/*.zip.sha256

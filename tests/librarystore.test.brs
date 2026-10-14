@@ -71,7 +71,7 @@ sub Test_Library_ReAddReseedsContinueWatching()
 
     Harness_Ok(store.AddSaved("tt0133093", "movie", "The Matrix", "https://img.example.com/tt0133093.png", "landscape"), "add back")
     Harness_Ok(CwHasMeta(store, "tt0133093"), "re-add restores CW from the account item's progress")
-    Harness_Equal(store.Position("tt0133093"), 420000, "the resume position is restored")
+    Harness_Equal(store.Position("tt0133093"), 420, "the resume position is restored in native seconds")
     Harness_Equal(store.ResumeFor("tt0133093").posterShape, "landscape", "resume carries the account item's shape")
 end sub
 
@@ -213,7 +213,7 @@ end sub
 sub Test_Library_InMemoryOnlyWithoutRegistry()
     Harness_Suite("LibraryStore works without a registry")
     store = LibraryStore()
-    Harness_Ok(store.AddSaved("tt0111161", "movie", "The Shawshank Redemption"), "in-memory add works")
+    Harness_Ok(not store.AddSaved("tt0111161", "movie", "The Shawshank Redemption"), "memory-only add is not a durable acknowledgement")
     Harness_Equal(store.SavedItems().Count(), 1, "in-memory list works")
 
     empty = LibraryStore(MockRegistry())

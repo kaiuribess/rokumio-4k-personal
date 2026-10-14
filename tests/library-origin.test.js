@@ -43,9 +43,10 @@ Harness_Suite("Saved custom series restores its metadata provider")
 data={saved:{},savedOrder:[],sessionType:"guest",AddSaved:__LibraryStore_method_AddSaved,HasKey:__LibraryStore_method_HasKey,SafeProviderKey:__LibraryStore_method_SafeProviderKey,
   ReSeedPositionFromAccount:sub(id as string)
   end sub,
-  Save:sub()
+  Save:function() as boolean
     m.serialized=FormatJson(m.saved)
-  end sub}
+    return true
+  end function}
 host={data:data,callFunc:function(name as string,a=invalid as dynamic,b=invalid as dynamic,c=invalid as dynamic,d=invalid as dynamic,e=invalid as dynamic,f=invalid as dynamic) as dynamic
   if name="LibraryIsSaved" then return m.data.saved.DoesExist(a)
   if name="LibraryAddSaved" then return m.data.AddSaved(a,b,c,d,e,f)
@@ -97,6 +98,6 @@ if m.failed>0 then bad=invalid:ignored=bad.assertion
 `;
 const staging=path.join(root,'out-test','library-origin');fs.mkdirSync(staging,{recursive:true});
 const file=path.join(staging,'tests.brs');
-fs.writeFileSync(file,[read('tests/harness.brs'),read('source/util/ProviderPriority.brs'),read('source/util/MetadataOrigin.brs').replaceAll('ProviderPriority_Key(addon)','ProviderPriority_Key(addon,OriginTestHash)'),...methods,`function OriginTestHash(identity as string) as string\n if identity.InStr("custom.meta")>=0 then return String(64,"a")\n return String(64,"b")\nend function`,fixture].join('\n'),'utf8');
+fs.writeFileSync(file,[read('tests/harness.brs'),read('source/util/AccountEpoch.brs'),read('source/util/ProviderPriority.brs'),read('source/util/MetadataOrigin.brs').replaceAll('ProviderPriority_Key(addon)','ProviderPriority_Key(addon,OriginTestHash)'),...methods,`function OriginTestHash(identity as string) as string\n if identity.InStr("custom.meta")>=0 then return String(64,"a")\n return String(64,"b")\nend function`,fixture].join('\n'),'utf8');
 const run=spawnSync(process.execPath,[path.join(root,'node_modules/@rokucommunity/brs/bin/cli.js'),'--root',staging,file],{cwd:staging,encoding:'utf8'});
 process.stdout.write(run.stdout||'');process.stderr.write(run.stderr||'');process.exitCode=run.status===0 && !(run.stderr||'').trim() && /RESULT: PASS/.test(run.stdout||'') ? 0 : 1;

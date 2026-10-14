@@ -128,8 +128,12 @@ sub ResetUI()
     StopCountdown()
 end sub
 
-sub onTaskLink()
+sub onTaskLink(event = invalid as dynamic)
     if m.taskNode = invalid then return
+    if event <> invalid
+        sender = event.GetRoSGNode()
+        if sender = invalid or sender.id <> m.taskNode.id then return
+    end if
     link = m.taskNode.link
     if link = invalid or link = "" then link = "https://link.stremio.com"
     ShowLink(link)
@@ -151,8 +155,12 @@ sub ShowLink(link as string)
     StartCountdown()
 end sub
 
-sub onTaskQrcode()
+sub onTaskQrcode(event = invalid as dynamic)
     if m.taskNode = invalid then return
+    if event <> invalid
+        sender = event.GetRoSGNode()
+        if sender = invalid or sender.id <> m.taskNode.id then return
+    end if
     qrcode = m.taskNode.qrcode
     if qrcode <> invalid and qrcode <> ""
         ShowQr(qrcode)
@@ -254,15 +262,19 @@ sub onRefreshSelected()
     m.top.pushRequest = { action: "refreshCode" }
 end sub
 
-sub onTaskResult()
+sub onTaskResult(event = invalid as dynamic)
     if m.taskNode = invalid then return
+    if event <> invalid
+        sender = event.GetRoSGNode()
+        if sender = invalid or sender.id <> m.taskNode.id then return
+    end if
     result = m.taskNode.result
     if result = invalid then return
     if result.ok
         StopCountdown()
         Reveal()
         m.statusLabel.text = "Logged in!"
-        m.top.pushRequest = { action: "completeLogin", authKey: result.authKey, user: result.user }
+        m.top.pushRequest = { action: "completeLogin", taskIdentity:m.taskNode.id, authKey: result.authKey, user: result.user }
     else
         ' Failure stays on screen so the user can read the error; Back is the
         ' exit (it publishes cancelLogin) and the refresh button offers a fresh

@@ -53,13 +53,11 @@ const TRANSPORT_RETRY_BACKOFF_MS = 250
 ' fast.
 const TRANSPORT_RETRY_JITTER_MS = 150
 
-' A negative status is a transport-level failure: the transfer never completed
-' (refused connect, DNS, TLS). The dominant one is CURLE_COULDNT_CONNECT (-7),
-' which this device emits when too many NEW connections are opened at once. A
-' refused connect sends no bytes, so re-issuing is safe even for a POST; HTTP
-' errors (status >= 0) are never retried, and a timeout (status 0) must not be
-' multiplied by full waits.
-function TransportFailureIsRetryable(status as integer) as boolean
+' Reads can retry negative transport errors. Mutations are never automatically
+' replayed: even DNS/connect errors may describe a hop after a redirect. The
+' account outbox retains uncertain writes for an explicit retry/reconciliation.
+function TransportFailureIsRetryable(status as integer, method = "GET" as string) as boolean
+    if method <> "GET" and method <> "HEAD" then return false
     return status < 0
 end function
 
@@ -113,8 +111,8 @@ function CreateSyncHttpClient() as object
     ' Retry policy, reached through m for the same cross-component reason the
     ' request functions are; the decisions themselves are file-scope so they can
     ' be unit-tested without a device.
-    client._retryable = function(status as integer) as boolean
-        return TransportFailureIsRetryable(status)
+    client._retryable = function(status as integer, method as string) as boolean
+        return TransportFailureIsRetryable(status,method)
     end function
     client._retryAfter = function(attempt as integer) as integer
         ' The jitter is added HERE rather than inside TransportRetryBackoffMs
@@ -134,87 +132,90 @@ function CreateSyncHttpClient() as object
     ' resolve to invalid when a caller from another component invokes the
     ' request functions — anything user-defined must be reachable through m.
     client._attempt = function(request as object) as object
-        result = { ok: false, status: 0, body: "", error: "" }
         transfer = CreateObject("roUrlTransfer")
-        transfer.SetCertificatesFile("common:/certs/ca-bundle.crt")
-        transfer.EnablePeerVerification(true)
-        transfer.EnableHostVerification(true)
-        transfer.EnableEncodings(true)
-        transfer.SetUrl(request.url)
-        if request.headers <> invalid then transfer.SetHeaders(request.headers)
-        transfer.RetainBodyOnError(true)
         port = CreateObject("roMessagePort")
-        transfer.SetMessagePort(port)
-
-        issued = false
-        if request.method = "POST"
-            payload = ""
-            if request.body <> invalid then payload = FormatJson(request.body)
-            issued = transfer.AsyncPostFromString(payload)
-        else if request.method = "HEAD"
-            ' AsyncHead(), not SetRequest("HEAD") + AsyncGetToString(). SetRequest
-            ' is documented as a way to change the method and carries the warning
-            ' that it can generate invalid requests; AsyncHead() is the purpose-
-            ' built call and lands its roUrlEvent on the port like the others.
-            '
-            ' It has to be a real HEAD. The streaming server's bare torrent route
-            ' is a stream endpoint that advertises Accept-Ranges and a
-            ' Content-Length in the gigabytes, so a GET here would be a request
-            ' to buffer an entire feature into a string — and would do it while
-            ' believing it was only asking for headers.
-            issued = transfer.AsyncHead()
-        else
-            issued = transfer.AsyncGetToString()
-        end if
-        if not issued
-            result.error = "request could not be issued"
-            return result
-        end if
-
-        event = Wait(request.timeoutMs, port)
-        if event = invalid
-            transfer.AsyncCancel()
-            result.error = "request timed out"
-            return result
-        end if
-        if Type(event) <> "roUrlEvent"
-            result.error = "unexpected port message"
-            return result
-        end if
-
-        result.body = event.GetString()
-        result.status = event.GetResponseCode()
-        result.ok = result.status >= 200 and result.status < 300
-        if not result.ok
-            ' A negative status is the transfer never completing — refused
-            ' connection, DNS failure, TLS failure — and is the case GetFailureReason
-            ' exists to explain. This is also why the sign of status alone cannot be
-            ' used to reason about a failure: negative means transport-level, and
-            ' SubtitlesStore.Subtitles therefore reports `issued` separately instead
-            ' of reserving a sentinel inside the same negative range.
-            if result.status < 0
-                ' Low-level reasons may contain the configured URL/API key and
-                ' are forwarded to status labels by callers. Keep them private.
-                result.error = "network connection failed (" + result.status.ToStr() + ")"
+        fs = CreateObject("roFileSystem")
+        identity = transfer.GetIdentity().ToStr()
+        output = "tmp:/cc-response-" + identity
+        inputFile = "tmp:/cc-request-" + identity
+        result = {ok:false,status:0,body:"",error:"Request failed"}
+        try
+            transfer.SetMessagePort(port)
+            transfer.SetCertificatesFile("common:/certs/ca-bundle.crt")
+            transfer.EnablePeerVerification(true)
+            transfer.EnableHostVerification(true)
+            transfer.EnableEncodings(true)
+            transfer.SetUrl(request.url)
+            if request.headers <> invalid then transfer.SetHeaders(request.headers)
+            transfer.RetainBodyOnError(true)
+            limit = TransportResponseLimit(request.url)
+            issued = false
+            if request.method = "POST"
+                payload = FormatJson(request.body)
+                if Len(payload) <= 131072 and WriteAsciiFile(inputFile,payload) then issued = transfer.AsyncPostFromFileToFile(inputFile,output)
+            else if request.method = "HEAD"
+                issued = transfer.AsyncHead()
             else
-                result.error = "HTTP " + result.status.ToStr()
+                issued = transfer.AsyncGetToFile(output)
             end if
-        end if
+            if issued
+                clock = CreateObject("roTimespan")
+                clock.Mark()
+                completed = false
+                while clock.TotalMilliseconds() < request.timeoutMs
+                    event = Wait(50,port)
+                    size = 0
+                    for each path in [output,output+".tmp"]
+                        stat = fs.Stat(path)
+                        if Type(stat) = "roAssociativeArray" and stat.size <> invalid then size = size + stat.size
+                    end for
+                    if size > limit
+                        result.error = "Response exceeds the device budget"
+                        exit while
+                    end if
+                    if Type(event) = "roUrlEvent"
+                        result.status = event.GetResponseCode()
+                        result.ok = result.status >= 200 and result.status < 300
+                        if request.method <> "HEAD"
+                            stat = fs.Stat(output)
+                            if Type(stat) = "roAssociativeArray" and stat.size <> invalid and stat.size <= limit
+                                result.body = ReadAsciiFile(output)
+                            else
+                                result.ok = false
+                                result.error = "Response unavailable within the device budget"
+                            end if
+                        end if
+                        completed = true
+                        exit while
+                    end if
+                end while
+                if not completed and result.error = "Request failed" then result.error = "Request timed out"
+                if not result.ok and completed then result.error = "Network or HTTP failure ("+result.status.ToStr()+")"
+            else
+                result.error = "Request could not be issued"
+            end if
+        catch e
+            result = {ok:false,status:0,body:"",error:"Bounded request failed"}
+        end try
+        transfer.AsyncCancel()
+        for each path in [inputFile,output,output+".tmp"]
+            fs.Delete(path)
+        end for
         return result
     end function
 
     ' Bounded retry around a single round-trip. The measured failure is a device
     ' ceiling on NEW concurrent connections (~4-6): sequential soaks are perfect,
     ' 8-wide bursts lose transfers, and the app's parallel launch syncs collide.
-    ' Only a transport-level failure (status < 0) retries — a refused connect
-    ' never sent bytes, so re-issuing is safe even for POST, while an HTTP error
+    ' GET/HEAD transport failures may retry. POST is never automatically replayed
+    ' because a failure can follow an applied write or redirect. An HTTP error
     ' is an answer and a timeout (status 0) must not be multiplied by full waits.
     client._execute = function(request as object) as object
         attempt = 1
         while true
             result = m._attempt(request)
             if result.ok then return m._trace(request, result)
-            if not m._retryable(result.status) then return m._trace(request, result)
+            if not m._retryable(result.status,request.method) then return m._trace(request, result)
             if attempt >= MAX_TRANSPORT_ATTEMPTS then return m._trace(request, result)
             Wait(m._retryAfter(attempt), invalid)
             attempt = attempt + 1
@@ -327,7 +328,7 @@ class Transport
     ' request. A caller can extend that one JSON request without changing the
     ' default for search, metadata or manifests.
     function Get(url as string, headers = invalid as dynamic, timeoutMs = REQUEST_TIMEOUT_MS as integer) as object
-        return m.Result(m.client.request("GET", url, headers, invalid, timeoutMs))
+        return m.Result(m.client.request("GET", url, headers, invalid, timeoutMs),TransportResponseLimit(url))
     end function
 
     ' A GET whose body comes back as text instead of being parsed as JSON.
@@ -383,7 +384,7 @@ class Transport
 
     ' Normalize a raw client result into the transport result: parse JSON when
     ' the body is non-empty, and demote a 2xx with a broken body to a failure.
-    function Result(raw as object) as object
+    function Result(raw as object, byteLimit = 2097152 as integer) as object
         result = {
             ok: raw.ok
             status: raw.status
@@ -391,6 +392,12 @@ class Transport
             error: raw.error
         }
         body = raw.body
+        if body <> invalid
+            if GetInterface(body,"ifString") = invalid then result.ok = false:result.error = "invalid response body":return result
+            bytes = CreateObject("roByteArray")
+            bytes.FromAsciiString(body)
+            if bytes.Count() > byteLimit then result.ok = false:result.error = "Response exceeds the device budget":return result
+        end if
         if (body = invalid or body = "") and result.ok
             result.ok = false
             result.error = "empty JSON response"
@@ -426,6 +433,7 @@ class Transport
     ' input rather than returning invalid, and Transport must turn that into a
     ' clean failure instead of a crash.
     function Parse(body as string) as dynamic
+        if not TransportJsonDepthAllowed(body) then return invalid
         try
             return ParseJson(body)
         catch e
@@ -433,6 +441,45 @@ class Transport
         end try
     end function
 end class
+
+' Limits apply to decoded response files and again before parsing. Transfer
+' cancellation is best effort; a temporary file can overshoot between polls.
+function TransportResponseLimit(url as string) as integer
+    path = LCase(url.Split("?")[0])
+    if path.InStr("/manifest.json") >= 0 then return 262144
+    if path.InStr("/subtitles/") >= 0 then return 131072
+    if path.InStr("/stream/") >= 0 or path.InStr("/catalog/") >= 0 or path.InStr("/meta/") >= 0 then return 1048576
+    return 2097152
+end function
+
+' Avoid giving the native parser pathological nesting. Brackets inside quoted
+' strings do not contribute to depth, including escaped quotes/backslashes.
+function TransportJsonDepthAllowed(body as string) as boolean
+    depth = 0
+    quoted = false
+    escaped = false
+    for i = 0 to Len(body) - 1
+        ch = body.Mid(i,1)
+        if quoted
+            if escaped
+                escaped = false
+            else if ch = Chr(92)
+                escaped = true
+            else if ch = Chr(34)
+                quoted = false
+            end if
+        else if ch = Chr(34)
+            quoted = true
+        else if ch = "{" or ch = "["
+            depth = depth + 1
+            if depth > 32 then return false
+        else if ch = "}" or ch = "]"
+            depth = depth - 1
+            if depth < 0 then return false
+        end if
+    end for
+    return depth = 0 and not quoted
+end function
 
 ' HTML is the one body this transport is guaranteed never to mean as JSON: the
 ' dead subtitle endpoint answers its stremio/v1 path with the add-on's landing

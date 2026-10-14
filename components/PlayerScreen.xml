@@ -18,6 +18,8 @@
         <function name="OnBackPressed" />
         <function name="PlaybackStatus" />
         <function name="CanAdvanceEpisode" />
+        <function name="CanRecoverSources" />
+        <field id="sourceRecoveryRequest" type="assocarray" alwaysNotify="true" />
         <!-- Called by MainScene from the two points the add-on registry actually
              moves (the sync install loop, and a Rokumio import), so a subtitle
              provider that lands after this screen entered is still asked. See
@@ -27,6 +29,7 @@
         <field id="nextEpisodeRequest" type="assocarray" alwaysNotify="true" />
     </interface>
 
+    <script type="text/brightscript" uri="pkg:/source/util/AccountEpoch.brs" />
     <script type="text/brightscript" uri="pkg:/source/util/MetadataOrigin.brs" />
     <script type="text/brightscript" uri="pkg:/source/util/ProviderPriority.brs" />
     <script type="text/brightscript" uri="pkg:/source/stores/SubtitlesStore.bs" />
@@ -48,6 +51,7 @@
     <script type="text/brightscript" uri="pkg:/components/PlayerNextEpisode.brs" />
 
     <children>
+        <Timer id="localCheckpoint" duration="30" repeat="true" />
         <Rectangle id="playerBg" width="1920" height="1080" />
         <Video
             id="video"

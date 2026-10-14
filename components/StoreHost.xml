@@ -11,6 +11,11 @@
         <function name="AddonsCatalogTitle" />
         <function name="AddonsGet" />
         <function name="AddonsGetAll" />
+        <function name="LibraryGetAccountOutbox" />
+        <function name="LibrarySetAccountOutbox" />
+        <function name="AddonsReconcileAccount" />
+        <function name="WatchClear" />
+        <function name="RetryPersistence" />
         <function name="AddonsHasResource" />
         <function name="AddonsHasType" />
         <function name="AddonsInstallFromDescriptor" />
@@ -80,6 +85,7 @@
          MainScene.xml's list minus the ones the Scene itself needs (ScreenStack,
          AsyncTask, Theme) plus DeepLinkStore, which the host never builds — the
          Scene parses deep links with a throwaway instance per call. -->
+    <script type="text/brightscript" uri="pkg:/source/stores/RegistryIO.bs" />
     <script type="text/brightscript" uri="pkg:/source/stores/Transport.bs" />
     <script type="text/brightscript" uri="pkg:/source/stores/SettingsStore.bs" />
     <script type="text/brightscript" uri="pkg:/source/stores/AuthStore.bs" />

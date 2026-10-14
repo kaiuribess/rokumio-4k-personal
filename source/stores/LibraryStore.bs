@@ -65,7 +65,11 @@ const GLYPH_PROGRESS = "clock"
 
 class LibraryStore
     registry as dynamic
+    persistenceRegistry as dynamic
     sessionType as string
+    accountScope as string
+    dirty as boolean
+    accountOutbox as object
     saved as object
     savedOrder as object
     positions as object
@@ -75,14 +79,23 @@ class LibraryStore
     unwatched as object
     codec as object
 
-    sub new(registry = invalid as dynamic, sessionType = "guest" as string)
+    sub new(registry = invalid as dynamic, sessionType = "guest" as string, accountScope = invalid as dynamic)
+        m.persistenceRegistry = registry
         m.registry = registry
+        m.accountScope = ""
+        m.dirty = false
+        if GetInterface(accountScope,"ifString") <> invalid then m.accountScope = accountScope
+        if sessionType = "stremio" and accountScope = "" then m.registry = invalid
+        if m.registry <> invalid and accountScope <> invalid
+            m.registry.Delete("stremio_library")
+        end if
         m.sessionType = "guest"
         if sessionType = "stremio" then m.sessionType = "stremio"
         m.saved = {}
         m.savedOrder = []
         m.positions = []
         m.stremioLibrary = []
+        m.accountOutbox = []
         m.watched = {}
         m.accountWatched = {}
         m.unwatched = {}
@@ -140,8 +153,7 @@ class LibraryStore
         }
         m.savedOrder.Unshift(metaId)
         m.ReSeedPositionFromAccount(metaId)
-        m.Save()
-        return true
+        return m.Save()
     end function
 
     ' Remove a library item and drop its continue-watching entries. Stremio's CW
@@ -188,7 +200,7 @@ class LibraryStore
         if parsed = invalid then return
         if not parsed.inProgress then return
         if m.IsChannelType(parsed.metaType) then return
-        m.SetPosition(parsed.videoId, parsed.metaId, parsed.metaType, parsed.season, parsed.episode, parsed.name, parsed.poster, parsed.position, parsed.duration, parsed.posterShape)
+        m.SetPosition(parsed.videoId, parsed.metaId, parsed.metaType, parsed.season, parsed.episode, parsed.name, parsed.poster, Int(parsed.position / 1000), Int(parsed.duration / 1000), parsed.posterShape)
     end sub
 
     ' The cached account item for a meta, or invalid when the account library has
@@ -337,9 +349,9 @@ class LibraryStore
     ' capped stack, and pops anything beyond MAX_CONTINUE_WATCHING. Blank
     ' positions are ignored so a fresh screen never clears stored progress.
     ' Channel/tv playback records nothing — see IsChannelType.
-    sub SetPosition(videoId as string, metaId as string, metaType as string, season as integer, episode as integer, name as string, poster = "" as string, position = 0 as integer, duration = 0 as integer, posterShape = "" as string, metadataProviderKey = "" as string)
-        if videoId = "" or metaId = "" then return
-        if m.IsChannelType(metaType) then return
+    function SetPosition(videoId as string, metaId as string, metaType as string, season as integer, episode as integer, name as string, poster = "" as string, position = 0 as integer, duration = 0 as integer, posterShape = "" as string, metadataProviderKey = "" as string) as boolean
+        if videoId = "" or metaId = "" then return false
+        if m.IsChannelType(metaType) then return false
         metadataProviderKey = m.SafeProviderKey(metadataProviderKey)
         if metadataProviderKey = "" then metadataProviderKey = m.MetadataKeyFor(metaId)
         for i = m.positions.Count() - 1 to 0 step -1
@@ -363,8 +375,8 @@ class LibraryStore
         while m.positions.Count() > MAX_CONTINUE_WATCHING
             m.positions.Pop()
         end while
-        m.Save()
-    end sub
+        return m.Save()
+    end function
 
     function Position(videoId as string) as integer
         for each entry in m.positions
@@ -819,8 +831,10 @@ class LibraryStore
                     name: entry.name
                     poster: entry.poster
                     posterShape: entry.posterShape
-                    position: entry.position
-                    duration: entry.duration
+                    ' The Stremio codec retains raw wire milliseconds; Roku
+                    ' resume/history use seconds, including cold-start restores.
+                    position: Int(entry.position / 1000)
+                    duration: Int(entry.duration / 1000)
                     metadataProviderKey: m.MetadataKeyFor(entry.metaId)
                 })
             end if
@@ -915,21 +929,36 @@ class LibraryStore
     ' Guest/stremio sessions persist under different keys so one session can
     ' never surface the other's saved content or continue-watching positions.
     function RegistryKey() as string
-        if m.sessionType = "stremio" then return "stremio_library"
+        if m.sessionType = "stremio"
+            if m.accountScope <> "" then return "account_" + m.accountScope + "_library"
+            return "stremio_library"
+        end if
         return "library"
     end function
 
     ' Repoint the store at another session's data. A same-session switch is a
     ' no-op; everything is reloaded fresh so the in-memory state always mirrors
     ' the active session's persisted key.
-    sub SwitchSession(sessionType as string)
+    sub SwitchSession(sessionType as string, accountScope = invalid as dynamic)
         if sessionType <> "guest" and sessionType <> "stremio" then return
-        if m.sessionType = sessionType then return
+        nextScope = m.accountScope
+        if GetInterface(accountScope,"ifString") <> invalid then nextScope = accountScope
+        if sessionType = "guest" then nextScope = ""
+        if m.sessionType = sessionType and m.accountScope = nextScope then return
+        if m.registry <> invalid and m.sessionType = "stremio" and m.accountScope <> ""
+            m.registry.Delete(m.RegistryKey())
+            m.registry.Flush()
+        end if
+        m.accountScope = nextScope
+        m.dirty = false
+        m.registry = m.persistenceRegistry
+        if sessionType = "stremio" and accountScope = "" then m.registry = invalid
         m.sessionType = sessionType
         m.saved = {}
         m.savedOrder = []
         m.positions = []
         m.stremioLibrary = []
+        m.accountOutbox = []
         m.watched = {}
         m.accountWatched = {}
         m.unwatched = {}
@@ -956,17 +985,41 @@ class LibraryStore
         return value
     end function
 
-    sub Save()
-        if m.registry = invalid then return
+    function Save() as boolean
+        m.dirty = true
+        if m.registry = invalid then return false
         data = { continueWatching: m.positions }
+        if m.sessionType = "stremio"
+            data.accountOutbox = m.accountOutbox
+            if m.accountOutbox.Count() > 0
+                data.localWatched = m.watched
+                data.localUnwatched = m.unwatched
+            end if
+        end if
         if m.sessionType <> "stremio"
             data.saved = m.saved
             data.savedOrder = m.savedOrder
             data.watched = m.watched
         end if
-        m.registry.Write(m.RegistryKey(), FormatJson(data))
-        m.registry.Flush()
-    end sub
+        written = m.registry.Write(m.RegistryKey(), FormatJson(data)) = true
+        committed = m.registry.Flush() = true
+        m.dirty = not (written and committed)
+        return not m.dirty
+    end function
+
+    function GetAccountOutbox() as object
+        return m.accountOutbox
+    end function
+
+    function SetAccountOutbox(jobs as object) as boolean
+        if m.sessionType <> "stremio" or Type(jobs) <> "roArray" or jobs.Count() > 128 then return false
+        m.accountOutbox = jobs
+        return m.Save()
+    end function
+
+    function SaveFailed() as boolean
+        return m.dirty
+    end function
 
     sub Load()
         if m.registry = invalid then return
@@ -978,7 +1031,12 @@ class LibraryStore
         catch e
             return
         end try
-        if parsed = invalid then return
+        if Type(parsed) <> "roAssociativeArray" then return
+        if m.sessionType = "stremio" and Type(parsed.accountOutbox) = "roArray" and parsed.accountOutbox.Count() <= 128 then m.accountOutbox = parsed.accountOutbox
+        if m.sessionType = "stremio" and m.accountOutbox.Count() > 0
+            if Type(parsed.localWatched) = "roAssociativeArray" then m.watched = parsed.localWatched
+            if Type(parsed.localUnwatched) = "roAssociativeArray" then m.unwatched = parsed.localUnwatched
+        end if
         if m.sessionType <> "stremio"
             if parsed.saved <> invalid and Type(parsed.saved) = "roAssociativeArray" then m.saved = parsed.saved
             if parsed.savedOrder <> invalid and Type(parsed.savedOrder) = "roArray" then m.savedOrder = parsed.savedOrder

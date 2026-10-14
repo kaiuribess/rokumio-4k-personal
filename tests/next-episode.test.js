@@ -13,7 +13,7 @@ const extract = (file,names) => names.map(name => {
   return match[0];
 }).join('\n');
 const file = path.join(dir,'tests.brs');
-fs.writeFileSync(file,[read('tests/harness.brs'),read('source/util/ProviderPriority.brs'),read('source/util/MetadataOrigin.brs'),read('source/util/NextEpisode.brs'),read('source/util/PlaybackInfo.brs'),read('components/PlayerNextEpisode.brs'),read('components/PlayerPosition.brs'),read('source/util/TimerGuard.brs').replace('CreateObject("roTimespan")','EpisodeTimerClock()'),extract('components/PlayerScreen.brs',['onVideoStateChanged','SavePosition','PublishWatchState']),extract('components/MainScene.brs',['onNextEpisodeRequest']),read('tests/next-episode.test.brs')].join('\n'));
+fs.writeFileSync(file,[read('tests/harness.brs'),read('source/util/AccountEpoch.brs'),read('source/util/ProviderPriority.brs'),read('source/util/MetadataOrigin.brs'),read('source/util/NextEpisode.brs'),read('source/util/PlaybackInfo.brs'),read('components/PlayerNextEpisode.brs'),read('components/PlayerPosition.brs'),read('source/util/TimerGuard.brs').replace('CreateObject("roTimespan")','EpisodeTimerClock()'),extract('components/PlayerScreen.brs',['onVideoStateChanged','SavePosition','PublishWatchState','ResolveOrdinal']),extract('components/MainScene.brs',['onNextEpisodeRequest']),read('tests/next-episode.test.brs')].join('\n'));
 const result = spawnSync(process.execPath,[path.join(root,'node_modules/@rokucommunity/brs/bin/cli.js'),'--root',dir,file],{cwd:root,encoding:'utf8'});
 process.stdout.write(result.stdout || '');
 process.stderr.write(result.stderr || '');

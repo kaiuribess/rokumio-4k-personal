@@ -6,7 +6,7 @@
 ' releases the component (and the video node it holds). Reading from this shared
 ' instance has no node-lifetime dependency.
 '
-' A last-value stash with no clearing: MainScene dedups repeated updates by
+' MainScene clears this mailbox on account changes and dedups updates by
 ' videoId + position, so "latest" is all it needs. Constructed once under
 ' MainScene scope and shipped through the stores map (like TimeUtil and
 ' WatchedCodec), never built inside a method.
@@ -25,4 +25,8 @@ class WatchStateBuffer
     function Latest() as dynamic
         return m.packet
     end function
+
+    sub Clear()
+        m.packet = invalid
+    end sub
 end class

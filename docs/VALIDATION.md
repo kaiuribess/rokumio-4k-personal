@@ -1,49 +1,22 @@
-# Release validation — 0.5.17
+# Release validation — 0.5.18
 
-Validated on 2026-10-14:
+Validated on 2026-10-14. This remains an experimental prerelease without physical Roku sign-off.
 
-- Full test chain passed: **4,703 BrightScript assertions plus 69 cinema policy assertions, totaling 4,772**. Separate Node media/transport/mock suites also passed; their counts are separate.
-- New complete-flow regressions reproduce and verify repairs for catalog re-entry, short-page loading, raw-versus-usable offsets, custom-series save/restore routing, accepted progress during recovery, proof resumption, manual provider precedence, warm diagnostics and public setup controls.
-- The source picker still uses 48-card pages, the shared two-worker budget, stable provider priority and the existing warm-cache limits. Both automatic Play modes, quality/audio preferences, next episode, subtitles, voice, search and full catalog browsing remain available.
-- Native scene/socket/network boundaries are simulated. Tests include actual production callbacks and compiled stores; they do not establish audible English, physical surround/HDR, full-film throughput or native rendering performance.
-- Compiler and package checks passed: 52 XML components and 259 package-root script references. Extended inspection also resolves the three relative script references and all declared component methods.
-- Public source, reachable Git history and compiled package receive secret-pattern/content review before publication. Synthetic fixtures are classified separately; this is not credential validation.
-- Development dependencies are unchanged. The two previously documented underlying toolchain advisories remain; Node dependencies are not shipped in the Roku package.
+- The full test chain passed **4,852 BrightScript assertions plus 69 cinema policy assertions: 4,921 total**. Separate Node media, transport, mock-provider and setup-server suites also passed; their counts are separate.
+- New tests execute production store and controller code against native boundary doubles: held A results/publishers/imports after switching to B; A in flight with distinct B/C edits; failed writes and restart outbox recovery; fresh baseline before explicit retry; independent Write/Flush refusals; cross-section registry budgeting; account add-on configuration/removal/order; public HTTP rejection; oversized decoded response files, long fields, deep JSON and subtitle floods; early-pool discovery recovery; periodic durable checkpoints, seek to zero and old-screen exit isolation.
+- CI builds once after tests and verifies the install ZIP: 201 members, 52 XML components, 267 package-root plus 3 relative script references, 157 implemented interface functions, valid inheritance, manifest artwork and licensing, and no development files.
+- CI records the exact ZIP hash, commit and run ID in artifact-provenance.json. Publication promotes that artifact directly, with its checksum and package-check.json. The public ZIP must be downloaded and checked against the CI bytes; a local rebuild is not substituted.
+- Public working source, reachable Git history and the install ZIP receive secret-pattern/content review. Dummy fixture values are classified separately. This is pattern/content review, not credential validation.
+- `npm audit` was rerun: two underlying development-tool advisories affect nine dependency entries (2 moderate, 7 high, 0 critical). No incompatible override is used. Those Node dependencies are excluded from the Roku installation ZIP.
 
-**0.5.17 has not been installed or physically tested.** The last confirmed device installation remains 0.5.12. This update does not certify universal English audio, genuine UHD or AX700 surround output. Source labels remain hints, native progress is not acoustic recognition, two occupied workers can delay later providers, and ordinary provider response bytes remain unbounded.
+The file-acquisition tests supply decoded native file sizes and scripted events; they do not run the actual Roku HTTP/decompression implementation. Cancellation is best effort and temporary files can overshoot between polling checks. Candidate limits bound serialized application payloads, not every internal/native allocation or aggregate network connection. The registry admission budget is deliberately uncompressed; native storage limits and acknowledgements remain authoritative.
 
-The optional-server audit item was resolved by correcting its public claim and setup wording: this build admits direct HTTPS sources and does not enable raw torrent/hash-only playback. The app has no native transcoder or torrent engine. The public local setup route rejects commands that trigger diagnostic playback; normal add-on imports retain their Add-ons-screen gate.
+Account saves are optimistic until acknowledged. Failed/uncertain cloud writes remain pending, with explicit retry against a fresh baseline. Restored uncertain writes wait for that retry. Persistent storage/network failures, a full outbox, forced termination before an acknowledged checkpoint, or logout with unsynced edits cannot guarantee preservation of every recent change. Older unowned Stremio caches are ignored; manually configured account providers may need re-importing.
 
-Install the compiled release ZIP, not GitHub's source archive. The release includes a SHA-256 checksum.
+The LAN setup page retains the private-interface, Host/Origin and open-Add-ons protections. A short-lived pairing code/TV confirmation is still a hardening recommendation. This release does not claim that an origin check authenticates every native LAN client.
 
----
+**0.5.18 has not been installed or physically tested.** The last confirmed installation remains 0.5.12. Stable status requires clean install and upgrade, a full movie, consecutive episode transitions, repeated seeking, Back during loading, failed/expired-source recovery and repeated-navigation memory measurements. Stereo and surround require audible tests on the actual HDMI route. No software assertion count certifies audible English, genuine sustained UHD, HDR, AX700 surround or uninterrupted playback of every provider file.
 
-# Release validation — 0.5.16
+Use the compiled release ZIP and its SHA-256 file, not GitHub's source archive. See [Changes](../CHANGELOG.md), [Playback](PLAYBACK.md) and [Development](DEVELOPMENT.md) for the repair details and practical limits.
 
-Validated on 2026-10-14:
-
-- The existing locked dependency installation is retained. Independent GitHub CI installs from the lockfile with `npm ci --ignore-scripts` before tests/build.
-- The full `npm test` chain passed: **4,635 BrightScript harness assertions plus 69 cinema stream policy assertions (4,704 total)**. Separate Node media/transport/mock suites also passed; their checks are not folded into that count.
-- **375 source-screen assertions** cover production callbacks including paging through 49/96/97/256 candidates, final candidate playback/full retained retry pool, 48-card page budget, stale navigation, page/focus restoration, provider/filter/refresh changes, manual precedence and Queued/Requesting status.
-- **238 source-prefetch/scheduling assertions** cover shared two-slot ownership, cold/warm adoption, original index alignment, preferred/last-working order, priority beyond the first four providers, invalid/missing keys, preserved cache validity, active-transfer non-preemption, suspension/resume, stale results, grace and strict quality changes.
-- **75 Home assertions** exercise the actual preview worker and rendering coordinator: 12-row/24-title caps, eight missing-manifest attempts, bounded catalog requests, malformed metadata, preserved artwork shapes, hidden-screen staging, featured-image cancellation, shortcut focus and exact full-catalog routing.
-- **34 playback-stability assertions** cover current-operation timer delays, startup/deadline ownership, last measured terminal position, explicit seek-to-zero behavior and deferred audio-repair timing. Existing native playback and watchdog suites also reproduce fixed timer/stopped/early-end cases.
-- **36 preference-policy/UI assertions**, plus store/controller tests, cover safe persistence, playback modes, provider selection, subsection Back and old sender rejection. Twelve new store assertions cover opaque keys, malformed values and refused-write retry.
-- Five new native-player assertions place recent-provider recording only after the existing English/unmuted/native A/V progress gate; diagnostics and duplicate ticks do not record it.
-- **77 next-episode assertions** are included in the total and exercise production policy, native finish callback, countdown controller, watch-state saving, old timer events, preserved comparison policy and MainScene routing.
-- **81 add-on/audio setup assertions** are included in the total: manifest roles/error categories, private-data exclusion, progressive results/focus, cancellation, stale results/deadlines, worker request scope, explicit equipment choices and honest capability reports.
-- `npm run build` passed with no compilation errors.
-- `python scripts/verify-package.py` passed ZIP integrity, manifest, component inheritance and packaged reference checks. The build has **52 XML components and 253 packaged script references**.
-- Illustrative FHD authoring previews of compact and expanded Home were reviewed for spacing and clipping. These reconstruct source coordinates with synthetic data, not native SceneGraph rendering.
-- Public source/history and compiled ZIP were scanned for secret-looking data. Private workstation configuration/logs are excluded; retained credential-looking test fixtures are synthetic. This is pattern/content review, not credential validation.
-- The supported toolchain patches removed the critical Node development advisory; two underlying advisories remain, affecting nine dependency entries. See the scoped dependency audit in DEVELOPMENT.md. Node development dependencies are excluded from the Roku ZIP.
-
-Independent code review inspected paging, stable priority/index mapping, cache validity, native Settings list generations, opaque storage and recent-provider proof timing. Source/controller tests were independently rerun.
-
-These checks run on a computer using simulated native device boundaries. **0.5.16 has not been installed, frame-rate profiled or physically playback-tested.** The previous 0.5.12 ZIP was confirmed running on a Streaming Stick+ 3830RW, but its next-episode transition was not physically playback-tested. That installation does not establish the new screens' rendering or source scheduling. Software/package checks do not prove audible English sound, UHD decoding, surround/HDR, throughput or uninterrupted full episodes on every source.
-
-Start sooner has fewer initial recovery choices than full comparison. Two slow occupied slots can delay later queued providers. Ordinary provider response sizes and total HTTPS/media connections are not bounded by the two-worker scheduler. These are intentional limits, not measured device freezes or memory leaks.
-
-Manual pages cover retained eligible sources; warm prefetch still has its 256-candidate/provider cap. Source labels remain initial quality hints. Preference memory uses native track/progress observations, not acoustic recognition or universal file compatibility.
-
-The release assets include the compiled install ZIP and its SHA-256 file. Verify the ZIP hash before installation; the repository's source archive is not directly installable. Runtime fixes and dependency advisory limits are described in [PLAYBACK.md](PLAYBACK.md) and [DEVELOPMENT.md](DEVELOPMENT.md).
+The complete-flow tests also caught a pre-existing time-unit boundary bug. Roku history/Video positions use seconds; Stremio `timeOffset` and `duration` use milliseconds ([official LibraryItemState](https://stremio.github.io/stremio-core/src/stremio_core/types/library/library_item.rs.html)). The account pump now converts outbound packets without mutating the seconds-valued outbox; sync/re-add paths convert incoming wire checkpoints back to native seconds. Regression tests cover a write/pull round trip. Existing incorrectly written cloud progress cannot be reconstructed automatically.

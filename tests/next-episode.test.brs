@@ -22,6 +22,7 @@ function EpisodeStore() as object
         m.calls.Push({name:name,a:a,b:b,c:c,h:h,i:i})
         if name = "TimeNowIso" then return "2026-10-14T12:00:00Z"
         if name = "LibraryIsChannelType" then return false
+        if name = "LibrarySetPosition" then return true
         return invalid
     end function}
 end function

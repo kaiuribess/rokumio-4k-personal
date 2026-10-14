@@ -106,7 +106,17 @@ class SubtitlesStore
             return result
         end if
 
-        result.subtitles = subtitles
+        result.subtitles = []
+        for each track in subtitles
+            if Type(track) <> "roAssociativeArray" then continue for
+            if GetInterface(track.url,"ifString") = invalid or Len(track.url) > 4096 then continue for
+            clean = {url:track.url}
+            for each key in ["id","lang","langName"]
+                if GetInterface(track[key],"ifString") <> invalid then clean[key] = Left(track[key],128)
+            end for
+            result.subtitles.Push(clean)
+            if result.subtitles.Count() >= 64 then exit for
+        end for
         result.ok = true
         return result
     end function

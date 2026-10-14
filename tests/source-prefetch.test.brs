@@ -503,7 +503,7 @@ m.autoClock.now = 750
 onAutomaticGrace()
 Harness_Ok(m.selectionTask <> invalid,"automatic selection starts after short grace despite slow provider")
 selection = m.selectionTask
-Harness_Equal(selection.streams.Count(),1,"early candidate pool contains only completed sources")
+Harness_Equal(selection.providerGroups[0].Count(),1,"early candidate pool contains only completed sources")
 selection.result = {streams:fast.result.streams}
 onAutomaticSourcesReady(PrefetchTest_Event(selection))
 Harness_Equal(m.pushCalls,1,"fast provider can start without waiting for every provider")
@@ -562,7 +562,7 @@ onSourcePrefetchChanged()
 selection.result = {streams:[]}
 onAutomaticSourcesReady(PrefetchTest_Event(selection))
 Harness_Ok(m.selectionTask <> invalid,"new results during empty early ranking are reranked rather than stranded")
-Harness_Equal(m.selectionTask.streams.Count(),2,"rerank includes the later provider")
+Harness_Equal(m.selectionTask.providerGroups[0].Count()+m.selectionTask.providerGroups[1].Count(),2,"rerank includes the later provider")
 
 Harness_Suite("Unavailable optional comparison clock never strands automatic selection")
 PrefetchTest_Setup(2)

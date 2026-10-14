@@ -88,6 +88,7 @@ sub init()
     if m.startupLimit <> invalid then m.startupLimit.ObserveField("fire", "onSourceStartupTimeout")
     m.sourceQueue = []
     m.sourceIndex = 0
+    m.discoveryPending = false
     m.retryPending = false
     m.playbackActive = false
     m.sourceAccepted = false
@@ -117,9 +118,12 @@ sub init()
     m.playArmed = false
     m.workerSequence = 0
     if m.playTimer <> invalid then m.playTimer.ObserveField("fire", "onPlayKickFire")
+    m.checkpointTimer = m.top.FindNode("localCheckpoint")
+    if m.checkpointTimer <> invalid then m.checkpointTimer.ObserveField("fire","onLocalCheckpoint")
 end sub
 
 function OnEnter(params as object) as void
+    m.accountGeneration = AccountEpoch_Read(m.top)
     if params = invalid or params.stream = invalid then return
     ResetAudioRecovery()
     m.playParams = params
@@ -133,9 +137,13 @@ function OnEnter(params as object) as void
     if params.autoSourceRetry = false then m.sourceQueue = AutoPlayback_Candidates(params.stream,invalid)
     if params.diagnosticControl = true then m.sourceQueue = [params.stream]
     m.sourceIndex = 0
+    m.discoveryPending = false
     m.sourceAccepted = false
     m.saved = false
     m.hasPlayed = false
+    m.lastDurablePosition = invalid
+    m.lastDurableDuration = invalid
+    if m.checkpointTimer <> invalid then m.checkpointTimer.control = "start"
     m.playingSegment = invalid
     m.resolvedPlayback = invalid
     m.devicePlaybackInfo = invalid
@@ -724,6 +732,7 @@ sub onSubtitleResult(event as object)
     firstTracks = m.subtitleTracks = invalid or m.subtitleTracks.Count() = 0
     if m.subtitleTracks = invalid then m.subtitleTracks = []
     for each track in result.subtitles
+        if m.subtitleTracks.Count() >= 64 then exit for
         subtitleUrl = PlaybackInfo_SubtitleUrl(track)
         if subtitleUrl = "" then continue for
         ' Provider values are untyped. Normalize the fields used by the native
@@ -1485,6 +1494,7 @@ sub ScheduleNextSource(reason as string)
             m.status.text = "No compatible English 4K source found in " + m.sourceQueue.Count().ToStr() + " attempts. Play/Pause retries; Back cancels."
         end if
         m.top.SetFocus(true)
+        if m.playParams.autoSourceRetry <> false then QueueSourceDiscovery(false)
         return
     end if
     m.status.text = "Trying another English audio source automatically…" + Chr(10) + "Back cancels"
@@ -1498,6 +1508,16 @@ end sub
 sub onAutoSourceRetry()
     if not m.playbackActive or not m.retryPending then return
     if not TimerGuard_Ready(m.retryTimer,m.retryGuard) then return
+    if m.discoveryPending = true
+        if m.sourceAccepted = true then SavePosition()
+        excluded = []
+        if Type(m.playParams.excludedUrls) = "roArray" then excluded.Append(m.playParams.excludedUrls)
+        for each candidate in m.sourceQueue
+            if excluded.Count() < 192 then excluded.Push(candidate.url)
+        end for
+        m.top.sourceRecoveryRequest = {videoId:m.playParams.videoId,position:m.playParams.position,excludedUrls:excluded,round:m.discoveryRound,manual:m.discoveryManual = true}
+        return
+    end if
     if m.sourceQueue = invalid or m.sourceIndex + 1 >= m.sourceQueue.Count() then return
     m.retryPending = false
     ' Save the accepted session on this timer boundary before clearing the
@@ -1646,10 +1666,9 @@ end sub
 function OnKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
     if key = "play" and m.playbackActive and m.sourceQueue <> invalid and m.sourceIndex + 1 >= m.sourceQueue.Count() and m.audioGuardBlocked
-        m.sourceIndex = -1
-        m.retryPending = true
-        m.retryGuard = TimerGuard_Start(m.retryTimer,500)
+        QueueSourceDiscovery(true)
         return true
+
     end if
     if m.video = invalid
         if key = "back" then return false
@@ -1707,8 +1726,10 @@ end function
 ' node. Nothing is reaped: this screen and its node are static children of the
 ' Scene and survive the pop, so the next play re-arms them in CreateVideo.
 function OnExit() as void
+    if m.checkpointTimer <> invalid then m.checkpointTimer.control = "stop"
     CancelNextEpisode()
     m.playbackActive = false
+    m.discoveryPending = false
     m.retryPending = false
     if m.retryTimer <> invalid then m.retryTimer.control = "stop"
     StopSourceStartupLimit()
@@ -1802,6 +1823,9 @@ sub BlurFocus()
 end sub
 
 sub SavePosition()
+    if m.accountGeneration <> invalid
+        if AccountEpoch_Read(m.top) <> m.accountGeneration then return
+    end if
     if m.playParams <> invalid and m.playParams.diagnostic = true then return
     if m.sourceAccepted = false then return
     if m.saved then return
@@ -1840,12 +1864,28 @@ sub SavePosition()
     if params.posterShape <> invalid then posterShape = params.posterShape
 
     key = MetadataOrigin_Key(m.stores,params.addonAddress)
-    m.stores.library.callFunc("LibrarySetPosition", params.videoId, params.metaId, params.metaType, season, episode, name, poster, Int(position), Int(duration), posterShape, key)
+    durable = m.stores.library.callFunc("LibrarySetPosition", params.videoId, params.metaId, params.metaType, season, episode, name, poster, Int(position), Int(duration), posterShape, key)
     mid = ""
     if params.metaId <> invalid then mid = params.metaId
     m.stores.library.callFunc("LibraryMarkWatchedIfFinished", mid, params.videoId, Int(position), Int(duration))
-    m.saved = true
+    m.saved = durable = true
+    if m.saved
+        m.lastDurablePosition = Int(position)
+        m.lastDurableDuration = Int(duration)
+    end if
     PublishWatchState()
+end sub
+
+sub onLocalCheckpoint()
+    if m.playbackActive <> true or m.sourceAccepted <> true or m.hasPlayed <> true or m.retryPending = true then return
+    if m.playParams = invalid or m.playParams.diagnostic = true or m.stores = invalid then return
+    if m.stores.library.callFunc("LibraryIsChannelType",PlaybackInfo_Text(m.playParams.metaType)) then return
+    snapshot = PlaybackPosition_Snapshot()
+    if m.lastDurablePosition = Int(snapshot.position) and m.lastDurableDuration = Int(snapshot.duration) then return
+    m.saved = false
+    SavePosition()
+    ' Final exit must still save newer progress after this checkpoint.
+    m.saved = false
 end sub
 
 ' Publish the current playback position through the watchStateUpdate field for
@@ -1855,6 +1895,9 @@ end sub
 ' local state — the player never touches the API — and harmless in a guest
 ' session, where MainScene drops it.
 sub PublishWatchState()
+    if m.accountGeneration <> invalid
+        if AccountEpoch_Read(m.top) <> m.accountGeneration then return
+    end if
     if not m.sourceAccepted then return
     if m.playParams <> invalid and m.playParams.diagnostic = true then return
     if m.playParams = invalid or m.playParams.videoId = invalid then return
@@ -1881,6 +1924,9 @@ sub PublishWatchState()
     if params.poster <> invalid then poster = params.poster
 
     packet = {
+        accountGeneration:m.accountGeneration
+        season:ResolveOrdinal(params.season)
+        episode:ResolveOrdinal(params.episode)
         videoId: params.videoId
         metaId: params.metaId
         metaType: metaType
@@ -1895,3 +1941,25 @@ sub PublishWatchState()
     m.stores.watch.callFunc("WatchRecord", packet)
     m.top.watchStateUpdate = packet
 end sub
+
+' Discover more only after the current pool exhausted, on a deferred timer.
+function QueueSourceDiscovery(manual as boolean) as boolean
+    if m.playParams = invalid or m.playParams.diagnostic = true then return false
+    if GetInterface(m.playParams.videoId,"ifString") = invalid or m.playParams.videoId = "" then return false
+    round = 0
+    if m.playParams.recoveryRound <> invalid then round = m.playParams.recoveryRound
+    if not manual and round >= 2 then return false
+    m.discoveryRound = round + 1
+    if manual then m.discoveryRound = 1
+    m.discoveryManual = manual
+    m.discoveryPending = true
+    m.retryPending = true
+    m.status.text = "Checking remaining providers and fresh links…" + Chr(10) + "Back cancels"
+    m.retryGuard = TimerGuard_Start(m.retryTimer,500)
+    return true
+end function
+
+function CanRecoverSources(videoId as string) as boolean
+    if m.accountGeneration <> invalid and AccountEpoch_Read(m.top) <> m.accountGeneration then return false
+    return m.playbackActive = true and m.discoveryPending = true and m.playParams <> invalid and m.playParams.videoId = videoId
+end function

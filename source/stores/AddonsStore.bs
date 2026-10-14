@@ -11,8 +11,8 @@
 '
 ' Persistence is session-aware registry keys: a guest session uses "addons"
 ' (FormatJson of an AA keyed by addon id) + "addons_removed" (a JSON array of
-' removed built-in ids); a stremio session uses "stremio_addons" +
-' "stremio_addons_removed" so the two sessions never share state. The registry
+' removed built-in ids); production Stremio keys include the opaque account
+' scope. Unowned legacy account keys are ignored on upgrade. The registry
 ' section object is shared; only the key changes. Records are plain data only —
 ' FormatJson drops unsupported values.
 '
@@ -37,15 +37,30 @@ const OPENSUBTITLES_V3_ADDRESS = "https://opensubtitles-v3.strem.io"
 class AddonsStore
     transport as object
     registry as dynamic
+    persistenceRegistry as dynamic
     sessionType as string
+    accountScope as string
+    dirty as boolean
+    allowLocalHttp as boolean
     showBuiltIns as boolean
     installed as object
     removed as object
     order as object
 
-    sub new(http as object, registry = invalid as dynamic, sessionType = "guest" as string)
+    sub new(http as object, registry = invalid as dynamic, sessionType = "guest" as string, accountScope = invalid as dynamic, allowLocalHttp = false as boolean)
         m.transport = http
+        m.persistenceRegistry = registry
         m.registry = registry
+        m.accountScope = ""
+        m.dirty = false
+        m.allowLocalHttp = allowLocalHttp
+        if GetInterface(accountScope,"ifString") <> invalid then m.accountScope = accountScope
+        if sessionType = "stremio" and accountScope = "" then m.registry = invalid
+        if m.registry <> invalid and accountScope <> invalid
+            m.registry.Delete("stremio_addons")
+            m.registry.Delete("stremio_addons_order")
+            m.registry.Delete("stremio_addons_removed")
+        end if
         m.sessionType = "guest"
         if sessionType = "stremio" then m.sessionType = "stremio"
         m.showBuiltIns = (m.sessionType = "guest")
@@ -158,6 +173,7 @@ class AddonsStore
             end for
         end if
         if host = "" then return ""
+        if scheme = "http" and (m.allowLocalHttp <> true or not m.IsPrivateHttpHost(host)) then return ""
         if portStr <> ""
             if portStr.Len() > 5 then return ""
             for i = 0 to portStr.Len() - 1
@@ -178,6 +194,33 @@ class AddonsStore
     ' — those query args are the user's add-on config (e.g. a ?token=... API
     ' key) and must ride along on every later request. Returns "" when
     ' the URL carries no /manifest.json.
+    sub SetLocalHttpAllowed(value as boolean)
+        m.allowLocalHttp = value
+    end sub
+
+    function IsPrivateHttpHost(host as string) as boolean
+        if LCase(host) = "localhost" or host = "[::1]" then return true
+        parts = host.Split(".")
+        if parts.Count() <> 4 then return false
+        octets = []
+        for each part in parts
+            if not CreateObject("roRegex","^[0-9]{1,3}$","").IsMatch(part) then return false
+            n = Val(part)
+            if n < 0 or n > 255 then return false
+            octets.Push(n)
+        end for
+        return octets[0] = 10 or octets[0] = 127 or (octets[0] = 192 and octets[1] = 168) or (octets[0] = 172 and octets[1] >= 16 and octets[1] <= 31)
+    end function
+
+    function StoredHttpAllowed(record as object) as boolean
+        if not m.IsNonemptyString(record.address) then return true
+        if LCase(record.address).Left(7) <> "http://" then return true
+        parts = record.address.Split("?")
+        url = parts[0] + "/manifest.json"
+        if parts.Count() > 1 then url = url + record.address.Mid(record.address.InStr("?"))
+        return m.SanitizeUrl(url) <> ""
+    end function
+
     function BaseFromManifestUrl(url as string) as string
         candidate = m.SanitizeUrl(url)
         if candidate = "" then return ""
@@ -484,6 +527,10 @@ class AddonsStore
     function ManifestError(manifest as dynamic) as string
         if Type(manifest) <> "roAssociativeArray" then return "manifest must be a JSON object"
         if not m.IsNonemptyString(manifest.id) or not m.IsNonemptyString(manifest.name) then return "manifest missing id or name"
+        if Len(manifest.id) > 256 or Len(manifest.name) > 256 then return "manifest identity exceeds the device budget"
+        for each field in ["types","resources","idPrefixes","catalogs"]
+            if Type(manifest[field]) = "roArray" and manifest[field].Count() > 64 then return "manifest lists exceed the device budget"
+        end for
         if Type(manifest.types) <> "roArray" then return "manifest media types must be a list"
         for each mediaType in manifest.types
             if not m.IsNonemptyString(mediaType) then return "manifest contains an invalid media type"
@@ -564,6 +611,8 @@ class AddonsStore
         if Type(record) <> "roAssociativeArray" then return false
         if not m.IsNonemptyString(record.id) then return false
         if m.HasKey(m.installed, record.id) then return false
+        if not m.StoredHttpAllowed(record) then return false
+        if m.order.Count() >= 64 then return false
         m.installed[record.id] = record
         ' Registration order is display order (see GetAll). Appended, not
         ' inserted: during an account sync the descriptors arrive in the order
@@ -647,6 +696,33 @@ class AddonsStore
         result.id = record.id
         result.record = record
         return result
+    end function
+
+    function ReconcileAccount(descriptors as dynamic) as object
+        if m.sessionType <> "stremio" or Type(descriptors) <> "roArray" then return {ok:false,error:"No valid account snapshot"}
+        if descriptors.Count() > 64 then return {ok:false,error:"Account add-on collection exceeds the device budget"}
+        staging = AddonsStore(m.transport,invalid,"stremio")
+        staging.SetLocalHttpAllowed(m.allowLocalHttp)
+        for each descriptor in descriptors
+            if Type(descriptor) <> "roAssociativeArray" then return {ok:false,error:"Invalid account add-on snapshot"}
+            outcome = staging.InstallFromDescriptor(descriptor.transportUrl,descriptor.manifest)
+            if outcome.ok <> true then return {ok:false,error:"Account add-ons could not be validated"}
+            staging.installed[outcome.id].accountOwned = true
+        end for
+        ' Explicit local additions remain separate; account IDs/order win.
+        for each id in m.order
+            if m.HasKey(m.installed,id) and not staging.HasKey(staging.installed,id)
+                if m.installed[id].accountOwned <> true
+                    if staging.order.Count() >= 64 then return {ok:false,error:"Account plus local add-ons exceed the device budget"}
+                    staging.installed[id] = m.installed[id]
+                    staging.order.Push(id)
+                end if
+            end if
+        end for
+        m.installed = staging.installed
+        m.order = staging.order
+        persisted = m.Save()
+        return {ok:true,persisted:persisted,error:"",count:m.order.Count()}
     end function
 
     ' Remove an installed add-on, or a shipped built-in. The caller says which
@@ -743,10 +819,10 @@ class AddonsStore
         m.SortByNameThenId(unlisted)
 
         for each id in m.order
-            if m.HasKey(m.installed, id) then list.Push(m.installed[id])
+            if m.HasKey(m.installed, id) and m.StoredHttpAllowed(m.installed[id]) then list.Push(m.installed[id])
         end for
         for each record in unlisted
-            list.Push(record)
+            if m.StoredHttpAllowed(record) then list.Push(record)
         end for
         return list
     end function
@@ -819,12 +895,15 @@ class AddonsStore
     ' session can never surface the other's installed add-ons or removals. The
     ' registry section object is shared; only the key name changes.
     function RegistryKey() as string
-        if m.sessionType = "stremio" then return "stremio_addons"
+        if m.sessionType = "stremio"
+            if m.accountScope <> "" then return "account_" + m.accountScope + "_addons"
+            return "stremio_addons"
+        end if
         return "addons"
     end function
 
     function RemovedKey() as string
-        if m.sessionType = "stremio" then return "stremio_addons_removed"
+        if m.sessionType = "stremio" then return m.RegistryKey() + "_removed"
         return "addons_removed"
     end function
 
@@ -840,9 +919,22 @@ class AddonsStore
     ' Repoint the store at another session's data. A same-session switch is a
     ' no-op; installed/removed are reloaded fresh so the in-memory state always
     ' mirrors the active session's persisted key.
-    sub SwitchSession(sessionType as string)
+    sub SwitchSession(sessionType as string, accountScope = invalid as dynamic)
         if sessionType <> "guest" and sessionType <> "stremio" then return
-        if m.sessionType = sessionType then return
+        nextScope = m.accountScope
+        if GetInterface(accountScope,"ifString") <> invalid then nextScope = accountScope
+        if sessionType = "guest" then nextScope = ""
+        if m.sessionType = sessionType and m.accountScope = nextScope then return
+        if m.registry <> invalid and m.sessionType = "stremio" and m.accountScope <> ""
+            m.registry.Delete(m.RegistryKey())
+            m.registry.Delete(m.OrderKey())
+            m.registry.Delete(m.RemovedKey())
+            m.registry.Flush()
+        end if
+        m.accountScope = nextScope
+        m.dirty = false
+        m.registry = m.persistenceRegistry
+        if sessionType = "stremio" and accountScope = "" then m.registry = invalid
         m.sessionType = sessionType
         m.showBuiltIns = (sessionType = "guest")
         m.installed = {}
@@ -851,18 +943,24 @@ class AddonsStore
         m.Load()
     end sub
 
-    sub Save()
-        if m.registry = invalid then return
-        m.registry.Write(m.RegistryKey(), FormatJson(m.installed))
-        m.registry.Write(m.OrderKey(), FormatJson(m.order))
-        m.registry.Flush()
-    end sub
+    function Save() as boolean
+        m.dirty = true
+        if m.registry = invalid then return false
+        recordsWritten = m.registry.Write(m.RegistryKey(), FormatJson(m.installed)) = true
+        orderWritten = m.registry.Write(m.OrderKey(), FormatJson(m.order)) = true
+        removedWritten = m.registry.Write(m.RemovedKey(), FormatJson(m.removed)) = true
+        committed = m.registry.Flush() = true
+        m.dirty = not (recordsWritten and orderWritten and removedWritten and committed)
+        return not m.dirty
+    end function
 
-    sub SaveRemoved()
-        if m.registry = invalid then return
-        m.registry.Write(m.RemovedKey(), FormatJson(m.removed))
-        m.registry.Flush()
-    end sub
+    function SaveFailed() as boolean
+        return m.dirty
+    end function
+
+    function SaveRemoved() as boolean
+        return m.Save()
+    end function
 
     sub Load()
         if m.registry = invalid then return
@@ -885,8 +983,10 @@ class AddonsStore
                     record = parsed[id]
                     if Type(record) <> "roAssociativeArray" then continue for
                     if not m.IsNonemptyString(record.id) or not m.IsNonemptyString(record.name) then continue for
+                    if not m.StoredHttpAllowed(record) then continue for
                     if record.resources <> invalid then record.resources = m.NormalizeResources(record.resources)
                     if record.catalogs <> invalid then record.catalogs = m.NormalizeCatalogNames(record.catalogs, record.name)
+                    if m.installed.Count() >= 64 then exit for
                     m.installed[id] = record
                 end for
             end if

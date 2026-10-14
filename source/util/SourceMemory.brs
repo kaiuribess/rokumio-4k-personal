@@ -320,8 +320,7 @@ function SourceMemory_Save(registry as dynamic, data as dynamic, now as dynamic)
         raw = FormatJson(SourceMemory_Normalize(data,now))
         if Len(raw) > 6144 then return false
         if not registry.Write(SourceMemory_RegistryKey(),raw) then return false
-        registry.Flush()
-        return true
+        return registry.Flush() = true
     catch e
         return false
     end try

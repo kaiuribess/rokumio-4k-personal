@@ -52,6 +52,7 @@ sub init()
 end sub
 
 function OnEnter(params as object) as void
+    m.accountGeneration = AccountEpoch_Read(m.top)
     ' Re-entry after a push (EpisodesScreen, streams, …): params is invalid and
     ' the screen Group (not a focus target) was handed focus by the stack. The
     ' chip RowList must take it back, or nothing inside is reachable.
@@ -414,6 +415,9 @@ function ResumePosition() as integer
 end function
 
 sub ToggleLibrary()
+    if m.accountGeneration <> invalid
+        if AccountEpoch_Read(m.top) <> m.accountGeneration then return
+    end if
     if m.stores = invalid then return
     ' A meta from an add-on that ships no shape (or no poster) leaves those fields
     ' invalid. Every library boundary here is a typed string param, and Roku
@@ -449,6 +453,7 @@ sub ToggleLibrary()
     ' either way, so the Library screen reflects it before the account does.
     if m.stores.library.callFunc("LibrarySessionType") = "stremio"
         m.top.libraryChange = {
+            accountGeneration:m.accountGeneration
             metaId: m.meta.id
             metaType: m.meta.type
             name: m.meta.name

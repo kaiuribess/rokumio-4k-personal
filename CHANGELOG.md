@@ -1,5 +1,23 @@
 # Changes
 
+## 0.5.18 — 2026-10-14
+
+This is a reliability release responding to the deeper 0.5.17 audit. It remains an experimental prerelease without physical Roku sign-off.
+
+- Separate Stremio caches and pending edits by an opaque account identity. Ignore unowned legacy account caches; disown old account workers, pairing results, import results and local screen writes on a session change. Clear provider discovery and rebuild Home when the account changes.
+- Replace global pending write slots with a bounded per-item/per-kind queue. Coalesce only edits to the same item, wait for an initial account snapshot, retain unsuccessful writes, and preserve the pending outbox in account-owned storage. Settings → Retry saved changes refreshes the account baseline before replaying; uncertain writes restored after restart await explicit retry.
+- Check both registry Write and Flush. Retain dirty state, restore prior buffered values after refused transactions where possible, and retry outside native Video callbacks. Admission counts all registry sections against a conservative 30 KiB uncompressed budget; native compressed registry limits remain authoritative.
+- Fix the seconds/milliseconds boundary between Roku playback and Stremio library state, including synced resume and re-add paths. Preserve unsynced episode marks/unmarks with the durable outbox and reapply pending local resume after a fresh account pull.
+- Add dirty-only local resume checkpoints every 30 seconds during accepted playback. Failed flushes cannot advance acknowledged progress. Diagnostics, live channels, unaccepted sources and old account screens cannot save a checkpoint.
+- Reconcile validated account add-on snapshots as a whole: replace changed configurations, remove absent account-owned providers, apply order and retain intentional local additions. Invalid/failed snapshots preserve the previous usable collection.
+- Acquire HTTP bodies into temporary files with endpoint-specific decoded size checks before reading/parsing, plus JSON-depth checks. Bound retained source fields and share 1,024 candidates/1 MiB of serialized source data across the active title's providers, with individual limits of 256/256 KiB. Provider/manifest collections are bounded; subtitles have a 64-track merged cap. Temporary transfer files can overshoot between checks; this is not a hard socket or total application-memory cap.
+- Construct and rank automatic provider pools in a worker. Exhausting an early playback pool resumes queued discovery or refreshes an exhausted batch, excludes attempted exact delivery URLs in memory, retains the checkpoint and permits at most two automatic recovery rounds. Explicit retry requests fresh discovery. Late results cannot replace accepted playback.
+- Never automatically replay POST failures; GET/HEAD negative transport failures retain bounded retries. Require transport and application success for Stremio write acknowledgements.
+- Require HTTPS for public provider manifests, including cached/off-thread admission. An explicit local development setting permits HTTP private numeric IPs/localhost entered on Roku; the browser setup page continues to require HTTPS.
+- Publish the exact tested CI ZIP with checksum, package verification and commit/run provenance rather than a separate release rebuild.
+
+The LAN setup page still requires the Add-ons screen and retains its Host/Origin protections. A short-lived pairing code/TV confirmation remains a hardening recommendation. Native installation/upgrade, audible stereo/surround, full-film stability, seeking, episode transitions and memory profiling remain hardware validation work; software tests do not certify these.
+
 ## 0.5.17 — 2026-10-14
 
 - Fixed Home catalog re-entry: switching Movies/Shows/See all resets the prior page offset and results, so valid new pages replace the old titles.

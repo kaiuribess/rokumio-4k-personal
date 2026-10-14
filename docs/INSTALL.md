@@ -2,7 +2,7 @@
 
 ## Install the release ZIP
 
-**[Download the installable Roku ZIP — 0.5.17](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.17/rokumio-4k-personal-0.5.17.zip)**. Keep it zipped. This direct link avoids GitHub's source-code archives; those archives cannot be uploaded as the channel package.
+**[Download the installable Roku ZIP — 0.5.18](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.18/rokumio-4k-personal-0.5.18.zip)**. Keep it zipped. This direct link avoids GitHub's source-code archives; those archives cannot be uploaded as the channel package.
 
 1. On the Roku remote press **Home three times, Up twice, Right, Left, Right, Left, Right**.
 2. Write down the device URL displayed on the developer screen, enable the installer, review Roku's terms, and set an installer password privately. Roku restarts.

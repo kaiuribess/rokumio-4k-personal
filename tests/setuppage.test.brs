@@ -131,11 +131,9 @@ sub Test_Setup_ManifestUrlValidation()
 
     okList = [
         "https://a.example/manifest.json"
-        "http://a.example/manifest.json"
         "https://a.example/with/path/manifest.json"
         "https://a.example/manifest.json?token=abc"
         "https://a.example:8443/manifest.json"
-        "http://a.example:8080/manifest.json"
         "https://a.example/config:with:colons/manifest.json"
     ]
     for each url in okList
@@ -144,6 +142,8 @@ sub Test_Setup_ManifestUrlValidation()
 
     ' Malformed authorities and a filename other than manifest.json are refused.
     bad = [
+        "http://a.example/manifest.json"
+        "http://a.example:8080/manifest.json"
         ""
         "http://a.example/manifest.json extra"
         "https://a.example"

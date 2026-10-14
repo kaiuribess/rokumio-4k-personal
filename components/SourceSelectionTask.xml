@@ -2,6 +2,8 @@
 <component name="SourceSelectionTask" extends="Task">
     <interface>
         <field id="streams" type="array" />
+        <field id="providerGroups" type="array" />
+        <field id="excludedUrls" type="array" />
         <field id="videoId" type="string" value="" />
         <field id="audioMode" type="string" value="projector" />
         <field id="fourKOnly" type="boolean" value="false" />

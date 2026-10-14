@@ -5,7 +5,7 @@ sub save()
     ok = false
     try
         now = SourceMemory_Now()
-        registry = CreateObject("roRegistrySection", "playbackMemory")
+        registry = RegistryIO(CreateObject("roRegistrySection", "playbackMemory"),"playbackMemory")
         data = SourceMemory_Load(registry,now)
         if Type(m.top.events) = "roArray"
             for each entry in m.top.events

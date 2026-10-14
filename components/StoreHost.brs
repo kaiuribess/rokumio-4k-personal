@@ -30,18 +30,19 @@ sub init()
     ' with: BrightScript identifiers are case-insensitive, so a local called
     ' authStore IS the class AuthStore to the compiler, and a local called
     ' sessionType IS the function EffectiveSessionType below.
-    auth = AuthStore(CreateObject("roRegistrySection", "auth"))
+    auth = AuthStore(RegistryIO(CreateObject("roRegistrySection", "auth"),"auth"))
     bootSession = "guest"
     if auth.GetSession() = "stremio" then bootSession = "stremio"
 
+    preferences = SettingsStore(RegistryIO(CreateObject("roRegistrySection", "settings"),"settings"))
     m.stores = {
         transport: http
-        settings: SettingsStore(CreateObject("roRegistrySection", "settings"))
+        settings: preferences
         auth: auth
-        addons: AddonsStore(http, CreateObject("roRegistrySection", "addons"), bootSession)
+        addons: AddonsStore(http, RegistryIO(CreateObject("roRegistrySection", "addons"),"addons"), bootSession, auth.GetCacheScope(),preferences.allowLocalHttp)
         catalog: CatalogStore(http)
         episodes: EpisodesStore(http)
-        library: LibraryStore(CreateObject("roRegistrySection", "library"), bootSession)
+        library: LibraryStore(RegistryIO(CreateObject("roRegistrySection", "library"),"library"), bootSession, auth.GetCacheScope())
         playback: PlaybackStore(http)
         time: TimeUtil()
         watch: WatchStateBuffer()
@@ -51,6 +52,7 @@ sub init()
     ' re-targeted by SwitchSession — so a new session-aware store joins this one
     ' list and every auth flow reconciles it automatically.
     m.sessionAware = [m.stores.addons, m.stores.library]
+    m.stores.addons.SetLocalHttpAllowed(m.stores.settings.allowLocalHttp)
     ' Only fixed labels and counts: never print configured addresses or credentials.
     savedProviders = 0
     for each addon in m.stores.addons.GetAll()
@@ -78,9 +80,19 @@ end function
 ' logout and guest-continuation can never leave one of them on the old session.
 sub SwitchSession(newSession as string)
     for each store in m.sessionAware
-        store.SwitchSession(newSession)
+        store.SwitchSession(newSession,m.stores.auth.GetCacheScope())
     end for
 end sub
+
+function RetryPersistence() as object
+    failed = false
+    for each store in [m.stores.auth,m.stores.library,m.stores.addons,m.stores.settings]
+        if store.SaveFailed()
+            if not store.Save() then failed = true
+        end if
+    end for
+    return {failed:failed}
+end function
 
 ' LibraryStore keeps its session type as state rather than deriving it, so a
 ' screen that needs it asks here instead of reaching into the instance.
@@ -97,6 +109,22 @@ end function
 function AddonsGetAll() as object
     return m.stores.addons.GetAll()
 end function
+
+function LibraryGetAccountOutbox() as object
+    return m.stores.library.GetAccountOutbox()
+end function
+
+function LibrarySetAccountOutbox(jobs as object) as boolean
+    return m.stores.library.SetAccountOutbox(jobs)
+end function
+
+function AddonsReconcileAccount(descriptors as dynamic) as object
+    return m.stores.addons.ReconcileAccount(descriptors)
+end function
+
+sub WatchClear()
+    m.stores.watch.Clear()
+end sub
 
 ' addons.HasResource
 function AddonsHasResource(resources as dynamic, name as string) as boolean
@@ -313,8 +341,8 @@ function LibraryIsChannelType(metaType as string) as boolean
 end function
 
 ' library.SetPosition
-function LibrarySetPosition(videoId as string, metaId as string, metaType as string, season as integer, episode as integer, name as string, poster = "" as string, position = 0 as integer, duration = 0 as integer, posterShape = "" as string, metadataProviderKey = "" as string) as void
-    m.stores.library.SetPosition(videoId, metaId, metaType, season, episode, name, poster, position, duration, posterShape, metadataProviderKey)
+function LibrarySetPosition(videoId as string, metaId as string, metaType as string, season as integer, episode as integer, name as string, poster = "" as string, position = 0 as integer, duration = 0 as integer, posterShape = "" as string, metadataProviderKey = "" as string) as boolean
+    return m.stores.library.SetPosition(videoId, metaId, metaType, season, episode, name, poster, position, duration, posterShape, metadataProviderKey)
 end function
 
 ' library.SyncFromStremio
@@ -358,7 +386,9 @@ function SettingsRecordWorkingProviderKey(value as string) as boolean
 end function
 
 function SettingsSetPlaybackOption(optionName as string, value as boolean) as boolean
-    return m.stores.settings.SetPlaybackOption(optionName,value)
+    saved = m.stores.settings.SetPlaybackOption(optionName,value)
+    m.stores.addons.SetLocalHttpAllowed(m.stores.settings.allowLocalHttp)
+    return saved
 end function
 
 function SettingsSetAudioMode(value as string) as boolean

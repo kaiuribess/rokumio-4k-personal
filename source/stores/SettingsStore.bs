@@ -29,6 +29,7 @@ class SettingsStore
     autoNextEpisode as boolean
     autoSourceRetry as boolean
     waitForProviders as boolean
+    allowLocalHttp as boolean
     preferredProviderKey as string
     lastWorkingProviderKey as string
     workingProviderDirty as boolean
@@ -43,6 +44,7 @@ class SettingsStore
         m.autoNextEpisode = true
         m.autoSourceRetry = true
         m.waitForProviders = false
+        m.allowLocalHttp = false
         m.preferredProviderKey = ""
         m.lastWorkingProviderKey = ""
         m.workingProviderDirty = false
@@ -122,7 +124,7 @@ class SettingsStore
     end function
 
     function GetPlaybackOptions() as object
-        return {fourKOnly:m.fourKOnly,autoNextEpisode:m.autoNextEpisode,autoSourceRetry:m.autoSourceRetry,waitForProviders:m.waitForProviders}
+        return {fourKOnly:m.fourKOnly,autoNextEpisode:m.autoNextEpisode,autoSourceRetry:m.autoSourceRetry,waitForProviders:m.waitForProviders,allowLocalHttp:m.allowLocalHttp}
     end function
 
     function GetProviderPriority() as object
@@ -146,17 +148,16 @@ class SettingsStore
         m.workingProviderDirty = true
         if m.registry = invalid then m.workingProviderDirty = false:return true
         ok = m.registry.Write("lastWorkingProviderKey",value)
-        m.registry.Flush()
+        if m.registry.Flush() <> true then ok = false
         m.saveRefused = not ok
         m.workingProviderDirty = not ok
         return ok
     end function
 
     function SetPlaybackOption(optionName as string, value as boolean) as boolean
-        if optionName <> "fourKOnly" and optionName <> "autoNextEpisode" and optionName <> "autoSourceRetry" and optionName <> "waitForProviders" then return false
+        if optionName <> "fourKOnly" and optionName <> "autoNextEpisode" and optionName <> "autoSourceRetry" and optionName <> "waitForProviders" and optionName <> "allowLocalHttp" then return false
         m[optionName] = value
-        m.Save()
-        return true
+        return m.Save()
     end function
 
     ' Writes every field through the registry and flushes. roRegistrySection.Write
@@ -177,12 +178,13 @@ class SettingsStore
         lastSaved = m.registry.Write("lastWorkingProviderKey",m.lastWorkingProviderKey)
         m.workingProviderDirty = not lastSaved
         if not lastSaved then ok = false
-        for each optionName in ["fourKOnly","autoNextEpisode","autoSourceRetry","waitForProviders"]
+        for each optionName in ["fourKOnly","autoNextEpisode","autoSourceRetry","waitForProviders","allowLocalHttp"]
             value = "false"
             if m[optionName] then value = "true"
             if not m.registry.Write(optionName,value) then ok = false
         end for
-        m.registry.Flush()
+        if m.registry.Flush() <> true then ok = false
+        if not ok then m.workingProviderDirty = true
         m.saveRefused = not ok
         return ok
     end function
@@ -207,7 +209,7 @@ class SettingsStore
         recent = m.registry.Read("lastWorkingProviderKey")
         if m.IsProviderKey(preferred) then m.preferredProviderKey = preferred
         if m.IsProviderKey(recent) then m.lastWorkingProviderKey = recent
-        for each optionName in ["fourKOnly","autoNextEpisode","autoSourceRetry","waitForProviders"]
+        for each optionName in ["fourKOnly","autoNextEpisode","autoSourceRetry","waitForProviders","allowLocalHttp"]
             value = m.registry.Read(optionName)
             if value = "true" then m[optionName] = true
             if value = "false" then m[optionName] = false

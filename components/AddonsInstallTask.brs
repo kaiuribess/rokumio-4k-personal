@@ -14,6 +14,7 @@ sub install()
     try
         http = Transport()
         store = AddonsStore(http)
+        store.SetLocalHttpAllowed(m.top.allowLocalHttp = true)
         result = store.Install(m.top.address)
         record = invalid
         if result.ok and result.id <> invalid and result.id <> ""
@@ -26,6 +27,6 @@ sub install()
             record: record
         }
     catch e
-        m.top.result = { ok: false, id: "", error: e.message, record: invalid }
+        m.top.result = { ok: false, id: "", error: "Add-on could not be processed", record: invalid }
     end try
 end sub

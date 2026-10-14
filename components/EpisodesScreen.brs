@@ -67,6 +67,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
 end function
 
 function OnEnter(params as object) as void
+    m.accountGeneration = AccountEpoch_Read(m.top)
     ' Re-entry after a push (streams, player, …): params is invalid and the
     ' screen Group was handed focus by the stack. The episode RowList must take
     ' it back, or nothing inside is reachable — the list and its seasons survive,
@@ -450,6 +451,9 @@ end sub
 ' "restWatched"/"restUnwatched" operate on the focused season's video id list,
 ' from its first episode through the focused one.
 sub ApplyWatchChange(kind as string, action as object)
+    if m.accountGeneration <> invalid
+        if AccountEpoch_Read(m.top) <> m.accountGeneration then return
+    end if
     if m.stores = invalid then return
     if kind = "watch"
         m.stores.library.callFunc("LibraryMarkEpisodeWatched", action.metaId, action.videoId)
@@ -461,6 +465,7 @@ sub ApplyWatchChange(kind as string, action as object)
         m.stores.library.callFunc("LibraryMarkEpisodeUnwatched", action.metaId, action.videoId)
     end if
     m.top.watchedChange = {
+        accountGeneration:m.accountGeneration
         metaId: action.metaId
         videoId: action.videoId
         orderedVideoIds: m.orderedVideoIds

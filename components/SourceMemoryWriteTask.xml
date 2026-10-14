@@ -5,5 +5,6 @@
         <field id="result" type="assocarray" alwaysNotify="true" />
     </interface>
     <script type="text/brightscript" uri="pkg:/source/util/SourceMemory.brs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/RegistryIO.bs" />
     <script type="text/brightscript" uri="pkg:/components/SourceMemoryWriteTask.brs" />
 </component>

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component name="AddonSyncTask" extends="Task">
     <interface>
+        <field id="accountGeneration" type="integer" value="0" />
         <field id="authKey" type="string" value="" />
         <field id="result" type="assocarray" alwaysNotify="true" />
         <!-- How far sync() got, so a fault can name the hop that died instead of

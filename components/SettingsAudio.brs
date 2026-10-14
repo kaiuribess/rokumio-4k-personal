@@ -15,7 +15,7 @@ sub ApplyAudioSetup(mode as string)
     else
         m.status.text = "TV / projector speakers selected. Set Roku digital audio Stereo for compatible stereo sources."
     end if
-    if m.stores.settings.callFunc("SettingsSaveFailed") then m.status.text = m.status.text + " — not saved"
+    if m.stores.settings.callFunc("SettingsSaveFailed") = true then m.status.text = m.status.text + " — not saved"
     ReportSaveFault()
     BuildRows(true)
 end sub
@@ -61,9 +61,9 @@ sub ApplyPlaybackOption(kind as string, index as integer)
         value = index = 1
     end if
     if key = "" then return
-    if m.stores.settings.callFunc("SettingsSetPlaybackOption",key,value) <> true then return
+    acknowledged = m.stores.settings.callFunc("SettingsSetPlaybackOption",key,value) = true
     m.status.text = "Playback preference updated. Applies to new playback."
-    if m.stores.settings.callFunc("SettingsSaveFailed") then m.status.text = m.status.text + " — not saved"
+    if not acknowledged or m.stores.settings.callFunc("SettingsSaveFailed") = true then m.status.text = m.status.text + " — not saved"
     ReportSaveFault()
     BuildRows(true)
 end sub
