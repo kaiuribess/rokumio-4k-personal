@@ -341,8 +341,8 @@ function LibraryIsChannelType(metaType as string) as boolean
 end function
 
 ' library.SetPosition
-function LibrarySetPosition(videoId as string, metaId as string, metaType as string, season as integer, episode as integer, name as string, poster = "" as string, position = 0 as integer, duration = 0 as integer, posterShape = "" as string, metadataProviderKey = "" as string) as boolean
-    return m.stores.library.SetPosition(videoId, metaId, metaType, season, episode, name, poster, position, duration, posterShape, metadataProviderKey)
+function LibrarySetPosition(packet as dynamic) as boolean
+    return m.stores.library.SetPositionRecord(packet)
 end function
 
 ' library.SyncFromStremio

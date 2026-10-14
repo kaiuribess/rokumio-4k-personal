@@ -212,12 +212,21 @@ function CreateSyncHttpClient() as object
     ' is an answer and a timeout (status 0) must not be multiplied by full waits.
     client._execute = function(request as object) as object
         attempt = 1
+        budget = request.timeoutMs
+        if budget = invalid then budget = REQUEST_TIMEOUT_MS
+        clock = CreateObject("roTimespan")
+        clock.Mark()
         while true
-            result = m._attempt(request)
+            remaining = budget - clock.TotalMilliseconds()
+            if remaining <= 0 then return m._trace(request,{ok:false,status:0,body:"",error:"Request timed out"})
+            bounded = {method:request.method,url:request.url,headers:request.headers,body:request.body,timeoutMs:remaining}
+            result = m._attempt(bounded)
             if result.ok then return m._trace(request, result)
             if not m._retryable(result.status,request.method) then return m._trace(request, result)
             if attempt >= MAX_TRANSPORT_ATTEMPTS then return m._trace(request, result)
-            Wait(m._retryAfter(attempt), invalid)
+            delay = m._retryAfter(attempt)
+            if clock.TotalMilliseconds() + delay >= budget then return m._trace(request,result)
+            Wait(delay, invalid)
             attempt = attempt + 1
         end while
     end function

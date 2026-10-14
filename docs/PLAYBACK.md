@@ -70,3 +70,11 @@ Cloud changes are optimistic until acknowledged by the server. Distinct titles h
 Public manifest configuration requires HTTPS. Settings → Local development HTTP defaults to Off and admits only private numeric IPs/localhost when explicitly enabled; type such development URLs on Roku. Public HTTP links are rejected, and old public HTTP provider records are not restored. The browser import page remains HTTPS-only.
 
 Roku resume/history and the outbox use seconds. The Stremio API uses milliseconds; conversions happen at the account boundary. This fixes future synced positions and resume imports, but cannot infer the intended value of an incorrectly written older cloud checkpoint.
+
+## 0.5.19 playback changes
+
+4K first now keeps UHD-labelled candidates ahead of HD stereo hints and previously remembered HD files. Native file/audio checks can reject incompatible UHD files; an HD fallback is possible when permitted. 4K only remains label-based initially and rejects known below-UHD inspected MKV video.
+
+Online subtitle downloads are off by default. Enable Settings → Online subtitles to add those tracks to native Options; they are matched by title/episode and may not match the exact release or timing. Embedded captions follow Roku caption preferences. Press * while playing to change caption mode/track. The app does not silently change Roku global caption settings.
+
+The source status now displays elapsed time and cancellation guidance. Each source-list HTTP request has a shared 45-second acquisition/retry budget; the two-worker queue, JSON processing, file inspection and native buffering are separate stages. This is a bounded wait policy, not an instant-start promise.

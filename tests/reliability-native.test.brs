@@ -29,10 +29,10 @@ end function
 function AcquisitionObject(kind as string) as object
     if kind="roMessagePort" then return {}
     if kind="roTimespan"
-        return {state:m.acquisition,Mark:sub()
-            m.state.elapsed=0
+        return {state:m.acquisition,origin:0,Mark:sub()
+            m.origin=m.state.elapsed
         end sub,TotalMilliseconds:function() as integer
-            return m.state.elapsed
+            return m.state.elapsed-m.origin
         end function}
     end if
     if kind="roFileSystem"
@@ -135,6 +135,28 @@ end function
 result=client._execute({method:"POST",url:"https://example.invalid/api/write"})
 Harness_Equal(client.applied,1,"receive failure after applied POST is not automatically replayed")
 Harness_Ok(not result.ok,"uncertain completion remains failed for explicit reconciliation")
+
+Harness_Suite("GET retries share the entire request deadline")
+AcquisitionSetup(0)
+client=AcquisitionClient()
+client.state=m.acquisition
+client.timeouts=[]
+client._retryAfter=function(attempt as integer) as integer
+    return 100
+end function
+client._attempt=function(request as object) as object
+    m.timeouts.Push(request.timeoutMs)
+    spend=400
+    if spend>request.timeoutMs then spend=request.timeoutMs
+    m.state.elapsed=m.state.elapsed+spend
+    return {ok:false,status:-28,body:"",error:"native timeout"}
+end function
+result=client._execute({method:"GET",url:"https://example.invalid/stream/movie/A.json",timeoutMs:1000})
+Harness_Ok(not result.ok,"native negative timeout remains a controlled failure")
+Harness_Equal(client.timeouts.Count(),2,"remaining budget prevents another full request")
+Harness_Equal(client.timeouts[0],1000,"first attempt receives original budget")
+Harness_Equal(client.timeouts[1],500,"retry receives remaining time after backoff")
+Harness_Ok(m.acquisition.elapsed<=1000,"negative native status cannot multiply total wait")
 
 print "Assertions passed: ";m.passed;" failed: ";m.failed
 if m.failed=0 then print "RESULT: PASS" else print "RESULT: FAIL":stop

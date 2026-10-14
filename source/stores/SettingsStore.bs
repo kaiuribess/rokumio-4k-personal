@@ -30,6 +30,7 @@ class SettingsStore
     autoSourceRetry as boolean
     waitForProviders as boolean
     allowLocalHttp as boolean
+    onlineSubtitles as boolean
     preferredProviderKey as string
     lastWorkingProviderKey as string
     workingProviderDirty as boolean
@@ -45,6 +46,7 @@ class SettingsStore
         m.autoSourceRetry = true
         m.waitForProviders = false
         m.allowLocalHttp = false
+        m.onlineSubtitles = false
         m.preferredProviderKey = ""
         m.lastWorkingProviderKey = ""
         m.workingProviderDirty = false
@@ -124,7 +126,7 @@ class SettingsStore
     end function
 
     function GetPlaybackOptions() as object
-        return {fourKOnly:m.fourKOnly,autoNextEpisode:m.autoNextEpisode,autoSourceRetry:m.autoSourceRetry,waitForProviders:m.waitForProviders,allowLocalHttp:m.allowLocalHttp}
+        return {fourKOnly:m.fourKOnly,autoNextEpisode:m.autoNextEpisode,autoSourceRetry:m.autoSourceRetry,waitForProviders:m.waitForProviders,allowLocalHttp:m.allowLocalHttp,onlineSubtitles:m.onlineSubtitles}
     end function
 
     function GetProviderPriority() as object
@@ -155,7 +157,7 @@ class SettingsStore
     end function
 
     function SetPlaybackOption(optionName as string, value as boolean) as boolean
-        if optionName <> "fourKOnly" and optionName <> "autoNextEpisode" and optionName <> "autoSourceRetry" and optionName <> "waitForProviders" and optionName <> "allowLocalHttp" then return false
+        if optionName <> "fourKOnly" and optionName <> "autoNextEpisode" and optionName <> "autoSourceRetry" and optionName <> "waitForProviders" and optionName <> "allowLocalHttp" and optionName <> "onlineSubtitles" then return false
         m[optionName] = value
         return m.Save()
     end function
@@ -178,7 +180,7 @@ class SettingsStore
         lastSaved = m.registry.Write("lastWorkingProviderKey",m.lastWorkingProviderKey)
         m.workingProviderDirty = not lastSaved
         if not lastSaved then ok = false
-        for each optionName in ["fourKOnly","autoNextEpisode","autoSourceRetry","waitForProviders","allowLocalHttp"]
+        for each optionName in ["fourKOnly","autoNextEpisode","autoSourceRetry","waitForProviders","allowLocalHttp","onlineSubtitles"]
             value = "false"
             if m[optionName] then value = "true"
             if not m.registry.Write(optionName,value) then ok = false
@@ -209,7 +211,7 @@ class SettingsStore
         recent = m.registry.Read("lastWorkingProviderKey")
         if m.IsProviderKey(preferred) then m.preferredProviderKey = preferred
         if m.IsProviderKey(recent) then m.lastWorkingProviderKey = recent
-        for each optionName in ["fourKOnly","autoNextEpisode","autoSourceRetry","waitForProviders","allowLocalHttp"]
+        for each optionName in ["fourKOnly","autoNextEpisode","autoSourceRetry","waitForProviders","allowLocalHttp","onlineSubtitles"]
             value = m.registry.Read(optionName)
             if value = "true" then m[optionName] = true
             if value = "false" then m[optionName] = false

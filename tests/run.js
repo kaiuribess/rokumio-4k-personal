@@ -1313,7 +1313,7 @@ function checkTransportRetryContract() {
         err('Transport.bs has no client._execute — the retry wrapper is gone and a connection collision fails the fetch outright');
     } else {
         const body = exec[0];
-        if (!/m\._attempt\(request\)/.test(body)) {
+        if (!/m\._attempt\((request|bounded)\)/.test(body)) {
             err('Transport.bs client._execute does not call m._attempt — the single round-trip is the thing being retried');
         }
         if (!/m\._retryable\(result\.status,\s*request\.method\)/.test(body) || !/m\._retryAfter\(attempt\)/.test(body)) {

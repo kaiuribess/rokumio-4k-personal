@@ -91,6 +91,9 @@ sub init()
     m.autoGraceTimer.ObserveField("fire","onAutomaticGrace")
     m.autoClock = CreateObject("roTimespan")
     m.autoClock.Mark()
+    m.sourceProgress = m.top.FindNode("sourceProgress")
+    m.sourceProgress.ObserveField("fire","onSourceProgress")
+    m.loadStartedAt = invalid
     m.autoGraceDeadline = invalid
     m.autoGraceToken = ""
     UpdateQualityHint()
@@ -268,6 +271,7 @@ sub LoadStreams(params as object, allowPrefetch = true as boolean)
     ' is the cheapest thing that cannot repeat.
     m.loadSeq = m.loadSeq + 1
     m.loadToken = m.loadSeq.ToStr()
+    if m.autoClock <> invalid then m.loadStartedAt = m.autoClock.TotalMilliseconds()
 
     m.prefetchWaiting = []
     m.sourceQueue = []
@@ -672,7 +676,13 @@ sub UpdateStreamsStatus()
             if state = "queued" then queued = queued + 1
         end for
         m.status.text = requesting.ToStr() + " requesting sources; " + queued.ToStr() + " queued."
+        if m.autoClock <> invalid and m.loadStartedAt <> invalid
+            seconds = Int((m.autoClock.TotalMilliseconds() - m.loadStartedAt) / 1000)
+            m.status.text = m.status.text + "  " + seconds.ToStr() + "s elapsed · Back cancels"
+        end if
+        if m.sourceProgress <> invalid and m.top.screenActive and m.sourcesSuspended <> true then m.sourceProgress.control = "start"
     else
+        if m.sourceProgress <> invalid then m.sourceProgress.control = "stop"
         if total = 0
             if m.loadError <> ""
                 m.status.text = "Sources could not load. Check Add-ons or try another provider."
@@ -711,6 +721,8 @@ end sub
 
 sub CancelStreamsLoad()
     m.reloadNeeded = false
+    if m.sourceProgress <> invalid then m.sourceProgress.control = "stop"
+    m.loadStartedAt = invalid
     CancelAutomaticGrace()
     m.sourceQueue = []
     if m.prefetchNode <> invalid then m.prefetchNode.UnobserveField("revision")
@@ -1296,9 +1308,31 @@ end function
 
 sub SuspendSourceLoading()
     m.sourcesSuspended = true
+    if m.sourceProgress <> invalid then m.sourceProgress.control = "stop"
     CancelAutomaticGrace()
     if m.prefetchNode <> invalid and m.prefetchContext <> invalid then m.prefetchNode.callFunc("Suspend",m.prefetchContext.key)
 end sub
+
+sub onSourceProgress()
+    if not m.top.screenActive or m.sourcesSuspended = true or m.pendingCount = 0
+        if m.sourceProgress <> invalid then m.sourceProgress.control = "stop"
+        return
+    end if
+    UpdateStreamsStatus()
+end sub
+
+function SourceLoadStatus() as object
+    info = {active:m.top.screenActive = true,pending:m.pendingCount,requesting:0,queued:0,elapsedSeconds:0,selectionRunning:m.selectionTask <> invalid}
+    if m.autoClock <> invalid and m.loadStartedAt <> invalid then info.elapsedSeconds = Int((m.autoClock.TotalMilliseconds() - m.loadStartedAt) / 1000)
+    if Type(m.providers) = "roArray"
+        for i = 0 to m.providers.Count() - 1
+            state = ProviderRequestState(i)
+            if state = "pending" then info.requesting = info.requesting + 1
+            if state = "queued" then info.queued = info.queued + 1
+        end for
+    end if
+    return info
+end function
 
 sub BlurFocus()
     SuspendSourceLoading()

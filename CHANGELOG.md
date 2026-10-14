@@ -1,5 +1,17 @@
 # Changes
 
+## 0.5.19 — 2026-10-14
+
+Hotfix for a physical Roku failure found immediately after installing 0.5.18. This remains experimental.
+
+- Fix a confirmed Back/checkpoint crash: the resume record now crosses SceneGraph callFunc as one object, rather than an overlong positional call. The store validates the record and reports persistence acknowledgement. Account replay uses the same boundary. A new syntax-tree check covers every production callFunc and executes the real store forwarding path in checkpoint tests.
+- Give GET/HEAD retries one shared monotonic request budget, including backoff. Negative native transport statuses cannot multiply a source lookup into three full 45-second waits. Slow providers and native buffering still have their own costs.
+- Show elapsed source lookup time and Back cancellation text; stop its timer when hidden or cancelled. The read-only status endpoint includes counts and phase state without configured provider URLs. App version comes from the installed manifest.
+- Make 4K first prioritize UHD labels ahead of HD stereo hints and remembered HD files. English/native audio checks remain mandatory; HD alternatives remain available when fallback is enabled. Labels still do not establish actual encoded/decoded quality.
+- Add Settings → Online subtitles, off by default on new and upgraded installations. Embedded captions and Roku Options remain available. Opting in restores online subtitle choices, whose release/timing may not match the selected file.
+
+0.5.18 installed and launched, then a real source played AVC/AAC English with 1920×800 header metadata and advancing A/V timestamps before the resume-save interface error locked Back. This is a confirmed runtime regression, not a provider buffering diagnosis. A full movie, receiver surround, UHD sources and long-session memory have not been signed off.
+
 ## 0.5.18 — 2026-10-14
 
 This is a reliability release responding to the deeper 0.5.17 audit. It remains an experimental prerelease without physical Roku sign-off.

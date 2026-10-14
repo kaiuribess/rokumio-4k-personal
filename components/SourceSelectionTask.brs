@@ -30,6 +30,7 @@ sub choose()
         now = SourceMemory_Now()
         data = SourceMemory_Load(CreateObject("roRegistrySection", "playbackMemory"),now)
         streams = SourceMemory_Order(streams,data,m.top.videoId,m.top.audioMode,now)
+        streams = CinemaPreferUhdFirst(streams)
         if streams.Count() > 0
             key = SourceMemory_Fingerprint(streams[0],m.top.videoId,m.top.audioMode)
             for each entry in data.entries

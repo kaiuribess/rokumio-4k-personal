@@ -349,6 +349,22 @@ class LibraryStore
     ' capped stack, and pops anything beyond MAX_CONTINUE_WATCHING. Blank
     ' positions are ignored so a fresh screen never clears stored progress.
     ' Channel/tv playback records nothing — see IsChannelType.
+    ' Resume crosses SceneGraph callFunc as one record, avoiding its native
+    ' argument limit. The store validates optional fields at the data boundary.
+    function SetPositionRecord(packet as dynamic) as boolean
+        if Type(packet) <> "roAssociativeArray" then return false
+        for each field in ["videoId","metaId","metaType","name","poster","posterShape","metadataProviderKey"]
+            if packet[field] = invalid then packet[field] = ""
+            if GetInterface(packet[field],"ifString") = invalid then return false
+        end for
+        if packet.videoId = "" or packet.metaId = "" then return false
+        try
+            return m.SetPosition(packet.videoId,packet.metaId,packet.metaType,Int(packet.season),Int(packet.episode),packet.name,packet.poster,Int(packet.position),Int(packet.duration),packet.posterShape,packet.metadataProviderKey)
+        catch invalidRecord
+            return false
+        end try
+    end function
+
     function SetPosition(videoId as string, metaId as string, metaType as string, season as integer, episode as integer, name as string, poster = "" as string, position = 0 as integer, duration = 0 as integer, posterShape = "" as string, metadataProviderKey = "" as string) as boolean
         if videoId = "" or metaId = "" then return false
         if m.IsChannelType(metaType) then return false

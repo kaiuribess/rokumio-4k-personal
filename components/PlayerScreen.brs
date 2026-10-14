@@ -176,7 +176,12 @@ function OnEnter(params as object) as void
     end if
 
     StartResolve(params.stream, params.serverAddress, ResolveOrdinal(params.season), ResolveOrdinal(params.episode))
-    if params.diagnostic <> true then StartSubtitles(params)
+    ' IMDb-only subtitle results can target another release or timing. Online
+    ' captions are optional; native embedded tracks and Roku Options still work.
+    if params.diagnostic <> true and m.stores <> invalid
+        subtitlePrefs = m.stores.settings.callFunc("SettingsGetPlaybackOptions")
+        if Type(subtitlePrefs) = "roAssociativeArray" and subtitlePrefs.onlineSubtitles = true then StartSubtitles(params)
+    end if
     ArmSourceStartupLimit(true)
 end function
 
@@ -1864,7 +1869,8 @@ sub SavePosition()
     if params.posterShape <> invalid then posterShape = params.posterShape
 
     key = MetadataOrigin_Key(m.stores,params.addonAddress)
-    durable = m.stores.library.callFunc("LibrarySetPosition", params.videoId, params.metaId, params.metaType, season, episode, name, poster, Int(position), Int(duration), posterShape, key)
+    checkpoint = {videoId:params.videoId,metaId:params.metaId,metaType:params.metaType,season:season,episode:episode,name:name,poster:poster,position:Int(position),duration:Int(duration),posterShape:posterShape,metadataProviderKey:key}
+    durable = m.stores.library.callFunc("LibrarySetPosition", checkpoint)
     mid = ""
     if params.metaId <> invalid then mid = params.metaId
     m.stores.library.callFunc("LibraryMarkWatchedIfFinished", mid, params.videoId, Int(position), Int(duration))
@@ -1898,7 +1904,7 @@ sub PublishWatchState()
     if m.accountGeneration <> invalid
         if AccountEpoch_Read(m.top) <> m.accountGeneration then return
     end if
-    if not m.sourceAccepted then return
+    if m.sourceAccepted <> true then return
     if m.playParams <> invalid and m.playParams.diagnostic = true then return
     if m.playParams = invalid or m.playParams.videoId = invalid then return
     if m.stores = invalid then return

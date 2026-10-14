@@ -20,6 +20,7 @@ async function main() {
         extract('components/MainScene.brs',['onLibrarySyncResult','onAddonSyncResult','onImportTaskResult','onSourceRecoveryRequest']),
         read('source/util/CinemaStreams.brs'),read('source/util/PlaybackInfo.brs'),read('source/util/AutoPlayback.brs'),
         read('source/util/TimerGuard.brs').replace('CreateObject("roTimespan")','ReliabilityClock()'),read('components/PlayerPosition.brs'),
+        extract('components/StoreHost.brs',['LibrarySetPosition']),
         extract('components/PlayerScreen.brs',['SavePosition','PublishWatchState','onLocalCheckpoint','QueueSourceDiscovery','CanRecoverSources','onAutoSourceRetry']),
         extract('components/StreamsScreen.brs',['PrepareSourceRecovery']),
         // Native digest/time/registry unavailable here; fresh ranking itself is real.

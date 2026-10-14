@@ -76,7 +76,7 @@ function ReliabilityTestBudget(sectionName as string, key as string, value as st
 end function
 function ReliabilityHost(scope as string) as object
     native = MockRegistry()
-    return {native:native,library:LibraryStore(RegistryIO(native,"library",ReliabilityTestBudget),"stremio",scope),authKey:"fixture-A",session:"stremio",addonCalls:0,watch:invalid,callFunc:function(name as string,a=invalid as dynamic,b=invalid as dynamic,c=invalid as dynamic,d=invalid as dynamic,e=invalid as dynamic,f=invalid as dynamic,g=invalid as dynamic,h=invalid as dynamic,i=invalid as dynamic,j="" as dynamic,k="" as dynamic) as dynamic
+    return {RecordPosition:LibrarySetPosition,native:native,library:LibraryStore(RegistryIO(native,"library",ReliabilityTestBudget),"stremio",scope),authKey:"fixture-A",session:"stremio",addonCalls:0,watch:invalid,callFunc:function(name as string,a=invalid as dynamic,b=invalid as dynamic,c=invalid as dynamic,d=invalid as dynamic,e=invalid as dynamic,f=invalid as dynamic,g=invalid as dynamic,h=invalid as dynamic,i=invalid as dynamic,j="" as dynamic,k="" as dynamic) as dynamic
         if name="AuthGetSession" then return m.session
         if name="AuthGetAuthKey" then return m.authKey
         if name="LibraryBuildLibraryChangeItem" then return m.library.BuildLibraryChangeItem(a,b,c,d,e)
@@ -88,7 +88,10 @@ function ReliabilityHost(scope as string) as object
         if name="LibraryAddSaved" then return m.library.AddSaved(a,b,c,d)
         if name="LibraryRemoveSaved" then m.library.RemoveSaved(a)
         if name="LibraryIsChannelType" then return m.library.IsChannelType(a)
-        if name="LibrarySetPosition" then return m.library.SetPosition(a,b,c,d,e,f,g,h,i,j,k)
+        if name="LibrarySetPosition"
+            m.stores={library:m.library}
+            return m.RecordPosition(a)
+        end if
         if name="LibraryMarkWatchedIfFinished" then return false
         if name="WatchRecord" then m.watch=a
         if name="WatchClear" then m.watch=invalid

@@ -109,10 +109,10 @@ function CinemaStreamRank(stream as dynamic, patterns = invalid as dynamic, audi
     if audioMode = "projector"
         if patterns.aac.IsMatch(text)
             score = score + 100
-            ' In automatic projector mode, a stereo AAC hint gets tried before
-            ' an unknown 4K audio layout. Native file/audio checks still decide
-            ' compatibility; this ranking must never authorize audio by itself.
-            if patterns.stereoAac.IsMatch(text) then score = score + 1200
+            ' Prefer stereo within the quality tier. A stereo HD filename must
+            ' not silently outrank all UHD sources when the setting says 4K first.
+            ' Native file/audio checks still decide compatibility.
+            if patterns.stereoAac.IsMatch(text) then score = score + 200
         end if
     else
         if ddplus.IsMatch(text) then score = score + 100
@@ -155,6 +155,18 @@ function CinemaChooseStreams(streams as dynamic, fourKOnly as boolean, audioMode
 end function
 
 ' Status counts never need a ranking or sort.
+function CinemaPreferUhdFirst(streams as dynamic) as object
+    if Type(streams) <> "roArray" then return []
+    uhd = []
+    hd = []
+    pattern = CreateObject("roRegex", "(^|[^a-z0-9])(2160p?|4k|uhd)([^a-z0-9]|$)", "i")
+    for each stream in streams
+        if pattern.IsMatch(CinemaStreamText(stream)) then uhd.Push(stream) else hd.Push(stream)
+    end for
+    uhd.Append(hd)
+    return uhd
+end function
+
 function CinemaCountReadyStreams(streams as dynamic) as integer
     if Type(streams) <> "roArray" then return 0
     count = 0

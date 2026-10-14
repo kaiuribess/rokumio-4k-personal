@@ -702,7 +702,7 @@ end for
 raw.Push({name:"1080p AAC 2.0",url:"https://media.example.test/english.mkv"})
 bounded = SourcePrefetch_LimitStreams(raw,"projector")
 Harness_Equal(bounded.Count(),256,"retained candidate URLs are bounded per provider")
-Harness_Equal(bounded[0].name,"1080p AAC 2.0","ranking keeps the preferred stereo-labelled candidate within the cap")
+Harness_Equal(bounded[0].name,"2160p DTS","UHD labels take priority; native inspection still checks alternate audio")
 Harness_Equal(bounded[1].name,"2160p DTS","raw candidates retain potentially usable alternate audio tracks")
 Harness_Equal(raw.Count(),301,"prefetch ranking does not mutate the provider response array")
 remembered = {name:"1080p",url:"https://media.example.test/rotating-signed-url.mkv",behaviorHints:{filename:"remembered.1080p.mkv"},sourceMemoryProvider:"provider|provider.example.test"}
@@ -744,9 +744,9 @@ end for
 reserved = SourcePrefetch_LimitStreams(mixed,"projector")
 strict4K = CinemaFilterReadyStreams(reserved,true)
 Harness_Equal(reserved.Count(),256,"the 4K reserve stays inside the existing unique-source cap")
-Harness_Equal(strict4K.Count(),64,"strict 4K filtering exposes a reserve even when 300 HD stereo sources outrank it")
-Harness_Equal(reserved[0].url,mixed[0].url,"highest-ranked HD stereo remains the first ordinary playback candidate")
-Harness_Equal(reserved[191].url,mixed[191].url,"the first 192 HD stereo candidates retain their original priority")
+Harness_Equal(strict4K.Count(),100,"UHD-first ranking retains all 100 available UHD entries inside the cap")
+Harness_Equal(reserved[0].url,"https://media.example.test/uhd/0.mkv","UHD is tried before HD stereo fallback")
+Harness_Equal(reserved[191].url,mixed[91].url,"HD alternatives retain provider order after the UHD tier")
 ordered4K = true
 for i = 0 to 63
     if strict4K[i].url <> "https://media.example.test/uhd/"+i.ToStr()+".mkv" then ordered4K = false
@@ -755,8 +755,8 @@ Harness_Ok(ordered4K,"reserved 4K files retain provider rank without reversing r
 Harness_Equal(mixed.Count(),400,"reserve replacement never mutates the provider response array")
 mixed.Push(remembered)
 rememberedReserve = SourcePrefetch_LimitStreams(mixed,"projector","tt123",memory,1760000001#,PrefetchTest_RememberedHash)
-Harness_Equal(rememberedReserve[0].url,remembered.url,"an earlier verified HD source remains first when the 4K reserve is added")
-Harness_Equal(CinemaFilterReadyStreams(rememberedReserve,true).Count(),64,"remembered HD priority cannot consume the 4K reserve")
+Harness_Equal(rememberedReserve[0].url,remembered.url,"cache retains the verified HD fallback; automatic selection reapplies UHD-first tiers")
+Harness_Equal(CinemaFilterReadyStreams(rememberedReserve,true).Count(),100,"remembered HD priority cannot displace UHD candidates")
 Harness_Equal(rememberedReserve.Count(),256,"remembered priority and the 4K reserve share the same bounded cache")
 Harness_Equal(memory.entries.Count(),1,"reserving candidates never records or changes an outcome")
 
@@ -776,7 +776,7 @@ Harness_Equal(short4K.Count(),3,"duplicate 4K URLs do not inflate a short reserv
 Harness_Equal(short4K[0].url,"https://media.example.test/Uhd.mkv","short reserve preserves the first exact 4K URL")
 Harness_Equal(short4K[1].url,"https://media.example.test/uhd.mkv","case-sensitive 4K paths remain different reserve entries")
 Harness_Equal(short4K[2].url,"https://media.example.test/uhd.mkv?signature=new","signed URL rotation remains an exact distinct candidate")
-Harness_Equal(shortReserved[252].url,mixed[252].url,"a three-entry reserve retains the first 253 ranked HD candidates")
+Harness_Equal(shortReserved[255].url,mixed[252].url,"three UHD entries still leave room for the first 253 HD alternatives")
 
 already4K = []
 for i = 0 to 9
@@ -787,7 +787,7 @@ for each stream in mixed
 end for
 alreadyReserved = SourcePrefetch_LimitStreams(already4K,"projector")
 alreadyStrict = CinemaFilterReadyStreams(alreadyReserved,true)
-Harness_Equal(alreadyStrict.Count(),64,"higher-ranked 4K entries count toward the minimum reserve rather than adding a second reserve")
+Harness_Equal(alreadyStrict.Count(),110,"all 110 UHD candidates fit and remain available ahead of HD fallback")
 Harness_Equal(alreadyReserved[0].url,"https://media.example.test/first-uhd/0.mkv","highest-ranked stereo 4K remains the first ordinary candidate")
 Harness_Equal(alreadyStrict[9].url,"https://media.example.test/first-uhd/9.mkv","existing high-ranked 4K order is preserved")
 Harness_Equal(alreadyStrict[10].url,"https://media.example.test/uhd/0.mkv","later 4K reserve starts after existing higher-ranked 4K")
@@ -800,10 +800,10 @@ Harness_Equal(m.testRegistry.reads,1,"prefetch consults existing outcome metadat
 m.testProviderStreams = [{name:"2160p Dolby DTS",url:"https://media.example.test/mixed-tracks.mkv"},{name:"1080p AAC2.0",url:"https://media.example.test/stereo.mkv"}]
 PrefetchTest_Load()
 Harness_Equal(m.top.result.readyStreams.Count(),2,"prefetched picker retains a Dolby-labelled file whose stereo alternative was not named")
-Harness_Equal(m.top.result.readyStreams[0].url,"https://media.example.test/stereo.mkv","prefetch still ranks likely playable stereo ahead of uncertain audio")
+Harness_Equal(m.top.result.readyStreams[0].url,"https://media.example.test/mixed-tracks.mkv","4K first retains quality priority; file audio checks decide compatibility")
 StreamsTest_Load()
 Harness_Equal(m.top.result.readyStreams.Count(),2,"ordinary source worker uses the same non-destructive audio hint policy")
-Harness_Equal(m.top.result.readyStreams[0].url,"https://media.example.test/stereo.mkv","ordinary source worker keeps projector preference while retaining alternatives")
+Harness_Equal(m.top.result.readyStreams[0].url,"https://media.example.test/mixed-tracks.mkv","ordinary worker uses the same UHD-first policy while retaining HD fallback")
 Harness_Suite("Warm provider diagnostics survive candidate filtering")
 for each statusSource in [
     {name:"Torrentio [TB Error]",url:"https://torrentio.strem.fun/videos/failed_access_v3.mp4"},
@@ -819,4 +819,19 @@ for each statusSource in [
     Harness_Equal(warmLabel,ordinaryLabel,"warm path retains account and pending-download explanations")
     Harness_Equal(warmResult.streams.Count(),0,"diagnostic records do not become playable candidates")
 end for
+Harness_Suite("Source waiting stays visible and progress stops on cancellation")
+PrefetchTest_Setup(2)
+m.sourceProgress={control:"stop"}
+LoadStreams(m.params)
+m.autoClock.now=12000
+onSourceProgress()
+Harness_Ok(m.status.text.InStr("12s elapsed")>=0,"waiting shows elapsed time instead of a static freeze-like status")
+Harness_Ok(m.status.text.InStr("Back cancels")>=0,"cancellation remains visible while providers wait")
+info=SourceLoadStatus()
+Harness_Equal(info.pending,2,"safe status reports outstanding providers")
+Harness_Equal(info.elapsedSeconds,12,"safe status exposes age without provider URLs")
+Harness_Ok(FormatJson(info).InStr("https://")<0,"diagnostic contains no configured endpoint")
+CancelStreamsLoad()
+onSourceProgress()
+Harness_Equal(m.sourceProgress.control,"stop","Back disarms progress updates")
 Harness_Finish()

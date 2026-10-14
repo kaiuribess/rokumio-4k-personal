@@ -42,7 +42,8 @@ end function
 
 function ReadPlaybackDiagnostic() as object
     device = CreateObject("roDeviceInfo")
-    info = {version:"0.5.17",playback:m.playerScreen.callFunc("PlaybackStatus")}
+    info = {version:CreateObject("roAppInfo").GetVersion(),playback:m.playerScreen.callFunc("PlaybackStatus")}
+    info.sources = m.streamsScreen.callFunc("SourceLoadStatus")
     try
         info.audioOutput = device.GetAudioOutputChannel()
         info.aac = device.CanDecodeAudio({codec:"aac"})

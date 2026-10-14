@@ -22,6 +22,7 @@
         <function name="OnEnter" />
         <function name="OnExit" />
         <function name="PrepareSourceRecovery" />
+        <function name="SourceLoadStatus" />
         <function name="OnBackPressed" />
     </interface>
 
@@ -36,6 +37,7 @@
 
     <children>
         <Timer id="autoPlayGrace" duration="0.75" repeat="false" />
+        <Timer id="sourceProgress" duration="1" repeat="true" />
         <Rectangle id="streamBg" width="1920" height="1080" />
         <Poster id="bgPoster" width="1920" height="1080" loadDisplayMode="scaleToZoom" />
         <Rectangle id="bgScrim" width="1920" height="1080" />

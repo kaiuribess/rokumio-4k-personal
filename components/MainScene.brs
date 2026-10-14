@@ -1014,7 +1014,8 @@ sub onLibrarySyncResult(event = invalid as dynamic)
             season = 0:episode = 0
             if packet.season <> invalid then season = packet.season
             if packet.episode <> invalid then episode = packet.episode
-            m.storeHost.callFunc("LibrarySetPosition",packet.videoId,packet.metaId,packet.metaType,season,episode,packet.name,packet.poster,packet.position,packet.duration)
+            checkpoint = {videoId:packet.videoId,metaId:packet.metaId,metaType:packet.metaType,season:season,episode:episode,name:packet.name,poster:packet.poster,position:packet.position,duration:packet.duration}
+            m.storeHost.callFunc("LibrarySetPosition",checkpoint)
         end if
     end for
     ScheduleWatchStatePush()

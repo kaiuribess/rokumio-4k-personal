@@ -109,6 +109,9 @@ sub BuildRows(preserveFocus = false as boolean)
     m.rows.Push({action:"preferredSource",title:"Preferred source",value:PreferredProviderValue()})
     m.rows.Push({action:"autoplay",title:"Next episode",value:nextLabel})
     m.rows.Push({action:"recovery",title:"Source recovery",value:recoveryLabel})
+    subtitlesLabel = "Off (embedded captions only)"
+    if prefs.onlineSubtitles then subtitlesLabel = "On"
+    m.rows.Push({action:"onlineSubtitles",title:"Online subtitles",value:subtitlesLabel})
     m.rows.Push({ action: "addonChecks", title: "Add-on checks", value: "Find problems" })
     m.rows.Push({
         action: "server"
@@ -211,7 +214,7 @@ sub onRowSelected(event = invalid as dynamic)
         ShowAudioSetup()
     else if action = "audioConnection"
         ShowAudioConnection()
-    else if action = "quality" or action = "autoplay" or action = "recovery" or action = "autoStart"
+    else if action = "quality" or action = "autoplay" or action = "recovery" or action = "autoStart" or action = "onlineSubtitles"
         ShowPlaybackOption(action)
     else if action = "addonChecks"
         m.top.pushRequest = {screen:"addonHealthScreen",params:{}}
