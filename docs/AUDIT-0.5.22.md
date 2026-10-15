@@ -32,7 +32,7 @@ References: [Stremio request definitions at inspected core commit](https://githu
 
 Add-ons shows loading, complete, partial, failed, truly empty-account and unsaved states. Counts distinguish imported, exact duplicates, unsupported transports, invalid descriptors and device-budget exclusions. Complete snapshots replace changed account configurations, apply order and remove absent account-owned records. Partial snapshots retain previously installed providers; local-only records survive both cases. A full registry can leave an imported collection usable only for the current session; that is reported as unsaved, never durable success.
 
-When catalogs are absent, **Add movie and show catalogs → Cinemeta · only on this Roku** is explicit opt-in. Tests execute the real row builder and selection path, assert no hidden provider installation during rendering and verify only the requested local manifest is queued. It supplies metadata/search, not stream access or a subscription.
+After a complete account snapshot confirms catalogs are absent, **Add movie and show catalogs → Cinemeta · only on this Roku** is explicit opt-in. Tests execute the real row builder and selection path, assert no hidden provider installation during rendering and verify only the requested local manifest is queued. It supplies metadata/search, not stream access or a subscription.
 
 ## Data integrity and playback audit
 

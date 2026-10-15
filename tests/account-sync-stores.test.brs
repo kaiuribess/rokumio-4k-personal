@@ -48,6 +48,13 @@ sub Test_AccountSync_StoreBoundaries()
     Harness_Equal(reopened.GetAll().Count(),2,"distinct configurations survive registry reload")
     Harness_Equal(reopened.GetAll()[0].address,store.GetAll()[0].address,"configuration order and private query survive reload")
 
+    conflict=SyncFixture("streams",stream.transportUrl,["stream"],[])
+    conflict.manifest.version="conflicting-version"
+    outcome=store.ReconcileAccount([stream,conflict])
+    Harness_Ok(outcome.complete<>true,"same identity with conflicting manifest is not an exact duplicate")
+    Harness_Equal(outcome.invalid,1,"conflicting duplicate is reported invalid")
+    Harness_Equal(outcome.duplicates,0,"only matching descriptors count as exact duplicates")
+
     Harness_Suite("Local ownership survives an account collision and later removal")
     store=AddonsStore(ScriptedTransport([]),MockRegistry(),"stremio",String(64,"a"))
     store.descriptorDigest=SyncDigestFixture

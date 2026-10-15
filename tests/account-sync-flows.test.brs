@@ -200,6 +200,12 @@ Harness_Equal(m.storeHost.stores.addons.GetAll().Count(),0,"no unsolicited catal
 StartAddonSync():bad=m.addonSyncTask:RunSync(bad,42):onAddonSyncResult(SyncEvent(bad))
 Harness_Equal(m.addonSyncStatus.state,"failed","malformed API envelope fails without throwing")
 
+StartAddonSync():rejected=m.addonSyncTask
+RunSync(rejected,[{transportUrl:"stremio://unsupported",manifest:{}},42]):onAddonSyncResult(SyncEvent(rejected))
+Harness_Equal(m.addonSyncStatus.state,"failed","entirely rejected collection is not empty success")
+Harness_Ok(m.addonSyncStatus.text.InStr("1 unsupported, 1 invalid")>=0,"all-rejected outcome exposes actionable exact rejection counts")
+Harness_Ok(m.addonSyncStatus.text.InStr("stremio://")<0,"all-rejected summary contains no private transport URL")
+
 Harness_Suite("Account switch rejects a delayed old task through actual login and store boundaries")
 StartAddonSync():old=m.addonSyncTask
 RunSync(old,collection):SyncLogin("B"):current=m.addonSyncTask
@@ -221,6 +227,13 @@ end function}
 m.top.getScene=function() as object
     return m.scene
 end function
+savedStatus=m.top.scene.status
+m.top.scene.status={state:"failed",complete:false,text:"Account sync failed"}
+BuildRows()
+for each row in m.rows
+    Harness_Ok(row.action<>"catalog","failed sync cannot be disguised by local catalog onboarding")
+end for
+m.top.scene.status=savedStatus
 BuildRows()
 Harness_Equal(m.storeHost.stores.addons.GetAll().Count(),1,"rendering onboarding cannot silently add a provider")
 found=-1

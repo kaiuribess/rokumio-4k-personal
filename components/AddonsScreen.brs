@@ -79,6 +79,7 @@ sub BuildRows()
     m.rows = []
     hasStreamSource = false
     hasCatalog = false
+    catalogOnboarding = true
     installed = 0
     m.rows.Push({
         action: "add"
@@ -89,10 +90,14 @@ sub BuildRows()
     if m.stores <> invalid
         scene = m.top.getScene()
         if m.stores.auth.callFunc("AuthGetSession") = "stremio"
+            catalogOnboarding = false
             m.rows.Push({action:"sync",title:"Sync Stremio add-ons",value:"Retry account import"})
             if scene <> invalid
                 sync = scene.callFunc("ReadAddonSyncStatus")
-                if Type(sync) = "roAssociativeArray" and sync.text <> "" then m.status.text = sync.text
+                if Type(sync) = "roAssociativeArray"
+                    if sync.text <> "" then m.status.text = sync.text
+                    catalogOnboarding = sync.complete = true
+                end if
             end if
         end if
         for each addon in m.stores.addons.callFunc("AddonsGetAll")
@@ -114,7 +119,7 @@ sub BuildRows()
         end for
     end if
 
-    if not hasCatalog then m.rows.Push({action:"catalog",title:"Add movie and show catalogs",value:"Cinemeta · only on this Roku"})
+    if not hasCatalog and catalogOnboarding then m.rows.Push({action:"catalog",title:"Add movie and show catalogs",value:"Cinemeta · only on this Roku"})
     content = CreateObject("roSGNode", "ContentNode")
     for each row in m.rows
         entry = content.CreateChild("ContentNode")

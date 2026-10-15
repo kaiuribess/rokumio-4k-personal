@@ -73,7 +73,10 @@ class StremioApiStore
         result = invalid
         if res.ok = true and Type(res.json) = "roAssociativeArray" then result = res.json.result
         if Type(result) <> "roAssociativeArray" or Type(result.addons) <> "roArray"
-            return { ok: false, descriptors: [], error: m.EnvelopeError(res, "Could not sync addons"), revokedSession: m.IsSessionRevoked(res) }
+            failureKind = "schema"
+            if res.ok <> true then failureKind = "transport"
+            if res.ok = true and Type(res.json) = "roAssociativeArray" and res.json.error <> invalid then failureKind = "api"
+            return { ok: false, descriptors: [], failureKind:failureKind, error: m.EnvelopeError(res, "Could not sync addons"), revokedSession: m.IsSessionRevoked(res) }
         end if
         ' Preserve entry boundaries for per-descriptor validation. A malformed
         ' entry must not throw here and discard its supported neighbours.

@@ -718,6 +718,12 @@ class AddonsStore
         end try
     end function
 
+    function SameDescriptor(left as object, right as object) as boolean
+        a = [m.ManifestIdentity(left),left.address,left.name,left.version,left.types,left.idPrefixes,left.catalogs,left.resources]
+        b = [m.ManifestIdentity(right),right.address,right.name,right.version,right.types,right.idPrefixes,right.catalogs,right.resources]
+        return FormatJson(a) = FormatJson(b)
+    end function
+
     function ReconcileAccount(descriptors as dynamic) as object
         summary = {ok:false,applied:false,complete:false,persisted:false,received:0,imported:0,duplicates:0,unsupported:0,invalid:0,limited:0,retained:0,removed:0,count:m.order.Count(),error:"No valid account snapshot"}
         if m.sessionType <> "stremio" or Type(descriptors) <> "roArray" then return summary
@@ -736,7 +742,11 @@ class AddonsStore
                 continue for
             end if
             record = outcome.record
-            if staging.FindIdentity(staging.installed,record) <> "" then summary.duplicates=summary.duplicates+1:continue for
+            same = staging.FindIdentity(staging.installed,record)
+            if same <> ""
+                if m.SameDescriptor(staging.installed[same],record) then summary.duplicates=summary.duplicates+1 else summary.invalid=summary.invalid+1
+                continue for
+            end if
             if staging.order.Count() >= 64 then summary.limited=summary.limited+1:continue for
             oldKey = m.FindIdentity(m.installed,record)
             if oldKey <> "" then record.id = oldKey

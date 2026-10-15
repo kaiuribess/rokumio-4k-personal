@@ -842,6 +842,9 @@ sub onAddonSyncResult(event = invalid as dynamic)
 
     if Type(result) <> "roAssociativeArray" or result.ok <> true
         m.addonSyncStatus = {state:"failed",text:"Stremio add-ons could not sync. Retry in Add-ons.",complete:false}
+        if result.failureKind = "transport" then m.addonSyncStatus.text="Stremio add-ons request failed. Check connectivity/service status and retry in Add-ons."
+        if result.failureKind = "api" then m.addonSyncStatus.text="Stremio declined the add-on request. Retry in Add-ons or reconnect the account."
+        if result.failureKind = "schema" then m.addonSyncStatus.text="Stremio returned an unexpected collection format. Retry in Add-ons."
         AddAddonSyncFault(m.addonSyncStatus.text)
         RefreshAddonStatus()
         PumpPendingLibrarySync()
@@ -852,6 +855,9 @@ sub onAddonSyncResult(event = invalid as dynamic)
     m.addonSyncStatus = outcome
     m.addonSyncStatus.state = "failed"
     m.addonSyncStatus.text = "No usable account snapshot. Retry in Add-ons."
+    if outcome.received <> invalid
+        m.addonSyncStatus.text = "No entries applied from " + outcome.received.ToStr() + ": " + outcome.unsupported.ToStr() + " unsupported, " + outcome.invalid.ToStr() + " invalid, " + outcome.limited.ToStr() + " over limits. Retry in Add-ons."
+    end if
     if outcome.applied = true
         m.addonSyncStatus.state = "partial"
         m.addonSyncStatus.text = "Imported " + outcome.imported.ToStr() + " of " + outcome.received.ToStr() + " account entries"
