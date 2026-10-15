@@ -77,3 +77,14 @@ Manual source pages retain 48 real cards plus navigation controls. More/Previous
 Upload a new release ZIP through the same installer when you are ready to restart the app. App updates are manual. Catalog/search/source responses come from online add-ons and can change independently of app releases. Fresh links or a refreshed manifest may be needed after provider changes. Registry configuration is separate from the ZIP; do not delete/reset/rekey the app if you intend to retain it.
 
 For someone using the app for the first time, share the README's direct **Download the Roku install ZIP** link together with this setup guide. Each person enables developer mode and configures their own provider privately. The ZIP cannot enable developer mode, supply subscriptions or update itself.
+
+
+## Stremio account import and recovery (0.5.22)
+
+Pair under Settings → Connect Stremio using the on-screen code. Do not share your account key. Supported account catalog/metadata, stream and subtitle add-ons import automatically after login and on each relaunch. Open Add-ons for current status and **Sync Stremio add-ons** to retry. A complete empty collection is distinct from a failed request. Partial results name accepted, unsupported, invalid and over-budget counts; previous providers are not removed on an incomplete snapshot. Exact duplicates are skipped; configured instances with different URLs remain separate.
+
+If your account has no catalog provider, choose **Add movie and show catalogs → Cinemeta · only on this Roku**. This explicit local installation adds browsing/search metadata; it supplies no movie streams, does not purchase a service, and never modifies your remote Stremio collection. A stream provider is still required for playback.
+
+For browser installation, leave Add-ons open, submit the configured HTTPS manifest privately and select **Allow import** on the TV within 60 seconds. Cancel requests you did not initiate. The browser acknowledgement only means the confirmation was queued; the TV's final import summary is authoritative. Manual URL entry and the local catalog option are already initiated using the remote and do not require another browser confirmation.
+
+If an account save is unsynced, Settings → **Retry saved changes** refreshes the server baseline before retrying retained edits. For device storage failures, **Retry device saves** restarts up to three background retry rounds. The app distinguishes a change held in memory from an acknowledged save. A full registry may require removing unnecessary local data; repeated network/storage failures remain visible rather than being treated as successful.

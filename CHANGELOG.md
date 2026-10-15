@@ -1,5 +1,21 @@
 # Changes
 
+## 0.5.22 — 2026-10-15
+
+Account sync and data-integrity repairs, based on the latest default branch `bcd32111d9b0996b35285b1a684513d88f66b0c1`. Experimental prerelease; no physical device validation for this update.
+
+- Import supported account entries even when an unrelated descriptor is unsupported or malformed. Exact duplicates are counted and skipped; distinct configurations sharing a manifest ID keep separate stable internal identities. Configuration paths/queries stay private and unchanged. Partial snapshots never authorize removals; complete snapshots reconcile configuration, order and account-owned removals while preserving local-only additions.
+- Consume an available sync result when the finished notification arrives first. Keep empty initial and duplicate/stale notifications harmless. Show loading, complete, partial, failed, empty-account and unsaved outcomes with counts and Add-ons → Sync Stremio add-ons retry.
+- Treat declared catalog lists independently of the manifest resource list. Include catalog/manifest changes and account order in Home, Search and Discover signatures; invalidate all consumers after imports. Offer explicit local-only Cinemeta onboarding when catalogs are absent; never alter the remote collection or silently install providers.
+- Require a successful account identity lookup before completing link-code login. Bound the pairing deadline using monotonic elapsed time. Report failed authentication persistence.
+- Restore the account outbox only at startup/session reconciliation. Preserve newer intent during sync-status cleanup. After uncertain writes, block newer same-title edits until an explicit retry obtains a fresh baseline; subsequent coalescing cannot remove that gate. Unrelated titles remain independent.
+- Bound automatic dirty-save retry to three timer rounds, retain dirty state and expose Settings → Retry device saves for every profile. Existing accepted-progress and 30-second playback checkpoints remain.
+- Require TV confirmation within 60 seconds for browser add-on imports, in addition to the open-Add-ons, session, private-interface and Host/Origin gates. Expire abandoned requests; reject stale/cancelled confirmations. Add restrictive response CSP/security headers to the Roku form and a hash-based script policy to the optional localhost inspector.
+- Add production callback integration tests spanning login/task/API/StoreHost/account stores and Search/Discover source controllers, plus snapshot, outbox, registry and security failure injection. Preserve playback selection, UHD/all filters, provider priorities, pagination, audio/subtitle preferences, voice, native controls, next episodes and source memory.
+
+See [audit](docs/AUDIT-0.5.22.md), [security review](docs/SECURITY_REVIEW.md) and [validation](docs/VALIDATION.md). No credentials, content or streaming accounts are bundled. Existing development-tool advisories remain documented; they are excluded from the Roku ZIP.
+
+
 ## 0.5.21 — 2026-10-14
 
 - Replace per-character substring allocation in the JSON depth guard with a linear UTF-8 byte scan. Preserve the response-byte and 32-level nesting budgets, including escaped quotes/backslashes. This addresses long catalog/series responses taking tens of seconds on the Stick.

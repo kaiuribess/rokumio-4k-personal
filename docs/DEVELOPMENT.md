@@ -104,3 +104,16 @@ See [Changes](../CHANGELOG.md) and [Validation](VALIDATION.md). The new failure-
 CI runs the full suite, builds once, verifies that ZIP, and writes its SHA-256/commit/run provenance. `scripts/release-provenance.py` refuses a changed package after verification. The release process downloads the successful artifact for the exact commit, renames its install ZIP without changing its bytes, and uploads it alongside package-check.json, artifact-provenance.json and the SHA-256 file. Independently download the public asset and compare its full hash with the CI artifact. Do not rebuild between validation and publication.
 
 Before stable status, perform clean install and upgrade, held-account-result isolation, a full movie, consecutive episodes, repeated seeking, Back during loading, expired/failed-source recovery and repeated-navigation memory measurements. Test audible stereo and the actual HDMI surround route separately. Passing software assertions cannot replace that sign-off.
+
+
+## Account sync integration repairs in 0.5.22
+
+`tests/account-sync-flows.test.js` executes production worker entry points with an injected transport at the native factory boundary. It then dispatches actual result/finished callbacks through real API/store forwarding, including both observer orders, initial empty/false events, delayed old-account results and repeated logout/login. Native SceneGraph threading is simulated, not certified. UI catalog signatures retain order and descriptor changes; do not restore the old sorted-address signature.
+
+Account add-on snapshots may be partially adopted: `applied` means usable in memory, `complete` means every unique supported descriptor fit validation/budgets, `persisted` is the device acknowledgement and `ok` requires complete plus persisted. Only complete snapshots authorize account-owned removals. Local-only providers remain. Exact duplicate descriptors are counted; same-ID different configurations use stable opaque internal keys, with `manifestId` retaining public identity. Never print these configured URLs or include them in public diagnostics.
+
+Restore the durable outbox only on startup/session reconciliation. Sync status cleanup must not overwrite newer pending intent. An uncertain same-title write blocks further edits for that title until a fresh baseline; coalescing preserves the block. Three automatic dirty-save rounds run on the existing timer, and Settings → Retry device saves restarts that budget. Playback checkpoint/native Video observer boundaries are unchanged.
+
+Browser setup calls `RequestSetupImport`; manual remote entry calls the existing local import path. The former requires on-TV consent and expires after 60 seconds, including stale-account and closed-screen rejection. The optional source inspector's CSP hashes its exact served script. Do not add unsafe-eval/inline-script allowances or keep the input socket timeout armed during a longer bounded media inspection.
+
+See [0.5.22 audit](AUDIT-0.5.22.md), [security review](SECURITY_REVIEW.md) and [validation](VALIDATION.md). The install package must be promoted from CI without rebuilding; no private account or live Roku is used by these tests.
