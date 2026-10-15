@@ -22,6 +22,7 @@
     <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
 
     <children>
+        <Timer id="episodeBuildTimer" duration="0.01" repeat="false" />
         <Timer id="episodePrefetchDelay" duration="0.5" repeat="false" />
         <Rectangle id="epBg" width="1920" height="1080" color="0x0" />
         <Poster id="bgPoster" width="1920" height="1080" loadDisplayMode="scaleToZoom" />

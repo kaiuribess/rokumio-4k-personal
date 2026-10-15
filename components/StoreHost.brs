@@ -435,3 +435,7 @@ end function
 function WatchRecord(packet as dynamic) as void
     m.stores.watch.Record(packet)
 end function
+
+function EpisodesPrepare(seriesId as string, meta as dynamic) as object
+    return m.stores.episodes.Prepare(seriesId,meta)
+end function

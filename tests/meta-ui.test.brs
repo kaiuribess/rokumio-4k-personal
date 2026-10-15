@@ -11,7 +11,7 @@ sub MetaTest_Reset()
     m.rendered = []
     m.built = []
     m.meta = { id: "ttcurrent", type: "series", name: "Current show" }
-    m.metaRefreshed = false
+    m.metaRefreshed = false:m.episodeSnapshotSequence=0
     m.seriesMeta = invalid
     m.epHeaderLine = { text: "Loading" }
     m.epDesc = { text: "Loading episodes" }

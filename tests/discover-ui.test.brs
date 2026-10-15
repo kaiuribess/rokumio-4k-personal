@@ -199,6 +199,21 @@ m.top.screenActive = false
 LandingChipsFocus()
 Harness_Equal(m.filterBar.chipFocusCount, 0, "hidden Discover does not move focus")
 
+Harness_Suite("Discover retry replaces pending work and refreshes page zero")
+DiscoverTest_Reset()
+m.sources=[{address:"https://catalog.example"}]
+FetchDiscover():old=m.loadTask
+Harness_Ok(onKeyEvent("play",true),"Play/Pause is an explicit retry action")
+Harness_Ok(m.loadTask.id<>old.id,"retry has its own task ownership")
+Harness_Equal(m.reaped.Count(),1,"retry cancels the pending old lookup")
+Harness_Equal(m.loadTask.pageOffset,0,"retry starts at page zero")
+onDiscoverLoaded(DiscoverTest_Event(old,{ok:true,metas:[{id:"late",type:"movie",name:"Late"}],hasMore:false}))
+Harness_Equal(m.metas.Count(),0,"abandoned retry result cannot repaint discovery")
+DiscoverTest_Reset():m.selectedCatalog=invalid:m.sourcesSignature="stale"
+m.stores.addons.values=[{address:"https://manifest.example",catalogs:invalid}]
+ignored=onKeyEvent("play",true)
+Harness_Ok(m.sourcesTask<>invalid,"retry can recover a manifest-source failure")
+
 Harness_Finish()
 if m.failed > 0
     failure = invalid

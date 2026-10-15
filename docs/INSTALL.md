@@ -2,12 +2,14 @@
 
 ## Install the release ZIP
 
-**[Download the installable Roku ZIP — 0.5.20](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.20/rokumio-4k-personal-0.5.20.zip)**. Keep it zipped. This direct link avoids GitHub's source-code archives; those archives cannot be uploaded as the channel package.
+**[Download the installable Roku ZIP — 0.5.21](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.21/rokumio-4k-personal-0.5.21.zip)**. Keep it zipped. This direct link avoids GitHub's source-code archives; those archives cannot be uploaded as the channel package.
 
 1. On the Roku remote press **Home three times, Up twice, Right, Left, Right, Left, Right**.
 2. Write down the device URL displayed on the developer screen, enable the installer, review Roku's terms, and set an installer password privately. Roku restarts.
 3. On a browser on the same network, open that device URL. Username: **`rokudev`**. Use the password you chose.
 4. Select **Upload**, choose the versioned app ZIP from [Releases](https://github.com/kaiuribess/rokumio-4k-personal/releases), and install/replace it using **zip**. The app should launch.
+
+A failed development-package installation or deleting the app can reset its local profile and configured providers. Keep your private provider setup link available; never share it publicly.
 
 Roku permits one sideloaded app at a time; this replaces an existing development app and restarts it. Download the release asset, not GitHub's source-code archive. These steps follow [Roku's developer setup documentation](https://developer.roku.com/dev/docs/developer-setup).
 

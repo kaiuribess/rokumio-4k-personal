@@ -210,21 +210,50 @@ class EpisodesStore
     ' watched bitfield indexes (bit i is the i-th id here), so it must never
     ' drift from what EpisodesScreen paints. Skips season 0 (specials).
     function OrderedVideoIds(seriesId as string, meta as object) as object
-        ids = []
-        if seriesId = "" or meta = invalid or meta.videos = invalid then return ids
-        seasons = m.Seasons(meta)
-        ordered = m.OrderedSeasons(seasons)
-        for s = 0 to ordered.Count() - 1
-            season = ordered[s]
-            if season = 0 then continue for
-            episodes = m.EpisodesForSeason(meta, season)
-            for each ep in episodes
-                if ep.episode <> invalid
-                    ids.Push(m.ResolveVideoId(seriesId, season, ep.episode, meta))
+        return m.Prepare(seriesId,meta).orderedVideoIds
+    end function
+
+    ' Group once and let the native array sort order each season. A stable
+    ' numeric tie-breaker preserves duplicate-coordinate display order. No
+    ' repeated whole-meta transfers or per-episode full-series scans.
+    function Prepare(seriesId as string, meta as dynamic) as object
+        result = {seasons:[],seasonEpisodes:[],orderedVideoIds:[]}
+        if meta = invalid or Type(meta.videos) <> "roArray" then return result
+        groups = {}
+        firstIds = {}
+        numbers = []
+        scale = meta.videos.Count() + 1
+        index = 0
+        for each video in meta.videos
+            index = index + 1
+            if Type(video) <> "roAssociativeArray" then continue for
+            season = m.EpisodeOrdinal(video.season)
+            episode = m.EpisodeOrdinal(video.episode)
+            if season = invalid or episode = invalid then continue for
+            video.season = season:video.episode = episode
+            key = season.ToStr()
+            if not groups.DoesExist(key) then groups[key] = []:numbers.Push(season)
+            groups[key].Push({entry:video,order:CDbl(episode)*scale+index})
+            coordinate = key + ":" + episode.ToStr()
+            if not firstIds.DoesExist(coordinate) and GetInterface(video.id,"ifString") <> invalid and video.id <> "" then firstIds[coordinate] = video.id
+        end for
+        numbers.Sort()
+        result.seasons = m.OrderedSeasons(numbers)
+        for each season in result.seasons
+            bucket = groups[season.ToStr()]
+            bucket.SortBy("order")
+            episodes = []
+            for each ranked in bucket
+                ep = ranked.entry
+                episodes.Push(ep)
+                if season <> 0 and seriesId <> ""
+                    coordinate = season.ToStr() + ":" + ep.episode.ToStr()
+                    if firstIds.DoesExist(coordinate) then result.orderedVideoIds.Push(firstIds[coordinate]) else result.orderedVideoIds.Push(m.videoId.Build(seriesId,season,ep.episode))
                 end if
             end for
+            result.seasonEpisodes.Push(episodes)
         end for
-        return ids
+        return result
     end function
 
     ' Whether a meta handed in from a list screen is too sparse to render a hero:
@@ -248,7 +277,8 @@ class EpisodesStore
     ' Values the provided record already has always win, so nothing the source
     ' screen supplied is lost; invalid and blank strings give way so the fetched
     ' meta fills those gaps. Object/array fields (e.g. Cinemeta `links`) count as
-    ' present and are never compared for blank-ness. Returns a new object —
+    ' present and are never compared for blank-ness. A successful full metadata
+    ' episode list takes precedence over a catalog preview. Returns a new object —
     ' neither input is mutated.
     function MergeMeta(provided as object, fetched as object) as object
         merged = {}
@@ -260,7 +290,11 @@ class EpisodesStore
         if provided <> invalid
             for each key in provided
                 value = provided[key]
-                if value <> invalid and (GetInterface(value, "ifString") = invalid or value <> "") then merged[key] = value
+                ' A catalog preview may have no episodes or only a partial list.
+                ' Preserve the complete list returned by the metadata endpoint.
+                keepFetchedVideos = key = "videos" and Type(merged.videos) = "roArray"
+                if keepFetchedVideos then keepFetchedVideos = merged.videos.Count() > 0
+                if not keepFetchedVideos and value <> invalid and (GetInterface(value, "ifString") = invalid or value <> "") then merged[key] = value
             end for
         end if
         return merged

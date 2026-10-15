@@ -41,6 +41,7 @@ sub init()
 
     m.chipsRow.ObserveField("rowItemSelected", "onChipSelected")
     m.metaTaskSequence = 0
+    m.episodeSnapshotSequence = 0
     m.loadTask = invalid
     m.prefetchTimer = m.top.FindNode("detailsPrefetchDelay")
     m.prefetchTimer.ObserveField("fire", "onDetailsPrefetch")
@@ -61,6 +62,7 @@ function OnEnter(params as object) as void
         ScheduleDetailsPrefetch()
         return
     end if
+    m.episodeSnapshotSequence = m.episodeSnapshotSequence + 1
     m.params = params
     if params.meta = invalid then return
     meta = params.meta
@@ -199,6 +201,7 @@ sub onMetaLoaded(event as object)
 
     m.meta = m.stores.episodes.callFunc("EpisodesMergeMeta", m.meta, result.meta)
     m.metaRefreshed = true
+    m.episodeSnapshotSequence = m.episodeSnapshotSequence + 1
     RenderHero(m.meta)
 end sub
 
@@ -401,7 +404,9 @@ sub OpenEpisodes()
         screen: "episodesScreen"
         params: {
             addonAddress: m.addonAddress
-            meta: { id: m.meta.id, type: m.meta.type, name: m.meta.name, poster: m.meta.poster, posterShape: m.meta.posterShape, background: m.meta.background, logo: m.meta.logo }
+            meta: m.meta
+            episodeMetaComplete: m.metaRefreshed = true
+            episodeSnapshot: m.episodeSnapshotSequence
             resume: m.resume
         }
     }

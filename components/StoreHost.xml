@@ -36,6 +36,7 @@
         <function name="EpisodesNeedsMetaFetch" />
         <function name="EpisodesOrderedSeasons" />
         <function name="EpisodesOrderedVideoIds" />
+        <function name="EpisodesPrepare" />
         <function name="EpisodesResolveVideoId" />
         <function name="EpisodesSeasons" />
         <function name="LibraryAddSaved" />

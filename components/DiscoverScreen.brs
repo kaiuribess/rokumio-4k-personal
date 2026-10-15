@@ -120,7 +120,7 @@ end function
 ' need it).
 sub EnsureSources()
     if m.stores = invalid
-        m.status.text = "Failed to load add-ons."
+        m.status.text = "Could not load catalogs. Play/Pause retries; Back returns."
         return
     end if
 
@@ -160,7 +160,7 @@ sub EnsureSources()
         return
     end if
 
-    m.status.text = "Loading…"
+    m.status.text = "Loading titles…     Back cancels"
     task = AsyncTask_Launch(m.top, "CatalogSourcesTask", "onSourcesLoaded", { addons: packets }, NextDiscoverWorkerId("discoverSources"))
     m.sourcesTask = task
 end sub
@@ -179,7 +179,7 @@ sub onSourcesLoaded(event as object)
     AsyncTask_Reap(task, m.top, false)
 
     if Type(result) <> "roAssociativeArray" or Type(result.sources) <> "roArray"
-        m.status.text = "Failed to load add-ons."
+        m.status.text = "Could not load catalogs. Play/Pause retries; Back returns."
         return
     end if
 
@@ -603,7 +603,7 @@ sub FetchDiscover()
     if m.selectedCatalog = invalid then return
     CancelLoad()
 
-    m.status.text = "Loading…"
+    m.status.text = "Loading titles…     Back cancels"
     task = AsyncTask_Launch(m.top, "DiscoverLoaderTask", "onDiscoverLoaded", {
         addonAddress: m.selectedCatalog.address
         metaType: m.selectedCatalog.rawType
@@ -673,7 +673,7 @@ sub onDiscoverLoaded(event as object)
     label = DiscoverLabel()
     if Type(result) <> "roAssociativeArray" or result.ok <> true or Type(result.metas) <> "roArray"
         if m.metas.Count() = 0
-            m.status.text = "Failed to load " + Chr(34) + label + Chr(34) + "."
+            m.status.text = "Could not load " + Chr(34) + label + Chr(34) + ". Play/Pause retries."
             LandingChipsFocus()
         end if
         return
@@ -868,6 +868,16 @@ end sub
 ' Down from the chips enters the results grid and Up from the grid returns.
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
+    if key = "play"
+        if m.selectedCatalog <> invalid and m.sources.Count() > 0
+            ResetDiscover()
+            FetchDiscover()
+        else
+            m.sourcesSignature = ""
+            EnsureSources()
+        end if
+        return true
+    end if
 
     ' The asterisk key is a one-press escape hatch: from anywhere in the
     ' results grid it drops focus back up onto the filter chips.

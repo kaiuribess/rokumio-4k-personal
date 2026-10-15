@@ -221,6 +221,26 @@ sub Test_Episodes_MergeMeta()
     Harness_Equal(fromFetchedLinks.links.Count(), 1, "fetched object field survives when provided lacks it")
     Harness_Ok(fromFetchedLinks.videos <> invalid and Type(fromFetchedLinks.videos) = "roArray", "fetched array survives")
 
+    longVideos=[]
+    for n=511 to 1 step -1
+        longVideos.Push({season:1,episode:n,id:"opaque-"+n.ToStr()})
+    end for
+    longVideos.Push({season:0,episode:1,id:"special"})
+    longIds=store.OrderedVideoIds("series",{videos:longVideos})
+    Harness_Equal(longIds.Count(),511,"long-show ordering retains every regular episode")
+    Harness_Equal(longIds[0],"opaque-1","long-show first opaque id follows numeric order")
+    Harness_Equal(longIds[510],"opaque-511","late opaque episode remains accessible")
+    duplicateIds=store.OrderedVideoIds("series",{videos:[{season:1,episode:1},{season:1,episode:1,id:"first"},{season:1,episode:1,id:"second"}]})
+    Harness_Equal(duplicateIds[0],"first","duplicate coordinates retain the original resolver's first usable id")
+    Harness_Equal(duplicateIds[2],"first","duplicate order cannot silently change watched-bitfield identities")
+
+    freshVideos=[{id:"real:episode",season:1,episode:1}]
+    emptyPreview=store.MergeMeta({id:"series",videos:[]},{videos:freshVideos})
+    Harness_Equal(emptyPreview.videos.Count(),1,"empty catalog preview cannot erase fetched episodes")
+    partialPreview=store.MergeMeta({id:"series",videos:[{id:"preview"}]},{videos:freshVideos})
+    Harness_Equal(partialPreview.videos[0].id,"real:episode","fresh full episode metadata supersedes a partial preview")
+    retained=store.MergeMeta({id:"series",videos:freshVideos},{description:"only hero"})
+    Harness_Equal(retained.videos[0].id,"real:episode","a response without episodes cannot erase existing videos")
     Harness_Equal(slim.description, invalid, "provided input not mutated")
     Harness_Equal(fetched.name, invalid, "fetched input not mutated")
 end sub

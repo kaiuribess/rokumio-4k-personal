@@ -467,22 +467,23 @@ function TransportJsonDepthAllowed(body as string) as boolean
     depth = 0
     quoted = false
     escaped = false
-    for i = 0 to Len(body) - 1
-        ch = body.Mid(i,1)
+    bytes = CreateObject("roByteArray")
+    bytes.FromAsciiString(body)
+    for each ch in bytes
         if quoted
             if escaped
                 escaped = false
-            else if ch = Chr(92)
+            else if ch = 92
                 escaped = true
-            else if ch = Chr(34)
+            else if ch = 34
                 quoted = false
             end if
-        else if ch = Chr(34)
+        else if ch = 34
             quoted = true
-        else if ch = "{" or ch = "["
+        else if ch = 123 or ch = 91
             depth = depth + 1
             if depth > 32 then return false
-        else if ch = "}" or ch = "]"
+        else if ch = 125 or ch = 93
             depth = depth - 1
             if depth < 0 then return false
         end if

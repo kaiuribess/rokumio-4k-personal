@@ -39,6 +39,10 @@ sub init()
     m.epList.ObserveField("rowItemFocused", "onItemFocused")
     m.epList.ObserveField("rowItemSelected", "onItemSelected")
 
+    m.buildTimer = m.top.FindNode("episodeBuildTimer")
+    m.buildTimer.ObserveField("fire","onEpisodeBuildTick")
+    m.buildClock = CreateObject("roTimespan")
+    m.buildPending = false
     m.seasons = []
     m.seasonEpisodes = []
     m.seriesTaskSequence = 0
@@ -54,6 +58,7 @@ end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
+    if m.buildPending = true and m.buildRefresh <> true then return key <> "back"
     if key = "OK" and m.loadTask = invalid and m.seasons.Count() = 0
         LoadSeries()
         return true
@@ -67,6 +72,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
 end function
 
 function OnEnter(params as object) as void
+    previousGeneration = m.accountGeneration
     m.accountGeneration = AccountEpoch_Read(m.top)
     ' Re-entry after a push (streams, player, …): params is invalid and the
     ' screen Group was handed focus by the stack. The episode RowList must take
@@ -82,8 +88,24 @@ function OnEnter(params as object) as void
         return
     end if
     if params.meta = invalid then return
+    ' Reopening the same fetched Details snapshot keeps the finished native grid.
+    ' A new title, provider, account or metadata refresh always rebuilds it.
+    if params.episodeSnapshot <> invalid and params.episodeSnapshot = m.episodeSnapshot and previousGeneration = m.accountGeneration
+        if m.meta <> invalid and m.seriesMeta <> invalid and params.meta.id = m.meta.id and params.addonAddress = m.addonAddress
+            if m.buildPending <> true and m.seasons.Count() > 0 and m.epList.content <> invalid
+                m.resume = params.resume
+                m.epList.SetFocus(true)
+                RefreshWatchedMarks()
+                ScheduleEpisodePrefetch()
+                return
+            end if
+        end if
+    end if
+    m.episodeSnapshot = params.episodeSnapshot
     m.addonAddress = params.addonAddress
     m.meta = params.meta
+    m.cachedSeriesMeta = invalid
+    if params.episodeMetaComplete = true and Type(m.meta.videos) = "roArray" and m.meta.videos.Count() > 0 then m.cachedSeriesMeta = m.meta
     m.resume = params.resume
     SourcePrefetch_Cancel(m.top, m.prefetchContext)
     m.prefetchContext = invalid
@@ -117,6 +139,15 @@ sub LoadSeries()
     SetEpisodeHelp("Loading episodes…     Back  Return")
 
     CancelLoad()
+    if Type(m.cachedSeriesMeta) = "roAssociativeArray"
+        cached = m.cachedSeriesMeta
+        m.cachedSeriesMeta = invalid
+        if cached.id = m.meta.id and Type(cached.videos) = "roArray" and cached.videos.Count() > 0
+            m.seriesMeta = cached
+            BuildList(cached)
+            return
+        end if
+    end if
     m.seriesTaskSequence = m.seriesTaskSequence + 1
     task = AsyncTask_Launch(m.top, "MetaLoaderTask", "onSeriesLoaded", {
         addonAddress: m.addonAddress
@@ -131,6 +162,7 @@ end sub
 ' thread — and dropping the observer means its result can never land; re-entering
 ' this screen builds the list afresh anyway.
 sub CancelLoad()
+    CancelEpisodeBuild()
     if m.loadTask <> invalid
         task = m.loadTask
         m.loadTask = invalid
@@ -174,54 +206,101 @@ end sub
 ' full ordered episode-id list is resolved first so the account bitfield decodes
 ' against the complete list (bit indexes are positions in that ordering).
 sub BuildList(meta as object)
-    allSeasons = m.stores.episodes.callFunc("EpisodesSeasons", meta)
-    if allSeasons.Count() = 0
+    CancelEpisodeBuild()
+    prepared = m.stores.episodes.callFunc("EpisodesPrepare",m.meta.id,meta)
+    m.seasons = prepared.seasons
+    m.seasonEpisodes = prepared.seasonEpisodes
+    m.orderedVideoIds = prepared.orderedVideoIds
+    if m.seasons.Count() = 0
         m.epHeaderLine.text = ""
         m.epDesc.text = "No episodes found for this series."
         SetEpisodeHelp("OK  Try again     Back  Return")
         return
     end if
+    m.buildContent = CreateObject("roSGNode","ContentNode")
+    BeginEpisodeBuild(false)
+end sub
 
-    m.seasons = m.stores.episodes.callFunc("EpisodesOrderedSeasons", allSeasons)
-    orderedEpisodes = m.stores.episodes.callFunc("EpisodesOrderedVideoIds", m.meta.id, meta)
-    m.orderedVideoIds = orderedEpisodes
+sub CancelEpisodeBuild()
+    if m.buildTimer <> invalid then m.buildTimer.control = "stop"
+    m.buildPending = false
+    m.buildContent = invalid
+end sub
 
-    content = CreateObject("roSGNode", "ContentNode")
-    anyRegular = false
-    allDone = true
-    nowIso = invalid
-    if m.stores <> invalid then nowIso = m.stores.time.callFunc("TimeNowIso")
-    for s = 0 to m.seasons.Count() - 1
-        season = m.seasons[s]
-        episodes = m.stores.episodes.callFunc("EpisodesEpisodesForSeason", meta, season)
-        m.seasonEpisodes.Push(episodes)
+sub BeginEpisodeBuild(refreshOnly as boolean)
+    m.buildRefresh = refreshOnly
+    m.buildSeason = 0:m.buildEpisode = 0
+    m.buildAnyRegular = false:m.buildAllDone = true
+    m.buildNow = m.stores.time.callFunc("TimeNowIso")
+    m.buildPending = true
+    if not refreshOnly
+        m.epDesc.text = "Preparing episodes…"
+        SetEpisodeHelp("Preparing episodes…     Back  Return")
+    end if
+    m.buildTimer.control = "start"
+end sub
 
-        row = content.CreateChild("ContentNode")
-        row.title = SeasonLabel(season)
-        for each ep in episodes
-            item = row.CreateChild("TileContent")
-            item.title = EpisodeLabel(season, ep)
-            if ep.thumbnail <> invalid and ep.thumbnail <> "" then item.hdPosterUrl = ep.thumbnail
-            if season <> 0
-                mark = m.stores.library.callFunc("LibraryEpisodeMark", m.meta.id, season, ep, orderedEpisodes, nowIso)
-                item.watched = mark.watched
-                item.aired = mark.aired
-                if mark.aired
-                    anyRegular = true
-                    if not item.watched then allDone = false
-                end if
+' Yield between small batches: even a thousand episodes must leave the render
+' thread time for Back and native events. Canceled/old-account ticks do nothing.
+sub onEpisodeBuildTick()
+    if m.buildPending <> true then return
+    if not m.top.screenActive or m.accountGeneration <> AccountEpoch_Read(m.top)
+        CancelEpisodeBuild()
+        return
+    end if
+    m.buildClock.Mark()
+    processed = 0
+    while m.buildSeason < m.seasons.Count() and processed < 24
+        season = m.seasons[m.buildSeason]
+        episodes = m.seasonEpisodes[m.buildSeason]
+        if m.buildEpisode >= episodes.Count()
+            m.buildSeason = m.buildSeason + 1:m.buildEpisode = 0
+            continue while
+        end if
+        if m.buildRefresh
+            row = m.epList.content.GetChild(m.buildSeason)
+            item = row.GetChild(m.buildEpisode)
+        else
+            if m.buildEpisode = 0
+                row = m.buildContent.CreateChild("ContentNode")
+                row.title = SeasonLabel(season)
+            else
+                row = m.buildContent.GetChild(m.buildSeason)
             end if
-        end for
-    end for
-
-    m.epList.content = content
-    m.epList.numRows = EpisodesVisibleRows(m.seasons.Count())
-    m.epList.jumpToRowItem = ResumePosition()
-    SetEpisodeHelp("Arrow keys  Browse     OK  Choose stream     *  Watched status     Back  Return")
-    if m.top.screenActive then m.epList.SetFocus(true)
-    UpdateHeader(m.epList.jumpToRowItem)
-
-    m.stores.library.callFunc("LibraryMarkAllIfDone", m.meta.id, anyRegular, allDone)
+            item = row.CreateChild("TileContent")
+        end if
+        ep = episodes[m.buildEpisode]
+        if not m.buildRefresh
+            item.title = EpisodeLabel(season,ep)
+            if ep.thumbnail <> invalid and ep.thumbnail <> "" then item.hdPosterUrl = ep.thumbnail
+        end if
+        if season <> 0
+            mark = m.stores.library.callFunc("LibraryEpisodeMark",m.meta.id,season,ep,m.orderedVideoIds,m.buildNow)
+            item.watched = mark.watched:item.aired = mark.aired
+            if mark.aired
+                m.buildAnyRegular = true
+                if not mark.watched then m.buildAllDone = false
+            end if
+        end if
+        m.buildEpisode = m.buildEpisode + 1
+        processed = processed + 1
+        if m.buildClock.TotalMilliseconds() >= 12 then exit while
+    end while
+    if m.buildSeason < m.seasons.Count()
+        m.buildTimer.control = "start"
+        return
+    end if
+    m.buildPending = false
+    if not m.buildRefresh
+        m.epList.content = m.buildContent
+        m.buildContent = invalid
+        m.epList.numRows = EpisodesVisibleRows(m.seasons.Count())
+        m.epList.jumpToRowItem = ResumePosition()
+        SetEpisodeHelp("Arrow keys  Browse     OK  Choose stream     *  Watched status     Back  Return")
+        if m.top.screenActive then m.epList.SetFocus(true)
+        UpdateHeader(m.epList.jumpToRowItem)
+    end if
+    m.stores.library.callFunc("LibraryMarkAllIfDone",m.meta.id,m.buildAnyRegular,m.buildAllDone)
 end sub
 
 sub SetEpisodeHelp(text as string)
@@ -244,29 +323,8 @@ sub RefreshWatchedMarks() as void
     if m.epList = invalid or m.epList.content = invalid then return
     if m.seasons.Count() = 0 or m.seasonEpisodes.Count() = 0 then return
     if m.stores = invalid or m.seriesMeta = invalid then return
-    orderedEpisodes = m.stores.episodes.callFunc("EpisodesOrderedVideoIds", m.meta.id, m.seriesMeta)
-    anyRegular = false
-    allDone = true
-    nowIso = m.stores.time.callFunc("TimeNowIso")
-    for s = 0 to m.seasons.Count() - 1
-        season = m.seasons[s]
-        row = m.epList.content.GetChild(s)
-        episodes = m.seasonEpisodes[s]
-        for e = 0 to episodes.Count() - 1
-            ep = episodes[e]
-            item = row.GetChild(e)
-            if season <> 0
-                mark = m.stores.library.callFunc("LibraryEpisodeMark", m.meta.id, season, ep, orderedEpisodes, nowIso)
-                item.watched = mark.watched
-                item.aired = mark.aired
-                if mark.aired
-                    anyRegular = true
-                    if not item.watched then allDone = false
-                end if
-            end if
-        end for
-    end for
-    m.stores.library.callFunc("LibraryMarkAllIfDone", m.meta.id, anyRegular, allDone)
+    CancelEpisodeBuild()
+    BeginEpisodeBuild(true)
 end sub
 
 function SeasonLabel(season as integer) as string
@@ -574,6 +632,7 @@ sub PushEpisode(season as integer, ep as object)
 end sub
 
 function OnExit() as void
+    CancelLoad()
     SourcePrefetch_Cancel(m.top, m.prefetchContext)
     if m.prefetchTimer <> invalid then m.prefetchTimer.control = "stop"
 end function

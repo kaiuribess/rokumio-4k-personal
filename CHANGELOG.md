@@ -1,5 +1,15 @@
 # Changes
 
+## 0.5.21 — 2026-10-14
+
+- Replace per-character substring allocation in the JSON depth guard with a linear UTF-8 byte scan. Preserve the response-byte and 32-level nesting budgets, including escaped quotes/backslashes. This addresses long catalog/series responses taking tens of seconds on the Stick.
+- Pass the successfully fetched complete episode list from Details to Episodes. Full endpoint episode metadata takes precedence over empty/partial catalog previews; provider episode IDs and watched ordering are retained.
+- Prepare episode groups once with native sorting and stable duplicate-coordinate ordering. Build and refresh at most 24 episode cards per timer callback, yielding after a small time budget. Back cancels requests and incomplete builds; old-account callbacks cannot complete them. No episode-count cutoff is introduced.
+- Reopen an already built grid for the same Details snapshot without rebuilding it. Title, provider, account and metadata-refresh ownership invalidate reuse.
+- Add Discover Play/Pause retry with a new page-zero request, canceled-result protection and clearer loading/error hints.
+- Add production-controller and batching regressions covering 511/880-record lists, all later cards, preview merging, snapshot ownership, canceled work and UTF-8/escaped JSON.
+- Retain the earlier native resume/checkpoint, UHD-first, source deadline, online-caption opt-in, account isolation and durable-save fixes. This is still an experimental prerelease, not a certification for every provider or audio/display route.
+
 ## 0.5.20 — 2026-10-14
 
 - Fix stale adaptive resolution evidence after switching files. Native Video can retain its previous streamingSegment; codec changes no longer poll that field. Only a fresh segment notification during an active HLS/DASH handoff can establish displayed dimensions/HDR. A new handoff starts unknown; audio-only notifications preserve the last fresh video dimensions within that same file.
