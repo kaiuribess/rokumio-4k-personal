@@ -102,15 +102,13 @@ end sub
 function CatalogSignature() as string
     if m.stores = invalid then return ""
     addons = m.stores.addons.callFunc("AddonsGetAll")
-    if addons = invalid then return ""
+    if Type(addons) <> "roArray" then return ""
     parts = []
     for each addon in addons
         if Type(addon) <> "roAssociativeArray" then continue for
-        address = DiscoverText(addon.address)
-        if address <> "" then parts.Push(address)
+        parts.Push({id:addon.id,address:addon.address,name:addon.name,version:addon.version,resources:addon.resources,types:addon.types,idPrefixes:addon.idPrefixes,catalogs:addon.catalogs})
     end for
-    parts.Sort("i")
-    return parts.Join(";")
+    return FormatJson(parts)
 end function
 
 ' Resolve the catalog sources, reusing the cache when the installed set is
@@ -894,3 +892,12 @@ function onKeyEvent(key as string, press as boolean) as boolean
     end if
     return false
 end function
+
+sub EnsureCurrentSources()
+    if m.stores = invalid or CatalogSignature() = m.sourcesSignature then return
+    CancelSources()
+    ResetDiscover()
+    m.sources = []:m.sourcesSignature = ""
+    m.sourcesSignature = CatalogSignature()
+    if m.top.visible then EnsureSources()
+end sub

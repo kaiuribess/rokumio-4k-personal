@@ -16,7 +16,7 @@ async function main() {
     const builder = new ProgramBuilder();
     await builder.run({project:null,rootDir:root,files:['source/**/*.bs','source/**/*.brs','bslib'],stagingDir:dir,createPackage:false,copyToStaging:true,deploy:false,emitDefinitions:false});
     if (builder.getDiagnostics().some(d=>d.severity===1)) throw new Error('Store compilation failed');
-    const code = [read('tests/harness.brs'),read('source/util/AccountEpoch.brs'),read('tests/mocks.brs'),read('components/AccountWork.brs'),
+    const code = [read('tests/harness.brs'),read('source/util/AccountEpoch.brs'),read('tests/mocks.brs'),read('components/AccountWork.brs'),read('components/AccountAddons.brs'),
         extract('components/MainScene.brs',['onLibrarySyncResult','onAddonSyncResult','onImportTaskResult','onSourceRecoveryRequest']),
         read('source/util/CinemaStreams.brs'),read('source/util/PlaybackInfo.brs'),read('source/util/AutoPlayback.brs'),
         read('source/util/TimerGuard.brs').replace('CreateObject("roTimespan")','ReliabilityClock()'),read('components/PlayerPosition.brs'),

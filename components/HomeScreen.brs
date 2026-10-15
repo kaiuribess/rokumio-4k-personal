@@ -93,17 +93,17 @@ end sub
 ' Mirrors ContinueWatchingSignature deliberately: derive from live store state,
 ' sort so ordering cannot make two equal sets look different, join. No network
 ' and no catalog walk — this is a set comparison, not a re-derivation, so it is
-' cheap enough to call on every entry and after every sync.
+' compares the ordered manifest descriptors without any network access.
 function CatalogSignature() as string
     if m.stores = invalid then return ""
     addons = m.stores.addons.callFunc("AddonsGetAll")
-    if addons = invalid then return ""
+    if Type(addons) <> "roArray" then return ""
     parts = []
     for each addon in addons
-        if addon.address <> invalid then parts.Push(addon.address)
+        if Type(addon) <> "roAssociativeArray" then continue for
+        parts.Push({id:addon.id,address:addon.address,name:addon.name,version:addon.version,resources:addon.resources,types:addon.types,idPrefixes:addon.idPrefixes,catalogs:addon.catalogs})
     end for
-    parts.Sort("i")
-    return parts.Join(";")
+    return FormatJson(parts)
 end function
 
 ' Re-derive the grid if the add-on set has moved under it. Cheap when fresh, and

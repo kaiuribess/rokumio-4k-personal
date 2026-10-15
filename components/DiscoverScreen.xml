@@ -10,6 +10,7 @@
          chosen type; the genre chip takes its options from the chosen catalog's
          manifest (and is omitted when that catalog declares no genre). -->
     <interface>
+        <function name="EnsureCurrentSources" />
         <!-- The one action Discover reports upward: a push request. -->
         <field id="pushRequest" type="assocarray" alwaysNotify="true" />
 

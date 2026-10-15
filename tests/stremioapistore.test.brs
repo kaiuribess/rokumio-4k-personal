@@ -151,7 +151,7 @@ sub Test_StremioApiStore_AddonCollectionGetMissingTransportFallsBackToBlank()
     res = store.AddonCollectionGet()
     Harness_Ok(res.ok, "request succeeds")
     Harness_Equal(res.descriptors.Count(), 1, "one descriptor")
-    Harness_Equal(res.descriptors[0].transportUrl, "", "blank transport URL")
+    Harness_Equal(res.descriptors[0].transportUrl, invalid, "missing transport URL stays malformed for descriptor validation")
     Harness_Equal(res.descriptors[0].manifest.id, "com.naked", "manifest mapped")
 end sub
 

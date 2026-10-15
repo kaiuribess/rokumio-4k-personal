@@ -48,7 +48,7 @@ Harness_Equal(scene.calls.Count(),0,"rejected diagnostics never dispatch to the 
 conn={inbound:TestRequest("/","manifest=https%3A%2F%2Faddon.example.test%2Fmanifest.json")}
 SetupServerHandle(setup,"test",conn,"ready")
 Harness_Equal(conn.code,"200","normal add-on import still dispatches")
-Harness_Equal(scene.calls[0],"ImportFromSetup","ordinary import retains scene permission gate")
+Harness_Equal(scene.calls[0],"RequestSetupImport","ordinary import requires TV confirmation")
 scene.addonsOpen=false
 SetupServerHandle(setup,"test",conn,"ready")
 Harness_Equal(conn.code,"409","closed Add-ons screen can still refuse import")

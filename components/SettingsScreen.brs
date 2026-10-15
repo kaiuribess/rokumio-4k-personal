@@ -130,6 +130,7 @@ sub BuildRows(preserveFocus = false as boolean)
         if Type(localPrefs) = "roAssociativeArray" and localPrefs.allowLocalHttp = true then localLabel = "On (private addresses only)"
     end if
     m.rows.Push({action:"localHttp",title:"Local development HTTP",value:localLabel})
+    m.rows.Push({action:"retryDeviceSaves",title:"Retry device saves",value:"Local storage"})
     if m.stores <> invalid and m.stores.auth.callFunc("AuthGetSession") = "stremio" then m.rows.Push({action:"retryAccountWrites",title:"Retry saved changes",value:"Account sync"})
     ' Advanced diagnostics fit the fourth visible row without covering status.
     if m.showNetDiag
@@ -201,6 +202,7 @@ sub onRowSelected(event = invalid as dynamic)
         end if
         return
     end if
+    if action = "retryDeviceSaves" then m.top.pushRequest={action:"retryDeviceSaves"}:return
     if action = "retryAccountWrites" then m.top.pushRequest={action:"retryAccountWrites"}:return
     if action = "providerChoice" then ApplyPreferredProvider(m.rows[index].providerKey):return
     if action = "preferredSource" then ShowPreferredProvider():return

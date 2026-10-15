@@ -96,13 +96,13 @@ end sub
 function CatalogSignature() as string
     if m.stores = invalid then return ""
     addons = m.stores.addons.callFunc("AddonsGetAll")
-    if addons = invalid then return ""
+    if Type(addons) <> "roArray" then return ""
     parts = []
     for each addon in addons
-        if addon.address <> invalid then parts.Push(addon.address)
+        if Type(addon) <> "roAssociativeArray" then continue for
+        parts.Push({id:addon.id,address:addon.address,name:addon.name,version:addon.version,resources:addon.resources,types:addon.types,idPrefixes:addon.idPrefixes,catalogs:addon.catalogs})
     end for
-    parts.Sort("i")
-    return parts.Join(";")
+    return FormatJson(parts)
 end function
 
 ' Resolve the catalog sources, reusing the cache when the installed set is
@@ -131,17 +131,17 @@ sub EnsureSources()
         address = addon.address
         if address = invalid or address = "" then continue for
         resources = addon.resources
-        hasCatalog = false
-        if resources <> invalid and Type(resources) = "roArray"
-            hasCatalog = m.stores.addons.callFunc("AddonsHasResource", resources, "catalog")
-        end if
-        if not hasCatalog then continue for
+        ' Catalog support is declared by the catalogs list, independent of
+        ' the manifest's resource list (Stremio's catalog special case).
+        if Type(addon.catalogs) = "roArray" and addon.catalogs.Count() = 0 then continue for
         if addon.catalogs = invalid or Type(addon.catalogs) <> "roArray" then allKnown = false
         name = addon.name
         if name = invalid then name = ""
         packets.Push({ address: address, name: name, resources: resources, catalogs: addon.catalogs })
     end for
 
+    CancelSources()
+    m.sources = []
     m.sourcesSignature = signature
     if packets.Count() = 0
         m.sources = []
@@ -677,3 +677,12 @@ function onKeyEvent(key as string, press as boolean) as boolean
     end if
     return false
 end function
+
+sub EnsureCurrentSources()
+    if m.stores = invalid or CatalogSignature() = m.sourcesSignature then return
+    query = m.lastQuery
+    ResetSearch()
+    if GetInterface(query,"ifString") <> invalid then m.pendingQuery = query
+    m.sourcesSignature = CatalogSignature()
+    if m.top.visible then EnsureSources()
+end sub

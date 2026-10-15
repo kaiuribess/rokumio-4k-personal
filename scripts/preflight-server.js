@@ -7,6 +7,8 @@ const {checkAddon,labels,readJson}=require('./preflight-lib');
 const {inspectMedia}=require('./media-probe');
 const secret=crypto.randomBytes(24).toString('hex');
 const page=fs.readFileSync(path.join(__dirname,'source-checker.html'),'utf8').replace('__CHECK_KEY__',secret);
+const scriptHash=crypto.createHash('sha256').update(/<script>([\s\S]+)<\/script>/.exec(page)[1]).digest('base64');
+const csp="default-src 'none'; script-src 'sha256-"+scriptHash+"'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
 const PUBLIC_SAMPLE='https://test.playready.microsoft.com/media/profficialsite/tearsofsteel_4k_60s_24fps.12000kbps.3840x2160.h265-10b.2ch.128kbps.aac.mp4';
 const PUBLIC_ADAPTIVE='https://devstreaming-cdn.apple.com/videos/streaming/examples/adv_dv_atmos/main.m3u8';
 const PUBLIC_SURROUND='https://ott.dolby.com/OnDelKits/DDP/Dolby_Digital_Plus_Online_Delivery_Kit_v1.4.1/Test_Signals/muxed_streams/MP4/Example/ChID_voices_1920x1080p_25fps_h265_6ch_256kbps_ddp.mp4';
@@ -25,7 +27,7 @@ const server=http.createServer(async(req,res)=>{
   const origin='http://127.0.0.1:'+server.address().port;
   const reply=(status,data,type='application/json')=>{
     res.writeHead(status,{'Content-Type':type+'; charset=utf-8','Cache-Control':'no-store',
-      'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-Frame-Options':'DENY'});
+      'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-Frame-Options':'DENY','Content-Security-Policy':csp});
     res.end(type==='application/json'?JSON.stringify(data):data);
   };
   if(req.headers.host!==new URL(origin).host)return reply(403,{error:'Local access only.'});
@@ -37,8 +39,10 @@ const server=http.createServer(async(req,res)=>{
   if(busy)return reply(409,{error:'A check is already running.'});
   busy=true;
   try{
+    req.setTimeout(10000,()=>req.destroy());
     let size=0;const parts=[];
     for await(const part of req){size+=part.length;if(size>32768)return reply(413,{error:'Input too large.'});parts.push(part);}
+    req.setTimeout(0); // The input deadline must not interrupt a longer bounded media inspection.
     const body=JSON.parse(Buffer.concat(parts).toString('utf8'));
     if(req.url==='/check'){
       candidates.clear();
@@ -76,6 +80,9 @@ const server=http.createServer(async(req,res)=>{
     reply(400,{error:'The check could not be completed. Verify the input and service availability. No private URL or error text was logged.'});
   }finally{busy=false;}
 });
+server.requestTimeout=15000;
+server.headersTimeout=10000;
+server.maxRequestsPerSocket=4;
 server.listen(0,'127.0.0.1',()=>{
   const url='http://127.0.0.1:'+server.address().port+'/';
   console.log('Private source checker: '+url);

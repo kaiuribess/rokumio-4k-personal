@@ -10,6 +10,8 @@
              wasClosed is built into the Dialog interface, not declared here. -->
         <field id="dialog" type="node" />
         <function name="Start" />
+        <function name="ReadAddonSyncStatus" />
+        <function name="RetryAddonSync" />
         <function name="RunPlaybackDiagnostic" />
         <function name="ReadPlaybackDiagnostic" />
         <function name="HandleDeepLink" />
@@ -24,6 +26,7 @@
              import is already running so the page can answer 409. Shares the
              single import slot with HandleDeepLink via BeginImport. -->
         <function name="ImportFromSetup" />
+        <function name="RequestSetupImport" />
         <!-- A screen whose store bind came up short reports the failing hop
              here (Screen.brs's SetStores) and the Scene paints it, so a broken
              store layer can never be mistaken for an empty catalog. -->
@@ -58,6 +61,8 @@
     <script type="text/brightscript" uri="pkg:/source/util/VoiceTransport.brs" />
     <script type="text/brightscript" uri="pkg:/components/MainScene.brs" />
     <script type="text/brightscript" uri="pkg:/components/AccountWork.brs" />
+    <script type="text/brightscript" uri="pkg:/components/AccountAddons.brs" />
+    <script type="text/brightscript" uri="pkg:/components/SetupImport.brs" />
     <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
 
     <children>

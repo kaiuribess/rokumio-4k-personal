@@ -116,7 +116,7 @@ sub Main()
         end function }
     }
     OnEnter(invalid)
-    Harness_Equal(m.rows.Count(), 14, "Guest sees provider, caption and playback preferences, audio and add-on checks")
+    Harness_Equal(m.rows.Count(), 15, "Guest sees provider, caption and playback preferences, audio and add-on checks")
     Harness_Equal(m.rows[4].value, "Start sooner", "automatic Play exposes early-start choice")
     Harness_Equal(m.rows[1].value, "TV / projector", "default preset is clearly named")
     m.top = { getScene: function() as dynamic
@@ -150,7 +150,7 @@ sub Main()
     m.showNetDiag = true
     m.list.rowItemFocused = [2, 0]
     BuildRows(true)
-    Harness_Equal(m.rows.Count(), 16, "Advanced diagnostics remain available after normal setup rows")
+    Harness_Equal(m.rows.Count(), 17, "Advanced diagnostics remain available after normal setup rows")
     Harness_Equal(m.list.jumpToRowItem[0], 2, "Revealing diagnostics preserves selected connection check")
     m.list.rowItemFocused = [99, 0]
     BuildRows(true)
