@@ -342,5 +342,23 @@ Harness_Ok(CanRecoverSources("A"),"current failed playback owns deferred recover
 m.discoveryPending=false
 Harness_Ok(not CanRecoverSources("A"),"late request cannot change successful playback")
 
+
+Harness_Suite("Uncertain same-title write blocks newer edits until a fresh baseline")
+ReliabilitySetup():m.accountLibraryReady=true
+QueueAccountEdit("libraryChange",ReliabilityChange("A",true)):PumpLibraryWrites():failed=m.libraryWriteTask
+QueueAccountEdit("libraryChange",ReliabilityChange("A",false))
+failed.result={ok:false}:onLibraryWriteResult(ReliabilityEvent(failed))
+Harness_Equal(m.libraryWriteTask,invalid,"failure cannot immediately replay a superseding edit")
+Harness_Equal(m.accountWrites.Count(),1,"only latest desired same-title edit is retained")
+Harness_Ok(m.accountWrites[0].blocked=true,"superseding edit remains visibly unsynced")
+QueueAccountEdit("libraryChange",ReliabilityChange("A",true)):PumpLibraryWrites()
+Harness_Equal(m.libraryWriteTask,invalid,"another local edit cannot bypass reconciliation gate")
+Harness_Ok(m.accountWrites[0].blocked=true,"coalescing preserves uncertainty barrier")
+RetryAccountWrites()
+m.librarySyncTask={id:"retry-newest",accountGeneration:0,result:{ok:true,items:[],revokedSession:false}}
+onLibrarySyncResult(ReliabilityEvent(m.librarySyncTask)):PumpLibraryWrites()
+Harness_Equal(m.libraryWriteTask.item._id,"A","explicit refresh safely rebuilds newest intent")
+Harness_Equal(m.libraryWriteTask.item.removed,false,"newest membership is not overwritten by older durable outbox")
+
 print "Assertions passed: ";m.passed;" failed: ";m.failed
 if m.failed=0 then print "RESULT: PASS" else print "RESULT: FAIL":stop

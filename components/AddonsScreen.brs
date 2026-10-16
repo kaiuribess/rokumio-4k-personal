@@ -78,6 +78,9 @@ end sub
 sub BuildRows()
     m.rows = []
     hasStreamSource = false
+    hasCatalog = false
+    catalogOnboarding = true
+    installed = 0
     m.rows.Push({
         action: "add"
         title: "Add add-on"
@@ -85,9 +88,24 @@ sub BuildRows()
     })
     m.rows.Push({action:"check",title:"Check add-ons",value:"Find problems"})
     if m.stores <> invalid
+        scene = m.top.getScene()
+        if m.stores.auth.callFunc("AuthGetSession") = "stremio"
+            catalogOnboarding = false
+            m.rows.Push({action:"sync",title:"Sync Stremio add-ons",value:"Retry account import"})
+            if scene <> invalid
+                sync = scene.callFunc("ReadAddonSyncStatus")
+                if Type(sync) = "roAssociativeArray"
+                    if sync.text <> "" then m.status.text = sync.text
+                    catalogOnboarding = sync.complete = true
+                end if
+            end if
+        end if
         for each addon in m.stores.addons.callFunc("AddonsGetAll")
             ' Configured addresses can carry provider keys in either their path
             ' or query. Display capabilities without exposing the address.
+            installed = installed + 1
+            if Type(addon.catalogs) = "roArray" and addon.catalogs.Count() > 0 then hasCatalog = true
+            if addon.builtin = true and AddonAdvertises(addon,"catalog") then hasCatalog = true
             value = AddonCapabilityText(addon)
             if AddonAdvertises(addon, "stream") then hasStreamSource = true
             m.rows.Push({
@@ -101,6 +119,7 @@ sub BuildRows()
         end for
     end if
 
+    if not hasCatalog and catalogOnboarding then m.rows.Push({action:"catalog",title:"Add movie and show catalogs",value:"Cinemeta · only on this Roku"})
     content = CreateObject("roSGNode", "ContentNode")
     for each row in m.rows
         entry = content.CreateChild("ContentNode")
@@ -110,12 +129,19 @@ sub BuildRows()
     end for
     m.list.content = content
 
-    installed = m.rows.Count() - 2
     if installed < 0 then installed = 0
     quantity = installed.ToStr() + " add-ons"
     if installed = 1 then quantity = "1 add-on"
     m.sub.text = quantity + " · Select Check add-ons for a connection report"
-    if not hasStreamSource and m.status.text = "" then m.status.text = "Catalogs are ready. Add a configured stream source to play movies and shows."
+    if m.status.text = ""
+        if not hasCatalog
+            m.status.text = "No catalog provider. Add catalogs below for browsing and search. Your Stremio account will not change."
+        else if not hasStreamSource
+            m.status.text = "Catalogs are ready. Add a configured stream source to play movies and shows."
+        end if
+    end if
+    m.companionCaption.text = "Account add-ons sync automatically after login. Retry sync here if any are missing." + Chr(10) + Chr(10) + "For manual setup: keep this screen open, open the address below on the same Wi-Fi, and paste a configured HTTPS manifest URL. Catalogs supply browsing/search; stream providers supply playback."
+
 end sub
 
 function AddonAdvertises(addon as object, resourceName as string) as boolean
@@ -151,6 +177,10 @@ sub onRowSelected()
         ShowAddDialog()
     else if row.action = "check"
         m.top.pushRequest = {screen:"addonHealthScreen",params:{}}
+    else if row.action = "sync"
+        m.top.getScene().callFunc("RetryAddonSync")
+    else if row.action = "catalog"
+        StartInstall("https://v3-cinemeta.strem.io/manifest.json")
     else
         ShowRemoveConfirm(row)
     end if

@@ -6,6 +6,7 @@
          pushRequest the Scene routes to Details. The * (options) key reopens
          a fresh keyboard prompt. -->
     <interface>
+        <function name="EnsureCurrentSources" />
         <!-- The one action Search reports upward: a push request. -->
         <field id="pushRequest" type="assocarray" alwaysNotify="true" />
 

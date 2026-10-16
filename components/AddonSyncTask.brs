@@ -7,21 +7,14 @@
 ' store's (and are unit-tested there); this worker only exists to keep the HTTP
 ' off the render thread.
 '
-' `stage` is the reason this worker carries two extra fields. The brs test
-' interpreter cannot run a Task's worker thread, so NOTHING in npm test executes
-' any of this — the only observer of this code is a Roku device, and for three
-' separate bugs now ("result" read as invalid, iteration order, a truthiness test
-' on an unassigned field) a green suite was no evidence at all. So the worker
-' narrates its own progress into a field the fault strip can read: the stage at
-' the moment of failure is the diagnosis, with no further round of hypotheses
-' needed. It stays in permanently for the same reason.
+' Integration tests execute this worker with a deterministic transport factory;
+' native Task threading and network timing still need device validation.
+' Stage values are fixed diagnostic labels. No URL, credential or raw exception
+' is included in the worker failure packet.
 '
-' One trap this file exists to make explicit, learned on device: an alwaysNotify
-' interface field notifies once at ObserveField time with its current value, and
-' that notification is delivered on the event loop — i.e. AFTER the launching sub
-' has returned and the worker has started. "finished" therefore arrives twice, and
-' the two arrivals differ only in value. Handlers must test the value. Setting it
-' last is what makes `true` mean "the worker is done"; nothing else does.
+' Both fields alwaysNotify. Ignore initial empty/false notifications; when a
+' true finished notification arrives, consume any available result before
+' reporting a missing-result failure. Observer dispatch order is not assumed.
 
 sub init()
     m.top.functionName = "sync"
@@ -37,14 +30,11 @@ sub sync()
         m.top.result = result
         m.top.stage = "result-written"
     catch e
-        ' Name the throw, then report it as a normal transport failure. The
-        ' catch packet is a result like any other, so the handler has one path.
+        ' A fixed error avoids reflecting private data from an exception.
         m.top.stage = "threw"
-        m.top.result = { ok: false, descriptors: [], error: e.message }
+        m.top.result = { ok: false, descriptors: [], error: "Could not sync account add-ons" }
     end try
     ' LAST statement, on both paths, and deliberately after the result write:
-    ' MainScene's onAddonSyncFinished may only conclude "the worker produced
-    ' nothing" once this is true, and a result that landed first is always
-    ' observed first.
+    ' MainScene checks the result from either observer, independent of order.
     m.top.finished = true
 end sub

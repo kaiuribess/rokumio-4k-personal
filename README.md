@@ -2,13 +2,13 @@
 
 A native Roku client with a dark red interface for browsing Stremio-compatible catalogs, searching movies and shows, and playing compatible direct streams with the Roku remote. This community derivative adds English audio selection, projector/surround preferences, clearer source cards, automatic source recovery, next-episode playback, and add-on checks. The repository and ZIP filename remain `rokumio-4k-personal` so existing links and build instructions continue to work.
 
-**Version 0.5.21 is an experimental reliability update.** It fixes slow catalog/series response processing, preserves complete episode metadata, and builds long episode grids in small batches so Back remains responsive. Controlled device checks cover Family Guy and The Simpsons as well as Discover filters. The previous playback, checkpoint and honest resolution-display fixes remain. Provider compatibility, audible surround and sustained genuine 4K still depend on the actual source and equipment.
+**Version 0.5.22 is an experimental account-sync and reliability update.** Stremio login imports supported account add-ons automatically, keeps useful entries when another is unsupported, and shows partial/failed/empty outcomes with retry. Catalog changes refresh Home, Search and Discover. Empty or stream-only accounts can explicitly add Cinemeta on this Roku without changing their remote account. Account-write recovery and browser import permissions are stronger. See the [audit and regression evidence](docs/AUDIT-0.5.22.md). This version has software validation; it has not received physical Roku sign-off. Provider compatibility, audible surround and sustained genuine 4K still depend on the actual source and equipment.
 
-**[Download the Roku install ZIP — 0.5.21](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.21/rokumio-4k-personal-0.5.21.zip)**
+**[Download the Roku install ZIP — 0.5.22](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.22/rokumio-4k-personal-0.5.22.zip)**
 
 Upload that ZIP without extracting it. GitHub's green Code button and “Source code” archives are for developers; they are not the Roku install package.
 
-[Release notes and checksum](https://github.com/kaiuribess/rokumio-4k-personal/releases/tag/v0.5.21) · [Installation](docs/INSTALL.md) · [Add-on checks](docs/ADDON_CHECKS.md) · [Playback and 4K](docs/PLAYBACK.md) · [Development](docs/DEVELOPMENT.md) · [Changes](CHANGELOG.md)
+[Release notes and checksum](https://github.com/kaiuribess/rokumio-4k-personal/releases/tag/v0.5.22) · [Installation](docs/INSTALL.md) · [Add-on checks](docs/ADDON_CHECKS.md) · [Playback and 4K](docs/PLAYBACK.md) · [Development](docs/DEVELOPMENT.md) · [Changes](CHANGELOG.md)
 
 ## What you can do
 

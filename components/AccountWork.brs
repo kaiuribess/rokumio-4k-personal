@@ -1,6 +1,7 @@
 '
 ' Account ownership and writes are held by MainScene; no worker changes owners.
 sub InitAccountWork()
+    m.persistenceRetryCount = 0
     m.accountGeneration = 0
     m.accountWorkerSequence = 0
     m.accountWrites = []
@@ -39,6 +40,7 @@ function AccountResultCurrent(task as dynamic, event as dynamic) as boolean
 end function
 
 sub ResetAccountWork()
+    m.persistenceRetryCount = 0
     m.accountGeneration = AccountGeneration() + 1
     m.top.accountGeneration = m.accountGeneration
     if m.watchStatePump <> invalid then m.watchStatePump.control = "stop"
@@ -50,6 +52,7 @@ sub ResetAccountWork()
         m.import = invalid
     end if
     m.addonSyncTask = invalid
+    m.addonSyncStatus = invalid
     m.librarySyncTask = invalid
     m.libraryWriteTask = invalid
     m.pushingLibraryWrite = false
@@ -57,6 +60,7 @@ sub ResetAccountWork()
     m.accountWrites = []
     m.accountPersistSignature = ""
     m.accountLibraryReady = false
+    m.pendingSetupImport = invalid
     m.pendingWatchState = invalid
     m.pendingWatchedChange = invalid
     m.pendingLibraryChange = invalid
@@ -78,10 +82,14 @@ function QueueAccountEdit(kind as string, payload as dynamic) as boolean
     if GetInterface(payload.metaId,"ifString") = invalid or payload.metaId = "" then return false
     if kind <> "watchState" and kind <> "watched" and kind <> "libraryChange" then return false
     if Type(m.accountWrites) <> "roArray" then m.accountWrites = []
+    blocked = false
+    for each queued in m.accountWrites
+        if queued.metaId = payload.metaId and queued.blocked = true then blocked = true
+    end for
     for index = 0 to m.accountWrites.Count() - 1
         job = m.accountWrites[index]
         if job.kind = kind and job.metaId = payload.metaId
-            m.accountWrites[index] = {kind:kind,metaId:payload.metaId,payload:payload,accountGeneration:generation,blocked:false}
+            m.accountWrites[index] = {kind:kind,metaId:payload.metaId,payload:payload,accountGeneration:generation,blocked:blocked}
             return true
         end if
     end for
@@ -89,7 +97,7 @@ function QueueAccountEdit(kind as string, payload as dynamic) as boolean
         ReportStoreFault("Account edit queue is full. Retry saved changes in Settings.",true)
         return false
     end if
-    m.accountWrites.Push({kind:kind,metaId:payload.metaId,payload:payload,accountGeneration:generation,blocked:false})
+    m.accountWrites.Push({kind:kind,metaId:payload.metaId,payload:payload,accountGeneration:generation,blocked:blocked})
     return true
 end function
 
@@ -158,7 +166,10 @@ sub onLibraryWriteResult(event = invalid as dynamic)
     if result.ok <> true and job <> invalid
         superseded = false
         for each newer in m.accountWrites
-            if newer.kind = job.kind and newer.metaId = job.metaId then superseded = true
+            if newer.metaId = job.metaId
+                newer.blocked = true
+                if newer.kind = job.kind then superseded = true
+            end if
         end for
         if not superseded
             job.blocked = true
@@ -183,11 +194,16 @@ sub RetryAccountWrites()
 end sub
 
 sub onPersistenceTick()
+    if m.pendingSetupImport <> invalid then ExpireSetupImport()
     if m.storeHost = invalid then return
+    if m.persistenceRetryCount = invalid then m.persistenceRetryCount = 0
+    if m.persistenceRetryCount >= 3 then return
     if Type(m.accountWrites) = "roArray" and m.accountWrites.Count() > 0 then PersistAccountWrites()
     result = m.storeHost.callFunc("RetryPersistence")
     if Type(result) <> "roAssociativeArray" then return
-    ReportStoreFault("Device storage could not save changes. Retrying.",result.failed = true)
+    if result.failed = true then m.persistenceRetryCount = m.persistenceRetryCount + 1 else m.persistenceRetryCount = 0
+    ReportStoreFault("Device storage could not save changes. Retrying.",result.failed = true and m.persistenceRetryCount < 3)
+    ReportStoreFault("Device save failed. Settings > Retry device saves.",result.failed = true and m.persistenceRetryCount >= 3)
 end sub
 
 sub PersistAccountWrites()
@@ -226,4 +242,9 @@ sub RestoreAccountWrites()
             end for
         end if
     end for
+end sub
+
+sub RetryDeviceSaves()
+    m.persistenceRetryCount = 0
+    onPersistenceTick()
 end sub

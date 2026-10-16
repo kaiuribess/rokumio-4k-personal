@@ -335,6 +335,7 @@ sub onSettingsAction()
         end if
     end if
     if request = invalid or request.action = invalid then return
+    if request.action = "retryDeviceSaves" then RetryDeviceSaves():return
     if request.action = "retryAccountWrites" then RetryAccountWrites():return
     if request.action = "login"
         m.loginFromSettings = true
@@ -606,7 +607,10 @@ sub onLinkCodeAction()
     end if
     if request.action = "completeLogin"
         if m.linkStremioTask = invalid or request.taskIdentity <> m.linkStremioTask.id then return
-        if m.storeHost <> invalid then m.storeHost.callFunc("AuthLoginStremio", request.authKey, request.user)
+        if m.storeHost <> invalid
+            login = m.storeHost.callFunc("AuthLoginStremio", request.authKey, request.user)
+            if Type(login) = "roAssociativeArray" and login.persisted <> true then ReportStoreFault("Login is active for this session; device save failed.",true)
+        end if
         ReconcileSession()
         m.revokedSessionHandled = false
         StartAddonSync()
@@ -795,6 +799,8 @@ sub StartAddonSync()
     if m.storeHost <> invalid then fields.authKey = m.storeHost.callFunc("AuthGetAuthKey")
     task = AsyncTask_Launch(m.top, "AddonSyncTask", "onAddonSyncResult", fields, NextAccountWorkerId("addonSync"), "onAddonSyncFinished")
     m.addonSyncTask = task
+    m.addonSyncStatus = {state:"loading",text:"Syncing Stremio add-ons…",complete:false}
+    RefreshAddonStatus()
 end sub
 
 ' Reconcile one validated account snapshot, preserving the last usable state
@@ -820,6 +826,7 @@ sub onAddonSyncResult(event = invalid as dynamic)
     if task = invalid then return
     result = task.result
     if result = invalid then return
+    if Type(result) <> "roAssociativeArray" then result = {ok:false}
 
     m.addonSyncTask = invalid
     AsyncTask_Reap(task, m.top, false)
@@ -833,35 +840,40 @@ sub onAddonSyncResult(event = invalid as dynamic)
         return
     end if
 
-    if not result.ok
-        reason = "unknown error"
-        if result.error <> invalid and result.error <> "" then reason = result.error
-        AddAddonSyncFault("addon sync failed: " + reason)
+    if Type(result) <> "roAssociativeArray" or result.ok <> true
+        m.addonSyncStatus = {state:"failed",text:"Stremio add-ons could not sync. Retry in Add-ons.",complete:false}
+        if result.failureKind = "transport" then m.addonSyncStatus.text="Stremio add-ons request failed. Check connectivity/service status and retry in Add-ons."
+        if result.failureKind = "api" then m.addonSyncStatus.text="Stremio declined the add-on request. Retry in Add-ons or reconnect the account."
+        if result.failureKind = "schema" then m.addonSyncStatus.text="Stremio returned an unexpected collection format. Retry in Add-ons."
+        AddAddonSyncFault(m.addonSyncStatus.text)
+        RefreshAddonStatus()
         PumpPendingLibrarySync()
         return
     end if
-
     outcome = m.storeHost.callFunc("AddonsReconcileAccount",result.descriptors)
-    if Type(outcome) <> "roAssociativeArray" or outcome.ok <> true
-        AddAddonSyncFault("Account add-ons were not updated; the snapshot was invalid")
-        PumpPendingLibrarySync()
-        return
+    if Type(outcome) <> "roAssociativeArray" then outcome = {applied:false,complete:false}
+    m.addonSyncStatus = outcome
+    m.addonSyncStatus.state = "failed"
+    m.addonSyncStatus.text = "No usable account snapshot. Retry in Add-ons."
+    if outcome.received <> invalid
+        m.addonSyncStatus.text = "No entries applied from " + outcome.received.ToStr() + ": " + outcome.unsupported.ToStr() + " unsupported, " + outcome.invalid.ToStr() + " invalid, " + outcome.limited.ToStr() + " over limits. Retry in Add-ons."
     end if
-    if m.homeScreen <> invalid then m.homeScreen.callFunc("EnsureCurrentRows")
-    ' The player snapshotted its subtitle providers when it was entered, which on
-    ' a cold launch is before this loop has run. Same predicate, same reason: tell
-    ' whichever player is up to re-derive, so an account add-on that is only now in
-    ' the registry is still asked for captions. Inert when no play is in progress —
-    ' the player's own m.subtitleParams guard makes it return.
-    if m.playerScreen <> invalid then m.playerScreen.callFunc("EnsureSubtitleProviders")
-    ' A sync that succeeded and still left the registry empty is the exact state
-    ' that used to require re-pairing. Name it, so a launch in that state is a
-    ' visible fault rather than a session that mysteriously has no catalogs.
-    if m.storeHost <> invalid and m.storeHost.callFunc("AddonsGetAll").Count() = 0
-        AddAddonSyncFault("addon sync: the account reported no add-ons")
+    if outcome.applied = true
+        m.addonSyncStatus.state = "partial"
+        m.addonSyncStatus.text = "Imported " + outcome.imported.ToStr() + " of " + outcome.received.ToStr() + " account entries"
+        if outcome.complete = true
+            m.addonSyncStatus.state = "complete"
+            m.addonSyncStatus.text = m.addonSyncStatus.text + ". Sync complete."
+            if outcome.received = 0 then m.addonSyncStatus.state = "empty":m.addonSyncStatus.text = "Your Stremio account has no add-ons."
+        else
+            m.addonSyncStatus.text = m.addonSyncStatus.text + ". Partial: " + outcome.unsupported.ToStr() + " unsupported, " + outcome.invalid.ToStr() + " invalid, " + outcome.limited.ToStr() + " over limits. Retry in Add-ons."
+        end if
+        if outcome.duplicates > 0 then m.addonSyncStatus.text = m.addonSyncStatus.text + " Duplicates skipped: " + outcome.duplicates.ToStr() + "."
+        if outcome.persisted <> true then m.addonSyncStatus.state="unsaved":m.addonSyncStatus.text=m.addonSyncStatus.text+" Loaded for this session; device save failed."
+        NotifyAddonChanges()
     end if
-    ' The add-on sync is done, so a launch-time library sync that deferred behind
-    ' it can now run without opening a second connection alongside it.
+    if m.addonSyncStatus.state <> "complete" and m.addonSyncStatus.state <> "empty" then AddAddonSyncFault(m.addonSyncStatus.text)
+    RefreshAddonStatus()
     PumpPendingLibrarySync()
 end sub
 
@@ -903,6 +915,10 @@ sub onAddonSyncFinished(event = invalid as dynamic)
     ' real notification is still to come. Touch nothing — reaping here is what
     ' destroyed the real result.
     if task.finished <> true then return
+    if Type(task.result) = "roAssociativeArray"
+        onAddonSyncResult(event)
+        return
+    end if
 
     m.addonSyncTask = invalid
 
@@ -911,8 +927,9 @@ sub onAddonSyncFinished(event = invalid as dynamic)
     AsyncTask_Reap(task, m.top, false)
 
     ClearAddonSyncFaults()
-    print "[addons] sync worker finished with NO result (stage: " ; stage ; ")"
-    AddAddonSyncFault("addon sync: the worker finished with no result (stage: " + stage + ")")
+    m.addonSyncStatus = {state:"failed",text:"Stremio add-on sync ended without a result. Retry in Add-ons.",complete:false}
+    AddAddonSyncFault(m.addonSyncStatus.text)
+    RefreshAddonStatus()
     PumpPendingLibrarySync()
 end sub
 
@@ -926,7 +943,6 @@ sub ClearAddonSyncFaults()
         end for
     end if
     m.addonSyncFaults = []
-    RestoreAccountWrites()
 end sub
 
 sub AddAddonSyncFault(reason as string)
@@ -1259,8 +1275,7 @@ sub FinishImport()
     ' that only re-registers what is already there still leaves Home showing
     ' whatever it walked before. The fill happens off the UI thread behind the
     ' summary dialog; nothing to block on here.
-    if m.homeScreen <> invalid then m.homeScreen.callFunc("EnsureCurrentRows")
-    if m.playerScreen <> invalid then m.playerScreen.callFunc("EnsureSubtitleProviders")
+    NotifyAddonChanges()
 
     m.import = invalid
 end sub

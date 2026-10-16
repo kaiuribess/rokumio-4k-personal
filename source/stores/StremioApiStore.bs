@@ -71,18 +71,16 @@ class StremioApiStore
     function AddonCollectionGet() as object
         res = m.PostLong("/api/addonCollectionGet", { type: "AddonCollectionGet", authKey: m.authKey, update: true })
         result = invalid
-        if res.ok and res.json <> invalid then result = res.json.result
-        if result = invalid or result.addons = invalid or Type(result.addons) <> "roArray"
-            return { ok: false, descriptors: [], error: m.EnvelopeError(res, "Could not sync addons"), revokedSession: m.IsSessionRevoked(res) }
+        if res.ok = true and Type(res.json) = "roAssociativeArray" then result = res.json.result
+        if Type(result) <> "roAssociativeArray" or Type(result.addons) <> "roArray"
+            failureKind = "schema"
+            if res.ok <> true then failureKind = "transport"
+            if res.ok = true and Type(res.json) = "roAssociativeArray" and res.json.error <> invalid then failureKind = "api"
+            return { ok: false, descriptors: [], failureKind:failureKind, error: m.EnvelopeError(res, "Could not sync addons"), revokedSession: m.IsSessionRevoked(res) }
         end if
-        descriptors = []
-        for each addon in result.addons
-            packet = { transportUrl: "", manifest: invalid }
-            if addon.transportUrl <> invalid then packet.transportUrl = addon.transportUrl
-            if addon.manifest <> invalid then packet.manifest = addon.manifest
-            descriptors.Push(packet)
-        end for
-        return { ok: true, descriptors: descriptors, error: "", revokedSession: false }
+        ' Preserve entry boundaries for per-descriptor validation. A malformed
+        ' entry must not throw here and discard its supported neighbours.
+        return {ok:true,descriptors:result.addons,error:"",revokedSession:false,received:result.addons.Count()}
     end function
 
     ' Whether an error envelope means the authKey no longer maps to a live

@@ -35,15 +35,16 @@ sub startAuth()
         m.top.qrcode = qr
 
         authKey = ""
-        elapsed = 0
-        while elapsed < 300000
+        deadline = CreateObject("roTimespan")
+        deadline.Mark()
+        while deadline.TotalMilliseconds() < 300000
             ' Stop-aware poll loop: MainScene sets control = "STOP" to cancel an
             ' old worker when a new code is requested (or the flow is cancelled).
             ' Removing a Task node does not kill its running thread, so the loop
             ' must check the stop signal itself.
             if m.top.control = "STOP" then exit while
             Sleep(3000)
-            elapsed = elapsed + 3000
+            if deadline.TotalMilliseconds() >= 300000 then exit while
             if m.top.control = "STOP" then exit while
             readRes = http.Get("https://link.stremio.com/api/v2/read?type=Read&code=" + result.code)
             readResult = invalid
@@ -69,6 +70,15 @@ sub startAuth()
             user = userRes.json.result
         end if
 
+        identity = ""
+        if Type(user) = "roAssociativeArray"
+            if GetInterface(user._id,"ifString") <> invalid then identity = user._id
+            if identity = "" and GetInterface(user.id,"ifString") <> invalid then identity = user.id
+        end if
+        if identity.Trim() = "" or Len(identity) > 256
+            m.top.result = {ok:false,authKey:"",user:invalid,error:"Paired, but Stremio could not verify the account. Retry login."}
+            return
+        end if
         m.top.result = { ok: true, authKey: authKey, user: user, error: "" }
     catch e
         m.top.result = { ok: false, authKey: "", user: invalid, error: "Login failed" }

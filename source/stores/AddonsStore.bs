@@ -54,6 +54,7 @@ class AddonsStore
         m.accountScope = ""
         m.dirty = false
         m.allowLocalHttp = allowLocalHttp
+        m.descriptorDigest = invalid
         if GetInterface(accountScope,"ifString") <> invalid then m.accountScope = accountScope
         if sessionType = "stremio" and accountScope = "" then m.registry = invalid
         if m.registry <> invalid and accountScope <> invalid
@@ -536,8 +537,16 @@ class AddonsStore
             if not m.IsNonemptyString(mediaType) then return "manifest contains an invalid media type"
         end for
         if Type(manifest.resources) <> "roArray" then return "manifest resources must be a list"
-        if m.NormalizeResources(manifest.resources).Count() = 0 then return "manifest has no usable resources"
+        if m.NormalizeResources(manifest.resources).Count() = 0 and m.NormalizeCatalogNames(manifest.catalogs,manifest.name).Count() = 0 then return "manifest has no usable resources"
         if manifest.catalogs <> invalid and Type(manifest.catalogs) <> "roArray" then return "manifest catalogs must be a list"
+        if Type(manifest.catalogs) = "roArray"
+            for each catalog in manifest.catalogs
+                if Type(catalog) <> "roAssociativeArray" then return "manifest contains an invalid catalog"
+                if not m.IsNonemptyString(catalog.id) or not m.IsNonemptyString(catalog.type) then return "manifest contains an invalid catalog"
+                if Len(catalog.id) > 256 or Len(catalog.type) > 128 then return "manifest catalog exceeds the device budget"
+            end for
+        end if
+        if Len(FormatJson(manifest)) > 65536 then return "manifest exceeds the device budget"
         return ""
     end function
 
@@ -648,81 +657,168 @@ class AddonsStore
     ' is the transport base (the URL minus the /manifest.json segment, query
     ' args preserved) so request building stays uniform. Duplicates are skipped
     ' by Register.
-    function InstallFromDescriptor(transportUrl as dynamic, manifest as dynamic) as object
-        result = { ok: false, id: "", error: "", record: invalid }
-        if transportUrl = invalid or transportUrl = ""
-            result.error = "no addon address"
-            return result
-        end if
-        if Type(manifest) <> "roAssociativeArray" or not m.IsNonemptyString(manifest.id) or not m.IsNonemptyString(manifest.name)
-            result.error = "manifest missing id or name"
-            return result
-        end if
-
+    function DescriptorRecord(transportUrl as dynamic, manifest as dynamic) as object
+        result = {ok:false,id:"",error:"Invalid add-on descriptor",category:"invalid",record:invalid}
+        if not m.IsNonemptyString(transportUrl) then return result
+        if Len(transportUrl) > 8192 then return result
         base = m.BaseFromManifestUrl(transportUrl)
         if base = ""
-            ' Legacy /stremio/v1, IPFS, and malformed descriptors cannot be
-            ' queried with the modern HTTP resource routes this client uses.
+            result.category = "unsupported"
             result.error = "unsupported addon transport"
             return result
         end if
         result.error = m.ManifestError(manifest)
         if result.error <> "" then return result
-
-        ' Only http(s) transports can be driven from Roku.
-        parts = base.Split("://")
-        if parts.Count() < 2 or (LCase(parts[0]) <> "http" and LCase(parts[0]) <> "https") then
-            result.error = "unsupported addon transport"
-            return result
-        end if
-
-        record = {
-            id: manifest.id
-            name: manifest.name
-            version: manifest.version
-            types: manifest.types
-            idPrefixes: m.DeclaredList(manifest.idPrefixes)
-            catalogs: m.NormalizeCatalogNames(manifest.catalogs, manifest.name)
-            resources: m.NormalizeResources(manifest.resources)
-            address: base
-            builtin: false
-        }
-        if not m.Register(record)
-            result.error = "addon already installed"
-            if m.HasKey(m.installed, record.id) then result.record = m.installed[record.id]
-            return result
-        end if
-        result.ok = true
-        result.id = record.id
-        result.record = record
+        record = {id:manifest.id,manifestId:manifest.id,name:manifest.name,version:"",types:manifest.types,idPrefixes: m.DeclaredList(manifest.idPrefixes),catalogs:m.NormalizeCatalogNames(manifest.catalogs,manifest.name),resources:m.NormalizeResources(manifest.resources),address:base,builtin:false}
+        if m.IsNonemptyString(manifest.version) then record.version = manifest.version.Left(128)
+        result.ok = true:result.id = record.id:result.record = record:result.error = "":result.category = ""
         return result
     end function
 
+    function InstallFromDescriptor(transportUrl as dynamic, manifest as dynamic) as object
+        result = m.DescriptorRecord(transportUrl,manifest)
+        if not result.ok then return result
+        if not m.Register(result.record)
+            result.ok = false:result.error = "addon already installed"
+            if m.HasKey(m.installed,result.id) then result.record = m.installed[result.id]
+        end if
+        result.persisted = not m.SaveFailed()
+        return result
+    end function
+
+    function ManifestIdentity(record as object) as string
+        if m.IsNonemptyString(record.manifestId) then return record.manifestId
+        return record.id
+    end function
+
+    function FindIdentity(records as object, record as object) as string
+        for each key in records
+            other = records[key]
+            if m.ManifestIdentity(other) = m.ManifestIdentity(record) and other.address = record.address then return key
+        end for
+        return ""
+    end function
+
+    ' Distinct configured instances can share a public manifest id. Use an
+    ' opaque private-URL digest only when an internal key would collide.
+    function ConfigurationKey(record as object) as string
+        try
+            if m.descriptorDigest <> invalid
+                digest = m.descriptorDigest(record.address)
+            else
+                bytes = CreateObject("roByteArray"):bytes.FromAsciiString(record.address)
+                engine = CreateObject("roEVPDigest")
+                if engine.Setup("sha256") <> 0 then return ""
+                digest = LCase(engine.Process(bytes))
+            end if
+            if not CreateObject("roRegex","^[0-9a-f]{64}$","").IsMatch(digest) then return ""
+            return m.ManifestIdentity(record) + "#cc:" + digest
+        catch e
+            return ""
+        end try
+    end function
+
+    function SameDescriptor(left as object, right as object) as boolean
+        a = [m.ManifestIdentity(left),left.address,left.name,left.version,left.types,left.idPrefixes,left.catalogs,left.resources]
+        b = [m.ManifestIdentity(right),right.address,right.name,right.version,right.types,right.idPrefixes,right.catalogs,right.resources]
+        return FormatJson(a) = FormatJson(b)
+    end function
+
     function ReconcileAccount(descriptors as dynamic) as object
-        if m.sessionType <> "stremio" or Type(descriptors) <> "roArray" then return {ok:false,error:"No valid account snapshot"}
-        if descriptors.Count() > 64 then return {ok:false,error:"Account add-on collection exceeds the device budget"}
+        summary = {ok:false,applied:false,complete:false,persisted:false,received:0,imported:0,duplicates:0,unsupported:0,invalid:0,limited:0,retained:0,removed:0,count:m.order.Count(),error:"No valid account snapshot"}
+        if m.sessionType <> "stremio" or Type(descriptors) <> "roArray" then return summary
+        summary.received = descriptors.Count()
         staging = AddonsStore(m.transport,invalid,"stremio")
         staging.SetLocalHttpAllowed(m.allowLocalHttp)
+        staging.descriptorDigest = m.descriptorDigest
+        inspected = 0
         for each descriptor in descriptors
-            if Type(descriptor) <> "roAssociativeArray" then return {ok:false,error:"Invalid account add-on snapshot"}
-            outcome = staging.InstallFromDescriptor(descriptor.transportUrl,descriptor.manifest)
-            if outcome.ok <> true then return {ok:false,error:"Account add-ons could not be validated"}
-            staging.installed[outcome.id].accountOwned = true
-        end for
-        ' Explicit local additions remain separate; account IDs/order win.
-        for each id in m.order
-            if m.HasKey(m.installed,id) and not staging.HasKey(staging.installed,id)
-                if m.installed[id].accountOwned <> true
-                    if staging.order.Count() >= 64 then return {ok:false,error:"Account plus local add-ons exceed the device budget"}
-                    staging.installed[id] = m.installed[id]
-                    staging.order.Push(id)
-                end if
+            if inspected >= 256 then summary.limited = summary.received-inspected:exit for
+            inspected = inspected+1
+            if Type(descriptor) <> "roAssociativeArray" then summary.invalid=summary.invalid+1:continue for
+            outcome = m.DescriptorRecord(descriptor.transportUrl,descriptor.manifest)
+            if outcome.ok <> true
+                if outcome.category = "unsupported" then summary.unsupported=summary.unsupported+1 else summary.invalid=summary.invalid+1
+                continue for
             end if
+            record = outcome.record
+            same = staging.FindIdentity(staging.installed,record)
+            if same <> ""
+                if m.SameDescriptor(staging.installed[same],record) then summary.duplicates=summary.duplicates+1 else summary.invalid=summary.invalid+1
+                continue for
+            end if
+            if staging.order.Count() >= 64 then summary.limited=summary.limited+1:continue for
+            oldKey = m.FindIdentity(m.installed,record)
+            if oldKey <> "" then record.id = oldKey
+            if staging.HasKey(staging.installed,record.id) then record.id = m.ConfigurationKey(record)
+            if record.id = "" or staging.HasKey(staging.installed,record.id) then summary.invalid=summary.invalid+1:continue for
+            record.accountOwned = true
+            staging.installed[record.id] = record:staging.order.Push(record.id)
+            summary.imported = summary.imported+1
         end for
-        m.installed = staging.installed
-        m.order = staging.order
-        persisted = m.Save()
-        return {ok:true,persisted:persisted,error:"",count:m.order.Count()}
+        summary.complete = summary.invalid=0 and summary.unsupported=0 and summary.limited=0
+        if not summary.complete and summary.imported=0
+            summary.error = "No supported add-ons could be imported"
+            return summary
+        end if
+        ' Only a complete snapshot authorizes account-owned removals. Keep
+        ' local-only/dual-owned records even when an account id collides.
+        for each id in m.order
+            if not m.HasKey(m.installed,id) then continue for
+            old = m.installed[id]
+            existing = staging.FindIdentity(staging.installed,old)
+            local = old.accountOwned<>true or old.locallyInstalled=true
+            if existing <> ""
+                if local then staging.installed[existing].locallyInstalled = true
+                continue for
+            end if
+            if summary.complete and not local then summary.removed=summary.removed+1:continue for
+            if staging.order.Count() >= 64
+                summary.complete=false:summary.limited=summary.limited+1
+                ' Keep the previous complete registry if local records cannot fit.
+                summary.error="Account plus local add-ons exceed the device budget"
+                return summary
+            end if
+            kept = {}
+            for each field in old
+                kept[field] = old[field]
+            end for
+            if local then kept.accountOwned=false
+            if staging.HasKey(staging.installed,kept.id) then kept.id=m.ConfigurationKey(kept)
+            if kept.id="" or staging.HasKey(staging.installed,kept.id)
+                summary.error="Configured add-on identities could not be separated"
+                return summary
+            end if
+            staging.installed[kept.id]=kept:staging.order.Push(kept.id)
+            summary.retained=summary.retained+1
+        end for
+        m.installed=staging.installed:m.order=staging.order
+        summary.applied=true:summary.persisted=m.Save():summary.ok=summary.complete and summary.persisted:summary.count=m.order.Count()
+        summary.error=""
+        if not summary.complete then summary.error="Some account add-ons could not be imported; removals were deferred"
+        caps=m.CapabilityCounts()
+        for each key in caps
+            summary[key]=caps[key]
+        end for
+        return summary
+    end function
+
+    function CapabilityCounts() as object
+        counts={catalogProviders:0,metadataProviders:0,streamProviders:0,subtitleProviders:0}
+        for each record in m.GetAll()
+            catalogProvider=false
+            if Type(record.catalogs)="roArray"
+                for each catalog in record.catalogs
+                    caps=m.CatalogCapabilities(catalog)
+                    if caps.feed or caps.search then catalogProvider=true
+                end for
+            end if
+            if catalogProvider then counts.catalogProviders=counts.catalogProviders+1
+            if m.HasResource(record.resources,"meta") then counts.metadataProviders=counts.metadataProviders+1
+            if m.HasResource(record.resources,"stream") then counts.streamProviders=counts.streamProviders+1
+            if m.HasResource(record.resources,"subtitles") then counts.subtitleProviders=counts.subtitleProviders+1
+        end for
+        return counts
     end function
 
     ' Remove an installed add-on, or a shipped built-in. The caller says which

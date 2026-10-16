@@ -134,7 +134,11 @@ test('Local browser boundary rejects cross-origin writes and handles bad input p
       child.on('error',reject);
     });
     const origin=new URL(output).origin;
-    const html=await (await fetch(output)).text();
+    const pageResponse=await fetch(output);
+    const html=await pageResponse.text();
+    const digest=require('node:crypto').createHash('sha256').update(/<script>([\s\S]+)<\/script>/.exec(html)[1]).digest('base64');
+    assert.ok(pageResponse.headers.get('content-security-policy').includes("script-src 'sha256-"+digest+"'"));
+    assert.ok(!pageResponse.headers.get('content-security-policy').includes('unsafe-eval'));
     assert.ok(html.includes('type="password"'));
     new (require('node:vm').Script)(/<script>([\s\S]+)<\/script>/.exec(html)[1]);
     const key=/'X-Check-Key':'([a-f0-9]+)'/.exec(html)[1];

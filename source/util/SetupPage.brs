@@ -404,7 +404,7 @@ function SetupHtmlPage() as string
 end function
 
 function SetupHtmlSent() as string
-    inner = "<p>Sent to the Roku. The add-on is installing on the TV now.</p>"
+    inner = "<p>Sent to the Roku. Confirm Allow import on the TV within 60 seconds, then watch the installation summary.</p>"
     inner = inner + "<p><a href='/'>Install another</a></p>"
     return SetupHtml("Sent", inner)
 end function
@@ -447,6 +447,9 @@ function SetupHttpResponse(status as string, body as string) as string
     response = response + "Content-Length: " + Len(body).ToStr() + CrLf()
     response = response + "Connection: close" + CrLf()
     response = response + "Cache-Control: no-store" + CrLf()
+    response = response + "X-Content-Type-Options: nosniff" + CrLf()
+    response = response + "Referrer-Policy: no-referrer" + CrLf()
+    response = response + "Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'" + CrLf()
     response = response + CrLf()
     return response + body
 end function
@@ -621,7 +624,7 @@ sub SetupServerHandle(setup as dynamic, key as string, conn as dynamic, state as
     ' readable summary on the TV.
     accepted = false
     if setup.scene <> invalid
-        accepted = setup.scene.callFunc("ImportFromSetup", url)
+        accepted = setup.scene.callFunc("RequestSetupImport", url)
     end if
     if accepted = true
         SetupServerRespond(setup, key, conn, "200", SetupHtmlSent())

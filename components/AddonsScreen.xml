@@ -86,9 +86,10 @@
 
         <Label
             id="addonsStatus"
-            translation="[80, 1000]"
+            translation="[80, 920]"
             width="1760"
-            height="40"
+            height="120"
+            wrap="true"
             font="font:SmallSystemFont" />
     </children>
 </component>

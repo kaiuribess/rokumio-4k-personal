@@ -1,4 +1,31 @@
-# Release validation — 0.5.21
+# Release validation — 0.5.22
+
+Validated in software on 2026-10-15, starting from latest default-branch commit `bcd32111d9b0996b35285b1a684513d88f66b0c1`. This remains an experimental prerelease. No physical Roku, authenticated Stremio account, personal credential or movie stream was accessed for this update. Earlier physical observations below apply to their identified versions only.
+
+| Command/check | Fresh result |
+|---|---|
+| `npm ci --ignore-scripts` | Exit 0; 207 packages installed, 208 audited. Dependency lifecycle scripts disabled. |
+| `npm test` | Exit 0; 5,065 BrightScript assertions in 31 interpreter runs plus 71 cinema-policy assertions = **5,136**. Separate Node suites report 56 test cases, all passing; other native-interface/static checks also passed. |
+| `npm run build` | Exit 0; compiled developer-install ZIP. |
+| `python scripts/verify-package.py` | Exit 0; version 0.5.22, 203 members, 52 XML components, 269 root/3 relative script references and 164 implemented interface functions. Integrity, manifest, references, interfaces, paths and development-file exclusion passed. |
+| `python scripts/release-provenance.py` | Exit 0; records ZIP hash/size, commit and CI identity. Publication uses the successful CI artifact unchanged, not the local ZIP. |
+| Secret-pattern/content review | PASS; current public working source, all reachable historical blobs and install ZIP members, with reviewed synthetic fixtures separated. No candidate values printed or credential validation performed. |
+| License checks | MIT LICENSE and upstream NOTICE preserved; third-party licenses and Open Sans OFL retained in package. Lawful-use/no-account-bundling wording remains. |
+| `npm audit --json` | Exit 1: 9 affected development dependency entries, representing 2 underlying advisories (7 high, 2 moderate, 0 critical). Documented in DEVELOPMENT.md; no incompatible override or downgrade. These Node dependencies are excluded from the Roku ZIP. |
+
+The new account-sync integration suite executes production link-code worker, addon sync worker, Stremio API store, StoreHost forwarders, login/session/logout and result/finished callbacks, Add-ons row building/selection, and Search/Discover source controllers. Deterministic native task, registry, transport, timer, dialog and node boundaries replace actual devices/network. It has 98 assertions covering initial/slow/partial/failed/empty sync, catalog-only manifests, duplicate/stale notifications, catalog refresh at unchanged URLs, delayed A after B login, repeated login/logout/relaunch, local-only onboarding, dirty-save retry and TV consent. Store regressions add configured-instance identity/reload, safe partial adoption and registry refusal coverage. Account pump tests now include failed writes superseded by newer edits and coalescing that must retain the reconciliation gate.
+
+Existing recovery/checkpoint/resource suites remain: distinct A/B/C edits, server acknowledgement/failure and restored outbox, Write/Flush refusal, accepted progress versus failed replacements, periodic checkpoints, oversized decoded files, excessive nesting/fields/subtitles and early-pool exhaustion followed by a working queued-provider candidate. Playback/audio/voice/next-episode/source-memory suites still pass. Static assertions changed only where the intended contract changed, with executable regressions replacing the old assumptions (ordered catalog signatures and safe fixed error messages, for example); failure assertions were not disabled.
+
+Native Task scheduling, real decompression cancellation, audible English or surround, sustained UHD/HDR and full-film stability remain unverified for 0.5.22. Temporary network files can overshoot polling limits. Dirty state cannot guarantee preservation across permanent storage refusal, logout with unsynced changes or power loss before an acknowledged checkpoint. Account snapshots over device limits are reported partial rather than silently complete.
+
+Before stable status, check clean install/upgrade, a real account's received collection, a full movie, consecutive episodes, repeated seeking/navigation, Back during loading, failed/expired-source recovery, repeated-navigation memory, audible stereo and actual AX700 HDMI surround. A label or codec capability flag is not proof of current-file decoded UHD or audible surround.
+
+The release includes the exact successful CI ZIP, SHA-256 text, package-check.json and artifact-provenance.json. The public asset is downloaded and compared byte-for-byte with the CI artifact after publication. See [audit](AUDIT-0.5.22.md), [security review](SECURITY_REVIEW.md) and [installation](INSTALL.md).
+
+---
+
+# Historical 0.5.21 validation
 
 Validated on 2026-10-14. This remains an experimental prerelease. Controlled native checks passed; full-workflow hardware sign-off remains incomplete.
 

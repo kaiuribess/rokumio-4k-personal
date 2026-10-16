@@ -30,6 +30,7 @@ async function writeCombinedScript() {
         'tests/reliability-stores.test.brs',
         'tests/addonsstore.test.brs',
         'tests/addonsync.test.brs',
+        'tests/account-sync-stores.test.brs',
         'tests/stremioauthstore.test.brs',
         'tests/catalogstore.test.brs',
         'tests/deeplinkstore.test.brs',
@@ -1071,17 +1072,14 @@ function checkStremioProvisioningContract() {
         console.error('MainScene.brs onAddonSyncResult does not retract its previous fault lines — a retry that failed differently would leave stale errors up forever');
         ok = false;
     }
-    if (!/if\s+not\s+result\.ok\s*\n[\s\S]{0,400}?AddAddonSyncFault\(/.test(result)) {
-        console.error('MainScene.brs onAddonSyncResult still falls off the end when the sync fails — an unreported failed sync is indistinguishable from a healthy one');
-        ok = false;
+    if (!/result\.ok <> true[^]*?AddAddonSyncFault\(/.test(result) || !/state:"failed"/.test(result)) {
+        console.error('Failed sync must publish an actionable failure, not a completed import');ok=false;
     }
-    if (!/result\.error/.test(result)) {
-        console.error('MainScene.brs onAddonSyncResult never reads result.error — the transport\'s own reason is discarded instead of shown');
-        ok = false;
+    if (/reason = result\.error/.test(result)) {
+        console.error('Raw API errors may contain credentials; use fixed safe UI messages');ok=false;
     }
-    if (!/AddAddonSyncFault\(\s*"addon sync: the account reported no add-ons"/.test(result)) {
-        console.error('MainScene.brs onAddonSyncResult must name the synced-but-empty outcome — that is the exact state that used to require re-pairing');
-        ok = false;
+    if (!/outcome\.received = 0[^]*?state = "empty"/.test(result)) {
+        console.error('A confirmed empty collection must have an explicit empty-account status');ok=false;
     }
 
     // 4. The bind probe must not report a stremio session's pre-sync emptiness as
@@ -2119,8 +2117,8 @@ function checkHomeCatalogStalenessContract() {
         err('HomeScreen.brs has no CatalogSignature() — nothing can tell that Home\'s rows were overtaken');
     } else if (!/m\.stores\.addons\.callFunc\(\s*"AddonsGetAll"\s*\)/.test(sig)) {
         err('HomeScreen.brs CatalogSignature() does not read the live add-on set — a signature derived from anything but the current registry cannot detect staleness');
-    } else if (!/\.Sort\(/.test(sig) || !/\.Join\(/.test(sig)) {
-        err('HomeScreen.brs CatalogSignature() does not sort and join — without that, two identical sets in a different order compare as different and every sync re-walks every catalog');
+    } else if (!/FormatJson\(parts\)/.test(sig) || !/catalogs:addon\.catalogs/.test(sig) || /\.Sort\(/.test(sig)) {
+        err('CatalogSignature must preserve descriptor changes and account order');
     }
 
     const ensure = body(home, 'EnsureCurrentRows');
@@ -2175,7 +2173,7 @@ function checkHomeCatalogStalenessContract() {
     if (!onSync) {
         err('MainScene.brs has no onAddonSyncResult()');
     } else {
-        if (!/callFunc\(\s*"EnsureCurrentRows"\s*\)/.test(onSync)) {
+        if (!/NotifyAddonChanges\(\)/.test(onSync)) {
             err('MainScene.brs onAddonSyncResult() no longer calls EnsureCurrentRows() — the sync is the authority on "the add-on set may have moved" and it now tells nobody');
         }
         if (/if\s+added\s*>/.test(onSync)) {
@@ -2184,7 +2182,7 @@ function checkHomeCatalogStalenessContract() {
     }
     const importSub = body(main, 'FinishImport');
     if (importSub) {
-        if (!/callFunc\(\s*"EnsureCurrentRows"\s*\)/.test(importSub)) {
+        if (!/NotifyAddonChanges\(\)/.test(importSub)) {
             err('MainScene.brs FinishImport() no longer calls EnsureCurrentRows() — an import that re-registers add-ons Home already has still leaves Home showing its pre-import catalog set');
         }
         if (/if\s+m\.import\.added\s*>/.test(importSub)) {
