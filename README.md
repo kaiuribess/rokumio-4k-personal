@@ -2,13 +2,13 @@
 
 A native Roku client with a dark red interface for browsing Stremio-compatible catalogs, searching movies and shows, and playing compatible direct streams with the Roku remote. This community derivative adds English audio selection, projector/surround preferences, clearer source cards, automatic source recovery, next-episode playback, and add-on checks. The repository and ZIP filename remain `rokumio-4k-personal` so existing links and build instructions continue to work.
 
-**Version 0.5.24 improves repeated-buffering recovery and catalog freshness.** Persistently stalling sources can recover without losing accepted progress, and private native diagnostics distinguish available delivery facts from guesses about speed. Home supports advertised current-year New feeds; Home and Discover refresh stale listings on re-entry. English 4K-first selection with 1080p fallback remains. This remains an experimental prerelease: software checks do not establish audible surround, uninterrupted films or sustained native 4K on every source. See [validation](docs/VALIDATION.md).
+**Version 0.5.25 adds recovery for frozen progress while Roku still reports playing.** After 45 seconds of continuously eligible, unchanged reported progress, the player uses its existing bounded source recovery. Pause, seek, startup and stale-event guards protect normal controls. Each playing-state event also inspects English audio facts once instead of six times. Private diagnostics add playback events, passive network counters, source-specific file-rate estimates and checkpoint timing. These changes do not establish a speed increase or eliminate host/Wi-Fi limits. Current-year catalog feeds and English 4K-first selection with 1080p fallback remain. This remains an experimental prerelease; audible surround, uninterrupted films and sustained native 4K require device evidence. See [validation](docs/VALIDATION.md).
 
-**[Download the Roku install ZIP — 0.5.24](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.24/rokumio-4k-personal-0.5.24.zip)**
+**[Download the Roku install ZIP — 0.5.25](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.25/rokumio-4k-personal-0.5.25.zip)**
 
 Upload that ZIP without extracting it. GitHub's green Code button and “Source code” archives are for developers; they are not the Roku install package.
 
-[Release notes and checksum](https://github.com/kaiuribess/rokumio-4k-personal/releases/tag/v0.5.24) · [Installation](docs/INSTALL.md) · [Add-on checks](docs/ADDON_CHECKS.md) · [Playback and 4K](docs/PLAYBACK.md) · [Development](docs/DEVELOPMENT.md) · [Changes](CHANGELOG.md)
+[Release notes and checksum](https://github.com/kaiuribess/rokumio-4k-personal/releases/tag/v0.5.25) · [Installation](docs/INSTALL.md) · [Add-on checks](docs/ADDON_CHECKS.md) · [Playback and 4K](docs/PLAYBACK.md) · [Development](docs/DEVELOPMENT.md) · [Changes](CHANGELOG.md)
 
 ## What you can do
 
@@ -43,6 +43,7 @@ These are our changes on top of the original client:
 - **Projector and surround preferences:** explicit equipment choice, connection guidance, current native capability reports, source ranking and compatibility checks for stereo speakers or a connected soundbar/receiver.
 - **Automatic source recovery:** bounded retries for failed starts, stalls and early endings, with memory of previously working file identities.
 - **Playback stability fixes:** current-operation timer guards, recovery when native terminal fields reset, a retained startup deadline until acceptance, and better ordering of usable English MP3/PCM and supported surround alternatives.
+- **Buffering diagnosis:** a bounded, source-scoped event trace, cached passive connection counters, file-size/duration estimates and checkpoint elapsed time. Private addresses, network names and configured source URLs stay out of these diagnostics; unknown speed remains unknown.
 - **Faster source browsing:** short-lived source preloading, fresh-link refresh, cleaner cards and protection against late results overriding a manual choice.
 - **Earlier automatic Play:** start from an available ranked pool after a short comparison window, or save Compare providers to wait for the wider pool. Shared source-list scheduling limits worker concurrency and pauses queued loading during playback.
 - **Automatic next episode:** a five-second countdown, Back cancellation, season rollover, fresh sources and preserved quality/audio preferences.

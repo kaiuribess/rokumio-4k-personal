@@ -1,4 +1,28 @@
-# Release validation — 0.5.24
+# Release validation — 0.5.25
+
+Prepared on 2026-10-17 from latest default-branch commit `766701d9cfc6d9bc6a61f093591cc2ba382e9acf`. The software verification below passed. This remains an experimental prerelease. Version 0.5.25 has not been installed or physically measured; do not treat software checks as playback-speed, audible-surround or full-film proof.
+
+| Command/check | Fresh result |
+|---|---|
+| `npm ci --ignore-scripts` | Exit 0; 207 packages installed, 208 audited; dependency lifecycle scripts disabled. |
+| `npm test` | Exit 0; 5,778 BrightScript assertions in 35 interpreter runs plus 129 cinema-policy assertions = **5,907**. Separate Node suites: 56 passing test cases; MP4 metadata: 29 checks; playlist handling: 50 assertions. Native-interface/static checks passed. |
+| `npm run build` | Exit 0; compiled version 0.5.25 developer-install ZIP. |
+| `python scripts/verify-package.py` | Exit 0; 207 members, 52 XML components, 273 root/3 relative script references and 164 implemented interface functions. Integrity, manifest, paths, references and development-file exclusion passed. |
+| Secret/content and license review | PASS; reviewed changed public source and 171 text members of the final local ZIP, with synthetic fixtures classified separately. No credential/configured-URL candidates or bundled movie/audio payloads found. MIT/upstream NOTICE, third-party licenses and Open Sans OFL preserved. |
+| `git diff --check` | Passed. |
+| `npm audit --json` | Exit 1; unchanged 9 development dependency entries from 2 underlying advisories (7 high, 2 moderate, 0 critical). Node dependencies are excluded from the Roku ZIP; see DEVELOPMENT.md. |
+
+New regressions execute production audio/state callbacks and checkpoint/store boundaries. They check one facts pass per event, preserved provisional sound/rendered acceptance/rejection messages, dirty checkpoint acknowledgement, failed clocks, bounded scalar metrics and unchanged skip guards. The new playing-state progress suite covers eligible 45-second stalls through the existing recovery/persistence path, normal movement, pause/seek/discontinuity, stale timer/source events, callback gaps, disabled recovery and live/diagnostic/startup exclusions. Native diagnostic tests cover stale source/node/generation events, distinct event/current snapshots, bounded trace retention, source-correlated duration, malformed/missing size facts and exact multi-gigabyte parsing. Passive network tests cover cache reuse including failures, reset/nonmonotonic counters, type changes, numeric bounds, private-field exclusion and caller-mutation isolation. The totals above include the new progress, network and file-facts runners in the ordinary npm chain. Focused regression work also caught and corrected single-precision large-file parsing and stale prior-source duration attribution before the full passing run.
+
+## Existing-device evidence collected before this patch
+
+Installed 0.5.24 was observed read-only during an existing movie. Three native-reported underruns were recorded. A later 22-sample window spanning 44.7 seconds retained `state=playing` while the native position and both audio/video timestamps stayed unchanged, on the same source attempt. That is evidence of stalled native progress without a reported buffering state, which the older buffering-state watchdog alone could not detect. Current measured host throughput remained unavailable; a raw native stream bitrate is not a download-speed measurement. These observations do not identify a provider/Wi-Fi/app cause or prove a physical improvement from 0.5.25, audible surround or sustained native UHD. No competing speed-test download, live setting change or replacement source was used to generate this evidence.
+
+Publication must promote the exact successful CI ZIP unchanged, with its SHA-256, package-check.json and artifact-provenance.json, then compare the public asset byte-for-byte. Local and CI ZIP hashes may differ because of build metadata. Physical verification of the new event context/duration, checkpoint timing, normal controls, actual audio route and long-film endurance remains required. All earlier hardware results below retain their original version and scope.
+
+---
+
+# Historical 0.5.24 validation
 
 Validated in software on 2026-10-17, starting from default-branch commit `146141c87217811d57a9f2e05fc8b7429cc043cd`. This remains an experimental prerelease. Read-only observations of an already-playing 0.5.23 stream informed the diagnosis; 0.5.24 was not installed during that movie.
 
