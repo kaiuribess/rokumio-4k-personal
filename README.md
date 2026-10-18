@@ -8,7 +8,7 @@ A native Roku client with a dark red interface for browsing Stremio-compatible c
 
 Upload that ZIP without extracting it. GitHub's green Code button and “Source code” archives are for developers; they are not the Roku install package.
 
-[Release notes and checksum](https://github.com/kaiuribess/rokumio-4k-personal/releases/tag/v0.5.29) · [Installation](docs/INSTALL.md) · [Add-on checks](docs/ADDON_CHECKS.md) · [Playback and 4K](docs/PLAYBACK.md) · [Development](docs/DEVELOPMENT.md) · [Changes](CHANGELOG.md)
+[Release notes and checksum](https://github.com/kaiuribess/rokumio-4k-personal/releases/tag/v0.5.29) · [Installation](docs/INSTALL.md) · **[Add-ons tutorial](docs/ADDONS.md)** · [Add-on checks](docs/ADDON_CHECKS.md) · [Playback and 4K](docs/PLAYBACK.md) · [Development](docs/DEVELOPMENT.md) · [Changes](CHANGELOG.md)
 
 ## What you can do
 
@@ -28,7 +28,7 @@ Upload that ZIP without extracting it. GitHub's green Code button and “Source 
 
 The built-in Cinemeta catalog supplies title metadata. **Playable movies, shows, provider accounts and configured stream add-ons are not bundled.** Install your own compatible provider manifest and use content you are authorized to access. Searching a title does not establish that a playable 4K source exists.
 
-For optional account-free providers and their tested limits, see the [free sources setup guide](docs/FREE-SOURCES.md).
+**New to add-ons? Follow the [simple add-ons tutorial](docs/ADDONS.md)** for Stremio account import, a public TMDB catalog preset, optional Comet/TorBox setup, TV approval and common fixes. For optional account-free providers and their tested limits, see the [free sources setup guide](docs/FREE-SOURCES.md).
 
 ## What we added
 

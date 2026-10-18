@@ -15,6 +15,8 @@ Roku permits one sideloaded app at a time; this replaces an existing development
 
 ## Add a playable source
 
+For a guided first setup, follow the **[add-ons tutorial](ADDONS.md)**. It explains catalogs versus playable sources, imports from Stremio, and optional TMDB/Comet configuration with your own accounts.
+
 1. Continue with a local profile, or use optional Stremio pairing to sync your library/add-ons.
 2. Open **Add-ons** and leave it open.
 3. On your phone/computer, open the exact local setup address displayed by the Roku app. Paste the configured HTTPS manifest URL supplied by your provider and submit it.
