@@ -13,7 +13,10 @@ function PrefetchTest_Node() as object
         m.observed = ""
     end sub, callFunc:function(name as string, value as dynamic, priority=invalid as dynamic) as dynamic
         if name = "Prepare" then return PrefetchTest_Prepare(value)
-        if name = "Snapshot" then return PrefetchTest_Snapshot(value)
+        if name = "Snapshot"
+            if priority = true then return PrefetchTest_Snapshot(value,true)
+            return PrefetchTest_Snapshot(value)
+        end if
         if name = "Adopt" then return PrefetchTest_Adopt(value)
         if name = "SetPriority" then PrefetchTest_SetPriority(value,priority)
         if name = "Suspend" then PrefetchTest_Suspend(value)
@@ -120,6 +123,7 @@ sub PrefetchTest_Setup(providerCount = 2 as integer)
     m.sourcesSuspended = false
     m.sourceRevision = 0
     m.selectionRevision = -1
+    m.freshnessRefreshUsed = false
     m.autoGraceTimer = {control:"stop",duration:0.75}
     m.autoClock = {now:0,TotalMilliseconds:function() as integer
         return m.now
@@ -955,4 +959,275 @@ Harness_Equal(m.prefetchState.activeTasks.Count(),2,"pending recovery remains in
 Harness_Equal(m.providers[0].streams[0].url,first.result.streams[0].url,"retained results remain available for filtered ranking")
 Harness_Equal(m.recoveryExcluded.Count(),1,"failed early candidate stays excluded while queued providers resume")
 Harness_Equal(m.params.position,456,"pending recovery also preserves the accepted checkpoint")
+
+Harness_Suite("Completed results expire by receipt age without abandoning active transfers")
+PrefetchTest_Setup(3)
+LoadStreams(m.params)
+first = m.launched[0]
+second = m.launched[1]
+m.prefetchState.clock.now = 100000
+first.result = PrefetchTest_Result("old-receipt")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(first))
+onSourcePrefetchChanged()
+third = m.launched[2]
+Harness_Equal(m.prefetchState.entries[0].receivedAt,100000,"completion stores monotonic receipt time rather than batch creation time")
+m.prefetchState.clock.now = 399999
+snapshot = PrefetchTest_Snapshot(m.prefetchContext.key,true)
+Harness_Ok(not snapshot.refreshed,"completed result remains reusable immediately before five-minute receipt budget")
+Harness_Equal(m.launched.Count(),3,"fresh snapshot does not duplicate existing provider work")
+m.params.position = 234.5
+m.recoveryExcluded = [first.result.streams[0].url]
+m.recoveryRound = 1
+oldToken = m.loadToken
+oldSequence = m.prefetchState.sequence
+m.prefetchState.clock.now = 400000
+Harness_Ok(RefreshExpiredSourceResults(),"new selection expires completed results exactly at receipt budget")
+Harness_Equal(m.providers[0].streams.Count(),0,"expired private URLs leave screen state before handoff")
+Harness_Equal(m.pendingCount,3,"expired provider becomes pending once alongside two preserved transfers")
+Harness_Equal(m.prefetchState.entries[0].status,"queued","two occupied transfers keep refresh queued")
+Harness_Equal(m.prefetchState.activeTasks.Count(),2,"expiry preserves shared two-worker ownership")
+Harness_Equal(m.launched.Count(),3,"expiry never cancels or duplicates still-running providers")
+Harness_Ok(not second.stopped and not third.stopped,"in-flight source tasks are not stopped by freshness expiry")
+Harness_Equal(m.loadToken,oldToken,"freshness keeps the screen's live batch identity")
+Harness_Equal(m.prefetchState.sequence,oldSequence,"freshness keeps pending coordinator ownership")
+Harness_Equal(m.params.position,234.5,"accepted checkpoint survives refresh")
+Harness_Equal(m.recoveryRound,1,"bounded recovery round survives refresh")
+Harness_Equal(m.recoveryExcluded.Count(),1,"failed delivery exclusions survive refresh")
+Harness_Ok(not RefreshExpiredSourceResults(),"repeated freshness check does not enqueue an expired provider twice")
+Harness_Equal(m.pendingCount,3,"duplicate refresh cannot increment pending twice")
+second.result = PrefetchTest_Result("slow-original")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(second))
+onSourcePrefetchChanged()
+Harness_Equal(m.providers[1].streams[0].url,second.result.streams[0].url,"already-running completion still belongs to the original title")
+Harness_Equal(m.launched.Count(),4,"one freed slot launches exactly one expired-provider replacement")
+replacement = m.launched[3]
+Harness_Equal(replacement.providerIndex,0,"replacement refreshes only expired completed provider")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(first))
+onSourcePrefetchChanged()
+Harness_Equal(m.pendingCount,2,"duplicate expired worker event cannot satisfy replacement")
+Harness_Equal(m.providers[0].streams.Count(),0,"duplicate expired result cannot return old signed links")
+replacement.result = PrefetchTest_Result("fresh-replacement")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(replacement))
+onSourcePrefetchChanged()
+Harness_Equal(m.providers[0].streams[0].url,replacement.result.streams[0].url,"fresh replacement reaches screen through production callbacks")
+Harness_Equal(m.pendingCount,1,"only the original third transfer remains pending")
+
+Harness_Suite("Playback suspension does not expire sources until a new screen return")
+PrefetchTest_Setup(2)
+LoadStreams(m.params)
+for each task in m.launched
+    task.result = PrefetchTest_Result(task.id)
+    PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(task))
+end for
+onSourcePrefetchChanged()
+SuspendSourceLoading():m.top.screenActive = false
+m.prefetchState.clock.now = 3600000
+snapshot = PrefetchTest_Snapshot(m.prefetchContext.key)
+Harness_Equal(snapshot.entries[0].status,"ready","passive snapshot never expires a playing source")
+snapshot = PrefetchTest_Snapshot(m.prefetchContext.key,true)
+Harness_Ok(not snapshot.refreshed,"even explicit freshness requests respect accepted-playback suspension")
+Harness_Ok(not RefreshExpiredSourceResults(),"hidden source screen cannot refresh or push playback")
+PrefetchTest_onPrefetchExpired()
+Harness_Equal(m.prefetchState.entries[0].status,"ready","old warm timer cannot expire adopted playback results")
+Harness_Equal(m.launched.Count(),2,"one hour of accepted playback never launches new provider transfers")
+m.top.screenActive = true:OnEnter(invalid)
+Harness_Equal(m.launched.Count(),4,"return from a long movie refreshes both expired completed providers")
+Harness_Equal(m.pendingCount,2,"screen return reflects fresh work")
+Harness_Equal(m.providers[0].streams.Count(),0,"source screen cannot retain an expired first provider")
+Harness_Equal(m.providers[1].streams.Count(),0,"source screen cannot retain an expired second provider")
+OnEnter(invalid)
+Harness_Equal(m.launched.Count(),4,"repeated return does not restart pending replacements")
+
+Harness_Suite("Freshness blocks stale automatic ranking and manual handoffs")
+PrefetchTest_Setup(1)
+LoadStreams(m.params)
+first = m.launched[0]
+first.result = PrefetchTest_Result("old-automatic")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(first))
+onSourcePrefetchChanged()
+m.autoPlayEnabled = true
+MaybeStartAutomaticPlayback()
+selection = m.selectionTask
+m.prefetchState.clock.now = 300000
+selection.result = {streams:first.result.streams,rememberedSource:false}
+onAutomaticSourcesReady(PrefetchTest_Event(selection))
+Harness_Equal(m.pushCalls,0,"ranking completed after receipt expiry cannot launch an old URL")
+Harness_Equal(m.pendingCount,1,"stale automatic result starts a fresh lookup")
+Harness_Ok(selection.reaped,"stale automatic ranking releases its worker")
+replacement = m.launched[2]
+replacement.result = PrefetchTest_Result("new-automatic")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(replacement))
+onSourcePrefetchChanged()
+selection = m.selectionTask
+selection.result = {streams:replacement.result.streams,rememberedSource:false}
+onAutomaticSourcesReady(PrefetchTest_Event(selection))
+Harness_Equal(m.pushCalls,1,"fresh replacement can hand off normally")
+PrefetchTest_Setup(1)
+LoadStreams(m.params)
+first = m.launched[0]
+first.result = PrefetchTest_Result("old-manual")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(first))
+onSourcePrefetchChanged()
+m.activeIndex = 0:m.sourcePage = 0:m.listFilled = true
+m.streams = first.result.streams
+m.sourceRows = [{kind:"source",index:0,loadToken:m.loadToken,providerIndex:0,page:0}]
+m.streamsList.rowItemFocused = [0,0]
+m.prefetchState.clock.now = 300000
+onStreamSelected()
+Harness_Equal(m.pushCalls,0,"manual row cannot hand off an expired link")
+Harness_Equal(m.pendingCount,1,"manual selection refreshes the expired provider")
+Harness_Ok(not m.autoPlayEnabled,"manual freshness refresh preserves manual source-choice intent")
+Harness_Ok(not m.sourcesSuspended,"manual refresh leaves screen usable while new results arrive")
+
+Harness_Suite("Adoption, failures and clock reset have bounded result retention")
+PrefetchTest_Setup(1)
+LoadStreams(m.params)
+failed = m.launched[0]
+failed.result = {error:"offline"}
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(failed))
+onSourcePrefetchChanged()
+Harness_Equal(m.prefetchState.entries[0].status,"failed","ordinary lookup failure is completed")
+m.prefetchState.clock.now = 300000
+snapshot = PrefetchTest_Adopt(m.prefetchContext)
+Harness_Equal(snapshot.entries[0].status,"pending","new adoption retries stale completed failures")
+Harness_Equal(m.launched.Count(),2,"expired failure gets one bounded replacement")
+PrefetchTest_Adopt(m.prefetchContext)
+Harness_Equal(m.launched.Count(),2,"repeated adoption preserves pending replacement")
+replacement = m.launched[1]
+m.prefetchState.clock.now = 400000
+replacement.result = PrefetchTest_Result("clock-reset")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(replacement))
+m.prefetchState.clock.now = 1
+snapshot = PrefetchTest_Snapshot(m.prefetchContext.key,true)
+Harness_Ok(snapshot.refreshed,"backwards monotonic clock invalidates uncertain receipt age")
+Harness_Equal(m.launched.Count(),3,"clock reset starts one refresh, not an unbounded loop")
+
+Harness_Suite("Slow Compare-providers batches reach a bounded handoff beyond receipt TTL")
+PrefetchTest_Setup(16)
+m.params.waitForProviders = true
+m.autoPlayEnabled = true
+LoadStreams(m.params)
+for i = 0 to 15
+    m.prefetchState.clock.now = (Int(i / 2) + 1) * 45000
+    m.autoClock.now = m.prefetchState.clock.now
+    completed = m.launched[i]
+    completed.result = PrefetchTest_Result("slow-provider-" + i.ToStr())
+    PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(completed))
+    onSourcePrefetchChanged()
+end for
+Harness_Equal(m.pendingCount,0,"sixteen 45-second providers can all finish despite batch age exceeding five minutes")
+Harness_Equal(m.launched.Count(),17,"long Compare batch does not continually restart earlier results during loading")
+selection = m.selectionTask
+selection.result = {streams:m.providers[0].streams,rememberedSource:false}
+onAutomaticSourcesReady(PrefetchTest_Event(selection))
+Harness_Equal(m.pendingCount,2,"handoff makes one freshness sweep for the two expired earliest completions")
+Harness_Equal(m.prefetchState.activeTasks.Count(),2,"bounded refresh still uses only two workers")
+replacementOne = m.launched[17]
+replacementTwo = m.launched[18]
+m.prefetchState.clock.now = 405000:m.autoClock.now = 405000
+for each replacement in [replacementOne,replacementTwo]
+    replacement.result = PrefetchTest_Result("fresh-slow-" + replacement.providerIndex.ToStr())
+    PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(replacement))
+    onSourcePrefetchChanged()
+end for
+Harness_Equal(m.pendingCount,0,"one bounded sweep finishes while later original results have also aged")
+selection = m.selectionTask
+selection.result = {streams:m.providers[0].streams,rememberedSource:false}
+onAutomaticSourcesReady(PrefetchTest_Event(selection))
+Harness_Equal(m.pushCalls,1,"Compare hands off instead of entering a sliding expiry loop")
+Harness_Equal(m.launched.Count(),20,"sixteen provider calls plus two replacements and two rankings bound the action")
+Harness_Equal(m.prefetchState.activeTasks.Count(),0,"completed bounded refresh leaves no abandoned transfer")
+
+Harness_Suite("Safe status distinguishes empty, failed, HD and UHD-labelled results")
+PrefetchTest_Setup(3)
+LoadStreams(m.params)
+first = m.launched[0]
+first.result = PrefetchTest_Result("hd-status")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(first))
+second = m.launched[1]
+second.result = {error:"private fixture error must not be exposed"}
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(second))
+third = m.launched[2]
+third.result = PrefetchTest_Result("uhd-status")
+third.result.uhdCount = 1
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(third))
+onSourcePrefetchChanged()
+info = SourceLoadStatus()
+Harness_Equal(info.providers,3,"safe status reports matching provider count")
+Harness_Equal(info.completed,3,"safe status reports both success and failure completions")
+Harness_Equal(info.failed,1,"safe status separately counts lookup failures")
+Harness_Equal(info.readyCandidates,2,"safe status counts ready candidates without exposing identities")
+Harness_Equal(info.uhdLabelCandidates,1,"status calls the quality count UHD labels, not decoded UHD")
+Harness_Ok(FormatJson(info).InStr("private") < 0,"status does not expose provider error text")
+Harness_Ok(FormatJson(info).InStr("https://") < 0,"status does not expose provider or media URLs")
+Harness_Equal(info.Count(),13,"diagnostic shape is a fixed scalar allowlist including effective playback mode")
+Harness_Ok(not info.fourKOnly and not info.waitForProviders,"default source status reports all-quality Start sooner mode")
+m.fourKOnly = true:m.params.waitForProviders = true
+info = SourceLoadStatus()
+Harness_Ok(info.fourKOnly and info.waitForProviders,"source status exposes effective strict UHD and Compare providers settings")
+m.fourKOnly = false:m.params.fourKOnly = true
+Harness_Ok(not SourceLoadStatus().fourKOnly,"source status reports the active screen filter rather than a stale parameter")
+m.headTitle = {text:"Fixture"}
+m.autoPlayEnabled = true
+PrefetchTest_PushAutomaticPlayer(first.result.streams[0],first.result.streams)
+Harness_Ok(m.top.pushRequest.params.preferUhd,"automatic player receives measured-HD deferral intent")
+DisableAutomaticForManualBrowse()
+PrefetchTest_PushAutomaticPlayer(first.result.streams[0],first.result.streams)
+Harness_Ok(not m.top.pushRequest.params.preferUhd,"manual player keeps the selected source without automatic UHD deferral")
+Harness_Suite("Native boxed integer source counts cross coordinator, screen and automatic startup")
+boxedCount = CreateObject("roInt"):boxedCount.SetInt(1)
+boxedLongCount = CreateObject("roLongInteger"):boxedLongCount.SetLongInt(1&)
+nativeResult = {uhdCount:boxedCount}
+Harness_Equal(Type(nativeResult.uhdCount),"roInt","regression fixture retains a real boxed roInt inside the task-result associative array")
+Harness_Equal(Type(boxedLongCount),"roLongInteger","regression fixture also exercises a real native 64-bit integer wrapper")
+for each count in [1,1&,boxedCount,boxedLongCount]
+    PrefetchTest_Setup(2)
+    m.autoPlayEnabled = true
+    m.fourKOnly = true
+    LoadStreams(m.params)
+    completed = m.launched[0]
+    uhd = {name:"2160p English AAC",url:"https://media.example.test/boxed-count.mkv"}
+    completed.result = {streams:[uhd],readyStreams:[uhd],uhdCount:count,error:""}
+    PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(completed))
+    onSourcePrefetchChanged()
+    Harness_Equal(m.providers[0].uhdCount,1,"integer count survives the actual worker-to-screen callback boundary")
+    Harness_Equal(Type(m.providers[0].uhdCount),"Integer","accepted native wrapper is normalized to a small scalar integer")
+    Harness_Equal(SourceLoadStatus().uhdLabelCandidates,1,"safe status reports the completed UHD count while another provider is pending")
+    Harness_Ok(SourceLoadStatus().fourKOnly,"safe status confirms the active strict-UHD filter independently of source counts")
+    Harness_Equal(m.autoGraceDeadline,750,"eligible UHD uses the bounded 750ms comparison interval")
+    m.autoClock.now = 749
+    onAutomaticGrace()
+    Harness_Equal(m.selectionTask,invalid,"boxed count cannot bypass the startup grace timer")
+    m.autoClock.now = 750
+    onAutomaticGrace()
+    Harness_Ok(m.selectionTask <> invalid,"strict UHD starts ranking without waiting for the remaining slow provider")
+    if m.selectionTask <> invalid then Harness_Ok(m.selectionTask.fourKOnly,"count admission preserves the separate strict UHD selection policy")
+end for
+
+Harness_Suite("Source count admission rejects coercion and bounds native integer counters")
+boxedFloat = CreateObject("roFloat"):boxedFloat.SetFloat(1.0)
+for each count in [invalid,"1",true,false,1.0,1.0#,boxedFloat,[],{},-1,-1&]
+    PrefetchTest_Setup(1)
+    LoadStreams(m.params)
+    completed = m.launched[0]
+    completed.result = {streams:[uhd],readyStreams:[uhd],uhdCount:count,error:""}
+    PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(completed))
+    onSourcePrefetchChanged()
+    Harness_Equal(m.providers[0].uhdCount,0,"malformed, floating-point or negative counts cannot become UHD evidence")
+    Harness_Equal(SourceLoadStatus().uhdLabelCandidates,0,"rejected count stays zero in safe diagnostics")
+end for
+hugeCount = CreateObject("roLongInteger"):hugeCount.SetLongInt(4294967296&)
+for each count in [2,4294967296&,hugeCount]
+    PrefetchTest_Setup(1)
+    LoadStreams(m.params)
+    completed = m.launched[0]
+    completed.result = {streams:[uhd],readyStreams:[uhd],uhdCount:count,error:""}
+    PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(completed))
+    onSourcePrefetchChanged()
+    Harness_Equal(m.providers[0].uhdCount,1,"oversized integer counts clamp before 32-bit conversion to the actual candidate budget")
+end for
+PrefetchTest_Setup(1)
+LoadStreams(m.params)
+ApplyProviderSources(0,{streams:[uhd],readyStreams:invalid,uhdCount:boxedCount,error:""})
+Harness_Equal(m.providers[0].uhdCount,0,"no ready array means no counted UHD candidates")
 Harness_Finish()

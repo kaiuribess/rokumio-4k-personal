@@ -1,3 +1,33 @@
+# Release validation — 0.5.27
+
+Prepared from latest default-branch commit `78739ac9cda30935e370053daae5adf871163a26`. This remains an experimental prerelease.
+
+| Command/check | Result |
+|---|---|
+| `npm ci --ignore-scripts` | Exit 0; unchanged pinned development dependency tree. |
+| `npm test` | Exit 0; 6,179 BrightScript assertions in 36 runs plus 142 cinema-policy assertions = **6,321**. Separate 56 Node test cases, 29 MP4 checks and 50 playlist assertions passed. |
+| `npm run build` | Exit 0 after correcting two local variable/function-name collisions in the new coordinator code. No assertion was weakened. |
+| `python scripts/verify-package.py` | Exit 0; 207 members, 52 XML components, 273 root/3 relative script references, 164 interface implementations. |
+| Focused final coordinator regression | 417 assertions passed after the compiler-only local rename. |
+| Independent review | Corrected new-session/exit clearing of measured-HD identities and a sliding refresh loop under sixteen slow providers. Final native-player suite independently passed 418 assertions. |
+| `npm audit --json` | Exit 1; unchanged 9 development dependency entries from two underlying advisories (7 high, 2 moderate, 0 critical). Node dependencies are excluded from the install ZIP. |
+
+The new regressions execute the real SourceSelectionTask worker with policy/source-memory stores; resolver/result/retry/native handoff and English-progress callbacks; and coordinator/screen entry, freshness, ranking and manual handoff boundaries. Coverage includes duplicate/host aliases, IPv6, exact-URL exclusions, bounded pools, retained HD after failed UHD, quality deferral without failure-memory writes, accepted-playback protection, stale callbacks, long-session returns, live-request preservation and a sixteen-provider/45-second deterministic schedule that must reach selection after one freshness sweep.
+
+A native counter boundary also rejected real boxed `roInt` values: the provider UHD count now accepts bounded native integer wrappers and rejects non-integers, with production callback coverage. Effective quality/comparison modes are exposed as booleans in safe diagnostics.
+
+Host diversity means distinct delivery hostnames, not independent infrastructure. The initial automatic pool still permits at most three UHD candidates when lower-quality fallback exists. A five-minute result-age budget is not knowledge of every provider's signed-link TTL. Native decoder/transport behavior and full-film reliability remain outside interpreter proof.
+
+### Source and native checks during this investigation
+
+Strict-UHD private tests for two movie IDs completed provider work without starting a compatible source in the observed window. These are failures to obtain usable UHD from that configuration, not proof of universal title unavailability or a Wi-Fi diagnosis. A PC-inspected public free-provider candidate contained a cropped 3840x1596 HEVC file. Its PC-resolved URL received HTTP 403 during native header acquisition and timed out before playback; no English/native-UHD success is claimed. A subsequent native Flix provider lookup returned 13 media candidates and attempted six without observed playing samples. Header requests included HTTP 403 and 206; some inspected files were 3840 pixels wide. Native errors/timeouts still prevented playback. This tests the automatic pool, not only the originally selected 14.02 GB file: the full-load worker did not use the private warm-task filter. The pre-counter-fix diagnostic package's zero UHD count was invalid evidence and is excluded. Detailed timing and package provenance are recorded separately in the release hardware report.
+
+The user's saved normal preference remains 4K first with 1080p fallback, Compare providers and source recovery. Temporary diagnostic packages change only test startup/provider selection, do not install add-ons or write viewing history, and must be replaced with the exact successful CI package before completion. Private media URLs, proxy headers and temporary test data remain excluded from source, package and public reports.
+
+A current primary-source review found no proven unlimited free UHD upgrade. Some aggregators repeat HDHub's underlying hosts. TorBox Essential is a $3/month candidate with a maintained connector, within the user's $5 ceiling; its official hosted Stremio add-on was disabled. No subscription, account authentication or payment was performed, and no account-backed native playback is certified. See [optional sources](FREE-SOURCES.md).
+
+---
+
 # Release validation — 0.5.26
 
 Prepared on 2026-10-17 from default-branch commit `766701d9cfc6d9bc6a61f093591cc2ba382e9acf`, with the preceding 0.5.25 candidate and further production-path repairs. This remains an experimental prerelease.

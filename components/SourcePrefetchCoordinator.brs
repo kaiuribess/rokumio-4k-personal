@@ -56,6 +56,7 @@ function Adopt(context as object) as dynamic
     m.fullLoad = true
     SetPriority(context.key, context.providerPriority)
     m.suspended = false
+    refreshed = PrefetchExpireCompleted()
     m.deadline = 0
     m.expiry.control = "stop"
     for i = 0 to context.providers.Count() - 1
@@ -71,7 +72,9 @@ function Adopt(context as object) as dynamic
         end if
     end for
     PrefetchPump()
-    return Snapshot(context.key)
+    adoption = Snapshot(context.key)
+    if adoption <> invalid then adoption.refreshed = refreshed
+    return adoption
 end function
 
 sub SetPriority(key as string, priority as dynamic)
@@ -109,17 +112,46 @@ end sub
 function Resume(key as string) as dynamic
     if m.context = invalid or m.context.key <> key then return invalid
     m.suspended = false
+    refreshed = PrefetchExpireCompleted()
     PrefetchPump()
-    return Snapshot(key)
+    resumed = Snapshot(key)
+    if resumed <> invalid then resumed.refreshed = refreshed
+    return resumed
 end function
 
-function Snapshot(key as string) as dynamic
+function Snapshot(key as string, refreshExpired = false as boolean) as dynamic
     if m.context = invalid or m.context.key <> key then return invalid
     if m.fullLoad <> true and m.clock.TotalMilliseconds() >= m.deadline
         PrefetchClear()
         return invalid
     end if
-    return {token:m.sequence.ToStr(), entries:m.entries}
+    refreshed = false
+    if refreshExpired and m.suspended <> true
+        refreshed = PrefetchExpireCompleted()
+        if refreshed then PrefetchPump()
+    end if
+    return {token:m.sequence.ToStr(), entries:m.entries, refreshed:refreshed}
+end function
+
+' Bound completed-list reuse by receipt age, not by when the title was opened.
+' Only explicit adoption/resume/handoff invokes this: diagnostics, late worker
+' notifications and the warm-expiry timer cannot disrupt accepted playback.
+' Five minutes is a freshness budget, not a promise about a provider URL's TTL.
+function PrefetchExpireCompleted() as boolean
+    if m.context = invalid or m.fullLoad <> true or m.suspended = true then return false
+    changed = false
+    now = m.clock.TotalMilliseconds()
+    for i = 0 to m.entries.Count() - 1
+        entry = m.entries[i]
+        if entry.status <> "ready" and entry.status <> "failed" then continue for
+        expired = entry.receivedAt = invalid
+        if not expired then expired = now < entry.receivedAt or now - entry.receivedAt >= 300000
+        if not expired then continue for
+        m.entries[i] = {status:"queued",result:invalid,warm:false}
+        changed = true
+    end for
+    if changed then m.top.revision = m.top.revision + 1
+    return changed
 end function
 
 sub Cancel(key as string)
@@ -210,11 +242,11 @@ sub onPrefetchLoaded(event as object)
             warm = m.entries[index].warm = true
             m.tasks[index] = invalid
             if Type(result.streams) = "roArray" and Type(result.readyStreams) = "roArray"
-                m.entries[index] = {status:"ready",result:result,warm:warm}
+                m.entries[index] = {status:"ready",result:result,warm:warm,receivedAt:m.clock.TotalMilliseconds()}
             else if warm and m.fullLoad = true
                 m.entries[index] = {status:"queued",result:invalid,warm:false}
             else
-                m.entries[index] = {status:"failed",result:{streams:[],readyStreams:[],error:"Source lookup failed"},warm:warm}
+                m.entries[index] = {status:"failed",result:{streams:[],readyStreams:[],error:"Source lookup failed"},warm:warm,receivedAt:m.clock.TotalMilliseconds()}
             end if
         end if
     end if

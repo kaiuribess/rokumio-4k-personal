@@ -23,7 +23,7 @@ async function main() {
     const functions = ['StartPlayback', 'CreateVideo', 'CustomizeVideoNode', 'onPlayKickFire',
         'ResetVideoNode', 'ClearSubtitleTrack', 'ApplySubtitleIndex', 'SelectedSubtitleTrack',
         'CurrentContent', 'SelectSubtitleTrack', 'BuildSubtitleTracks',
-        'TrackDisplayName', 'onResolveResult', 'onSubtitleResult', 'ClearSubtitles',
+        'TrackDisplayName', 'onResolveResult', 'DeferMeasuredHdCandidate', 'onSubtitleResult', 'ClearSubtitles',
         'onPlaybackFactsChanged', 'onStreamingSegmentChanged', 'NotPlayableOnDevice', 'NextPlayerWorkerId',
         'StartResolve', 'CancelResolve', 'LaunchSubtitleFetch', 'CancelSubtitles',
         'OnEnter', 'OnExit', 'SavePosition', 'ResolveOrdinal', 'onVideoStateChanged', 'onBufferingStatusChanged', 'HasLogo',
@@ -49,7 +49,7 @@ async function main() {
         .replace('data.ReadFile(path)','NativeBoundaryRead(data,path)');
     fs.writeFileSync(combined, ['harness.brs', 'mocks.brs', 'player-handoff.test.brs']
         .map(f => fs.readFileSync(path.join(__dirname, f), 'utf8')).join('\n') + '\n' + ['AccountEpoch.brs', 'ProviderPriority.brs', 'MetadataOrigin.brs', 'EnglishAudio.brs', 'AudioCapabilities.brs', 'AutoPlayback.brs', 'CinemaStreams.brs'].map(f => fs.readFileSync(path.join(root, 'source/util', f), 'utf8')).join('\n') + '\n' + nativeMedia + '\n' + resolver + '\n' + screen + '\n' +
-        memoryScreen + '\n' + support + '\n' + audioRecovery + '\n' + fs.readFileSync(path.join(root, 'source/util/NextEpisode.brs'), 'utf8') + '\n' + fs.readFileSync(path.join(root, 'components/PlayerNextEpisode.brs'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname,'native-resolve-boundary.test.brs'),'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'playback-native.test.brs'), 'utf8'));
+        memoryScreen + '\n' + support + '\n' + audioRecovery + '\n' + fs.readFileSync(path.join(root, 'source/util/NextEpisode.brs'), 'utf8') + '\n' + fs.readFileSync(path.join(root, 'components/PlayerNextEpisode.brs'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname,'native-resolve-boundary.test.brs'),'utf8') + '\n' + fs.readFileSync(path.join(__dirname,'playback-uhd-deferral.test.brs'),'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'playback-native.test.brs'), 'utf8'));
     const result = spawnSync(process.execPath, [
         path.join(root, 'node_modules', '@rokucommunity', 'brs', 'bin', 'cli.js'),
         '--root', staging, path.join(staging, 'source', 'bslib.brs'),

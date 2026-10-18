@@ -42,6 +42,6 @@ sub choose()
     end try
     ' Automatic startup samples a small ranked pool, then asks the coordinator
     ' for remaining/fresh providers. Manual browsing keeps its full source list.
-    if streams.Count() > 0 then streams = AutoPlayback_Candidates(streams[0],streams,6,3)
+    if streams.Count() > 0 then streams = AutoPlayback_Candidates(streams[0],streams,6,3,true)
     m.top.result = {streams:streams,rememberedSource:remembered}
 end sub
