@@ -629,9 +629,25 @@ sub FetchDiscover(preserveRows = false as boolean)
         catalogId: m.selectedCatalog.catalogId
         genre: GenreFilter()
         pageOffset: 0
+        pageSize: DiscoverPageSize()
     }, NextDiscoverWorkerId("discoverLoader"))
     m.loadTask = task
 end sub
+
+' Keep provider input out of an integer SceneGraph field until validated.
+function DiscoverPageSize() as integer
+    if Type(m.selectedCatalog) <> "roAssociativeArray" then return 100
+    if Type(m.selectedCatalog.catalog) <> "roAssociativeArray" then return 100
+    return DiscoverBoundedCount(m.selectedCatalog.catalog.pageSize,100,100)
+end function
+
+function DiscoverBoundedCount(value as dynamic, fallback as integer, maximum as integer) as integer
+    kind = Type(value)
+    if kind <> "Integer" and kind <> "roInt" and kind <> "roInteger" and kind <> "LongInteger" and kind <> "roLongInteger" and kind <> "roInt64" and kind <> "Float" and kind <> "roFloat" and kind <> "Double" and kind <> "roDouble" then return fallback
+    if value < 1 or value > maximum then return fallback
+    if Int(value) <> value then return fallback
+    return Int(value)
+end function
 
 ' The user scrolled near the bottom of the fetched results: fetch the next page
 ' (skip = raw provider records consumed) and append. Silent — the grid stays up untouched
@@ -648,6 +664,7 @@ sub LoadMore()
         catalogId: m.selectedCatalog.catalogId
         genre: GenreFilter()
         pageOffset: m.nextPageOffset
+        pageSize: DiscoverPageSize()
     }, NextDiscoverWorkerId("discoverLoaderMore"))
     m.loadTask = task
 end sub
@@ -731,9 +748,8 @@ sub onDiscoverLoaded(event as object)
         restorePosition = [Int(selectedIndex / m.chunk), selectedIndex MOD m.chunk]
     end if
     consumed = result.metas.Count()
-    if Type(result.rawCount) = "Integer" or Type(result.rawCount) = "roInteger"
-        if result.rawCount >= consumed then consumed = result.rawCount
-    end if
+    rawCount = DiscoverBoundedCount(result.rawCount,consumed,1000000)
+    if rawCount >= consumed then consumed = rawCount
     m.nextPageOffset = wantedOffset + consumed
     if wantedOffset = 0
         m.metas = usable
@@ -751,11 +767,23 @@ sub onDiscoverLoaded(event as object)
         m.status.text = ""
         if not refreshing then LandingChipsFocus()
     else
-        for each meta in usable
-            m.metas.Push(meta)
+        seen = {}
+        seen.SetModeCaseSensitive()
+        for each meta in m.metas
+            seen[meta.type.Len().ToStr() + ":" + meta.type + meta.id] = true
         end for
-        m.allLoaded = result.hasMore <> true or consumed = 0
-        UpdateGrid(AppendRestorePosition())
+        added = 0
+        for each meta in usable
+            key = meta.type.Len().ToStr() + ":" + meta.type + meta.id
+            if seen.DoesExist(key) then continue for
+            seen[key] = true
+            m.metas.Push(meta)
+            added = added + 1
+        end for
+        ' A provider that ignores skip or returns only unusable records must
+        ' not make focus notifications request the same page indefinitely.
+        m.allLoaded = result.hasMore <> true or consumed = 0 or added = 0
+        if added > 0 then UpdateGrid(AppendRestorePosition())
     end if
 end sub
 
@@ -859,10 +887,16 @@ end function
 
 function DiscoverUsableMetas(items as dynamic) as object
     usable = []
+    seen = {}
+    seen.SetModeCaseSensitive()
     if Type(items) <> "roArray" then return usable
     for each meta in items
         if Type(meta) <> "roAssociativeArray" then continue for
-        if DiscoverText(meta.id) = "" or DiscoverText(meta.type) = "" or DiscoverText(meta.name) = "" then continue for
+        id = DiscoverText(meta.id):kind = DiscoverText(meta.type)
+        if id = "" or kind = "" or DiscoverText(meta.name) = "" then continue for
+        key = kind.Len().ToStr() + ":" + kind + id
+        if seen.DoesExist(key) then continue for
+        seen[key] = true
         clean = {}
         for each key in meta
             clean[key] = meta[key]

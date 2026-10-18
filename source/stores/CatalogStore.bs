@@ -64,10 +64,9 @@ class CatalogStore
     end function
 
     ' Fetch one catalog row: GET {address}/catalog/{type}/{catalogId}/{extra}.json
-    ' with the extra segment defaulting to "skip=0". hasMore (the Stremio "there
-    ' is another skip page" flag) rides along for clients that paginate; a
-    ' response without it reports false.
-    function Catalog(addonAddress as string, metaType as string, catalogId as string, extra = "skip=0" as string) as object
+    ' with the extra segment defaulting to "skip=0". Honor an explicit
+    ' hasMore flag; otherwise a full advertised page implies another request.
+    function Catalog(addonAddress as string, metaType as string, catalogId as string, extra = "skip=0" as string, pageSize = invalid as dynamic) as object
         result = { ok: false, metas: invalid, hasMore: false, error: "" }
         if addonAddress = ""
             result.error = "no addon address"
@@ -120,9 +119,9 @@ class CatalogStore
         ' `result.hasMore = response.json.hasMore = true` idiom is unambiguous
         ' to mishandle (it IS a comparison), so state it plainly.
         if response.json.hasMore = invalid
-            ' Standard Stremio catalogs indicate another page by returning a
-            ' full 100-item page; hasMore is an optional provider extension.
-            result.hasMore = metas.Count() >= 100
+            ' Some catalogs advertise smaller pages (TMDB uses 20). Count the
+            ' raw response, not the filtered UI list, to preserve skip offsets.
+            result.hasMore = metas.Count() >= m.PageSize(pageSize)
         else
             result.hasMore = (response.json.hasMore = true)
         end if
@@ -139,6 +138,16 @@ class CatalogStore
     ' each search-capable catalog the same query. Nothing is stored locally.
     function Search(addonAddress as string, metaType as string, query as string, catalogId = "top" as string) as object
         return m.Catalog(addonAddress, metaType, catalogId, "search=" + m.transport.EncodeQueryValue(query))
+    end function
+
+    ' Treat only bounded integral numeric declarations as page sizes. Missing
+    ' or malformed manifest hints retain the standard 100-record default.
+    private function PageSize(value as dynamic) as integer
+        kind = Type(value)
+        if kind <> "Integer" and kind <> "roInt" and kind <> "roInteger" and kind <> "LongInteger" and kind <> "roLongInteger" and kind <> "roInt64" and kind <> "Float" and kind <> "roFloat" and kind <> "Double" and kind <> "roDouble" then return 100
+        if value < 1 or value > 100 then return 100
+        if Int(value) <> value then return 100
+        return Int(value)
     end function
 
     private function IsNonemptyString(value as dynamic) as boolean
