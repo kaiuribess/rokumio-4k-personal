@@ -367,9 +367,18 @@ sub ApplyProviderSources(index as integer, result as dynamic)
     provider = m.providers[index]
     provider.readyStreams = result.readyStreams
     provider.uhdCount = 0
-    if Type(result.uhdCount) = "Integer" or Type(result.uhdCount) = "roInteger"
+    countType = Type(result.uhdCount)
+    ' Native task associative arrays can box an Integer as roInt. Accept
+    ' integer wrappers explicitly; strings, floats and booleans are not counts.
+    if countType = "Integer" or countType = "roInt" or countType = "roInteger" or countType = "LongInteger" or countType = "roLongInteger" or countType = "roInt64"
         if Type(result.readyStreams) = "roArray"
-            if result.uhdCount >= 0 and result.uhdCount <= result.readyStreams.Count() then provider.uhdCount = result.uhdCount
+            count = result.uhdCount + 0
+            if count >= 0
+                ' Bound before Int(): a large native LongInteger must never
+                ' overflow the small per-provider candidate budget.
+                if count > result.readyStreams.Count() then count = result.readyStreams.Count()
+                provider.uhdCount = Int(count)
+            end if
         end if
     end if
     provider.sourceDiagnostics = result.sourceDiagnostics
@@ -1407,7 +1416,8 @@ sub onSourceProgress()
 end sub
 
 function SourceLoadStatus() as object
-    info = {active:m.top.screenActive = true,pending:m.pendingCount,requesting:0,queued:0,elapsedSeconds:0,selectionRunning:m.selectionTask <> invalid,providers:0,completed:0,failed:0,readyCandidates:0,uhdLabelCandidates:0}
+    prefs = PlaybackPreferences(m.stores,m.params)
+    info = {active:m.top.screenActive = true,pending:m.pendingCount,requesting:0,queued:0,elapsedSeconds:0,selectionRunning:m.selectionTask <> invalid,providers:0,completed:0,failed:0,readyCandidates:0,uhdLabelCandidates:0,fourKOnly:m.fourKOnly = true,waitForProviders:prefs.waitForProviders = true}
     if m.autoClock <> invalid and m.loadStartedAt <> invalid then info.elapsedSeconds = Int((m.autoClock.TotalMilliseconds() - m.loadStartedAt) / 1000)
     if Type(m.providers) = "roArray"
         info.providers = m.providers.Count()

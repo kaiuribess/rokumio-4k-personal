@@ -1160,7 +1160,13 @@ Harness_Equal(info.readyCandidates,2,"safe status counts ready candidates withou
 Harness_Equal(info.uhdLabelCandidates,1,"status calls the quality count UHD labels, not decoded UHD")
 Harness_Ok(FormatJson(info).InStr("private") < 0,"status does not expose provider error text")
 Harness_Ok(FormatJson(info).InStr("https://") < 0,"status does not expose provider or media URLs")
-Harness_Equal(info.Count(),11,"diagnostic shape is a fixed scalar allowlist")
+Harness_Equal(info.Count(),13,"diagnostic shape is a fixed scalar allowlist including effective playback mode")
+Harness_Ok(not info.fourKOnly and not info.waitForProviders,"default source status reports all-quality Start sooner mode")
+m.fourKOnly = true:m.params.waitForProviders = true
+info = SourceLoadStatus()
+Harness_Ok(info.fourKOnly and info.waitForProviders,"source status exposes effective strict UHD and Compare providers settings")
+m.fourKOnly = false:m.params.fourKOnly = true
+Harness_Ok(not SourceLoadStatus().fourKOnly,"source status reports the active screen filter rather than a stale parameter")
 m.headTitle = {text:"Fixture"}
 m.autoPlayEnabled = true
 PrefetchTest_PushAutomaticPlayer(first.result.streams[0],first.result.streams)
@@ -1168,4 +1174,60 @@ Harness_Ok(m.top.pushRequest.params.preferUhd,"automatic player receives measure
 DisableAutomaticForManualBrowse()
 PrefetchTest_PushAutomaticPlayer(first.result.streams[0],first.result.streams)
 Harness_Ok(not m.top.pushRequest.params.preferUhd,"manual player keeps the selected source without automatic UHD deferral")
+Harness_Suite("Native boxed integer source counts cross coordinator, screen and automatic startup")
+boxedCount = CreateObject("roInt"):boxedCount.SetInt(1)
+boxedLongCount = CreateObject("roLongInteger"):boxedLongCount.SetLongInt(1&)
+nativeResult = {uhdCount:boxedCount}
+Harness_Equal(Type(nativeResult.uhdCount),"roInt","regression fixture retains a real boxed roInt inside the task-result associative array")
+Harness_Equal(Type(boxedLongCount),"roLongInteger","regression fixture also exercises a real native 64-bit integer wrapper")
+for each count in [1,1&,boxedCount,boxedLongCount]
+    PrefetchTest_Setup(2)
+    m.autoPlayEnabled = true
+    m.fourKOnly = true
+    LoadStreams(m.params)
+    completed = m.launched[0]
+    uhd = {name:"2160p English AAC",url:"https://media.example.test/boxed-count.mkv"}
+    completed.result = {streams:[uhd],readyStreams:[uhd],uhdCount:count,error:""}
+    PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(completed))
+    onSourcePrefetchChanged()
+    Harness_Equal(m.providers[0].uhdCount,1,"integer count survives the actual worker-to-screen callback boundary")
+    Harness_Equal(Type(m.providers[0].uhdCount),"Integer","accepted native wrapper is normalized to a small scalar integer")
+    Harness_Equal(SourceLoadStatus().uhdLabelCandidates,1,"safe status reports the completed UHD count while another provider is pending")
+    Harness_Ok(SourceLoadStatus().fourKOnly,"safe status confirms the active strict-UHD filter independently of source counts")
+    Harness_Equal(m.autoGraceDeadline,750,"eligible UHD uses the bounded 750ms comparison interval")
+    m.autoClock.now = 749
+    onAutomaticGrace()
+    Harness_Equal(m.selectionTask,invalid,"boxed count cannot bypass the startup grace timer")
+    m.autoClock.now = 750
+    onAutomaticGrace()
+    Harness_Ok(m.selectionTask <> invalid,"strict UHD starts ranking without waiting for the remaining slow provider")
+    if m.selectionTask <> invalid then Harness_Ok(m.selectionTask.fourKOnly,"count admission preserves the separate strict UHD selection policy")
+end for
+
+Harness_Suite("Source count admission rejects coercion and bounds native integer counters")
+boxedFloat = CreateObject("roFloat"):boxedFloat.SetFloat(1.0)
+for each count in [invalid,"1",true,false,1.0,1.0#,boxedFloat,[],{},-1,-1&]
+    PrefetchTest_Setup(1)
+    LoadStreams(m.params)
+    completed = m.launched[0]
+    completed.result = {streams:[uhd],readyStreams:[uhd],uhdCount:count,error:""}
+    PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(completed))
+    onSourcePrefetchChanged()
+    Harness_Equal(m.providers[0].uhdCount,0,"malformed, floating-point or negative counts cannot become UHD evidence")
+    Harness_Equal(SourceLoadStatus().uhdLabelCandidates,0,"rejected count stays zero in safe diagnostics")
+end for
+hugeCount = CreateObject("roLongInteger"):hugeCount.SetLongInt(4294967296&)
+for each count in [2,4294967296&,hugeCount]
+    PrefetchTest_Setup(1)
+    LoadStreams(m.params)
+    completed = m.launched[0]
+    completed.result = {streams:[uhd],readyStreams:[uhd],uhdCount:count,error:""}
+    PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(completed))
+    onSourcePrefetchChanged()
+    Harness_Equal(m.providers[0].uhdCount,1,"oversized integer counts clamp before 32-bit conversion to the actual candidate budget")
+end for
+PrefetchTest_Setup(1)
+LoadStreams(m.params)
+ApplyProviderSources(0,{streams:[uhd],readyStreams:invalid,uhdCount:boxedCount,error:""})
+Harness_Equal(m.providers[0].uhdCount,0,"no ready array means no counted UHD candidates")
 Harness_Finish()
