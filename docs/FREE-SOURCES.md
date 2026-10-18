@@ -49,3 +49,11 @@ It supplies scheduled live channels, not on-demand access to every movie or epis
 For HD fallback, use **Settings > Picture quality > 4K first + 1080p**. Choose **TV / projector speakers** or **HDMI soundbar / receiver** under **Audio mode** to match the connected equipment. See [playback and 4K evidence](PLAYBACK.md) for the difference between source labels, encoded dimensions and native playback. Once a compatible direct stream starts, the setup phone/computer does not need to remain on.
 
 Keep configured URLs containing personal keys private. Only the account-free public examples above belong in shared documentation; never post signed media URLs, account manifests or credentials in an issue.
+
+## Broader coverage and current releases
+
+Catalogs and search query online providers. A newly listed movie or episode may still have no compatible stream; a theater listing is not evidence of a released UHD file. Adding more catalogs does not expand the media available from the installed stream providers.
+
+For larger files, an account-backed host may offer a more suitable delivery path than a throttled free host. This is conditional on the particular file, cache and connector. As checked on October 17, 2026, [TorBox's official May 20 announcement](https://feedback.torbox.app/changelog/v844) says its hosted Stremio add-on was disabled. Do not use old instructions promising that official manifest. A maintained third-party connector and its current direct HTTPS output need to be verified before recommending a subscription for Crimson. The [pricing page](https://www.torbox.app/pricing) lists the plans; a higher-priced plan does not prove better title coverage or compatibility with Roku.
+
+Crimson does not increase a file host's transfer allowance or make a fixed-bitrate MKV adaptive. The native player handles the actual media download. Software can reduce competing work, expose diagnostics and recover from a persistently failing source; it cannot guarantee every movie/show or unlimited, uninterrupted free UHD.
