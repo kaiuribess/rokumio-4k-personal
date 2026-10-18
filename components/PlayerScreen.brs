@@ -124,6 +124,7 @@ sub init()
     m.workerSequence = 0
     if m.playTimer <> invalid then m.playTimer.ObserveField("fire", "onPlayKickFire")
     m.checkpointTimer = m.top.FindNode("localCheckpoint")
+    m.checkpointTimerRequested = "none"
     if m.checkpointTimer <> invalid then m.checkpointTimer.ObserveField("fire","onLocalCheckpoint")
 end sub
 
@@ -152,7 +153,10 @@ function OnEnter(params as object) as void
     m.hasPlayed = false
     m.lastDurablePosition = invalid
     m.lastDurableDuration = invalid
-    if m.checkpointTimer <> invalid then m.checkpointTimer.control = "start"
+    if m.checkpointTimer <> invalid
+        m.checkpointTimer.control = "start"
+        m.checkpointTimerRequested = "start"
+    end if
     m.playingSegment = invalid
     m.resolvedPlayback = invalid
     m.devicePlaybackInfo = invalid
@@ -1693,7 +1697,7 @@ function PlaybackStatus() as object
     segment = PlaybackInfo_Segment(m.playingSegment)
     remembered = false
     if Type(m.playParams) = "roAssociativeArray" then remembered = m.playParams.rememberedSource = true
-    return {rememberedSource:remembered,memorySaved:m.memorySaved = true,device:m.devicePlaybackInfo,segment:segment,position:position,videoCodec:videoCodec,muted:muted,samples:samples,diagnostic:diagnostic,inspection:NativeMedia_Reason(media),format:format,state:state,audioCodec:codec,englishVerified:audio.verified,audioReason:audio.reason,englishTrackCount:audio.englishTracks.Count(),attempt:m.sourceIndex + 1,retrying:m.retryPending,resolution:NativeMedia_Resolution(media),active:m.playbackActive,buffering:BufferingRecovery_Status(),delivery:DeliveryInfo_Status(),checkpoint:CheckpointTiming_Status(),progress:ProgressRecovery_Status(),file:PlaybackInfo_FileFacts(media,DeliveryInfo_Duration())}
+    return {rememberedSource:remembered,memorySaved:m.memorySaved = true,device:m.devicePlaybackInfo,segment:segment,position:position,videoCodec:videoCodec,muted:muted,samples:samples,diagnostic:diagnostic,inspection:NativeMedia_Reason(media),format:format,state:state,audioCodec:codec,englishVerified:audio.verified,audioReason:audio.reason,englishTrackCount:audio.englishTracks.Count(),attempt:m.sourceIndex + 1,retrying:m.retryPending,resolution:NativeMedia_Resolution(media),active:m.playbackActive,sourceAccepted:m.sourceAccepted = true,hasPlayed:m.hasPlayed = true,buffering:BufferingRecovery_Status(),delivery:DeliveryInfo_Status(),checkpoint:CheckpointTiming_Status(),progress:ProgressRecovery_Status(),file:PlaybackInfo_FileFacts(media,DeliveryInfo_Duration())}
 end function
 
 sub ShowPlaybackInfo()
@@ -1818,7 +1822,10 @@ end function
 ' node. Nothing is reaped: this screen and its node are static children of the
 ' Scene and survive the pop, so the next play re-arms them in CreateVideo.
 function OnExit() as void
-    if m.checkpointTimer <> invalid then m.checkpointTimer.control = "stop"
+    if m.checkpointTimer <> invalid
+        m.checkpointTimer.control = "stop"
+        m.checkpointTimerRequested = "stop"
+    end if
     CancelNextEpisode()
     m.playbackActive = false
     m.discoveryPending = false
@@ -1974,11 +1981,29 @@ sub SavePosition()
 end sub
 
 sub onLocalCheckpoint()
-    if m.playbackActive <> true or m.sourceAccepted <> true or m.hasPlayed <> true or m.retryPending = true then return
-    if m.playParams = invalid or m.playParams.diagnostic = true or m.stores = invalid then return
+    ' Count callback delivery before every save guard. A zero save count alone
+    ' cannot distinguish an idle timer from an intentionally skipped checkpoint.
+    previous = CheckpointTiming_Status()
+    m.checkpointFireCount = previous.fireCount
+    if m.checkpointFireCount < 2147483647 then m.checkpointFireCount = m.checkpointFireCount + 1
+    m.checkpointLastGuard = "inactive"
+    if m.playbackActive <> true then return
+    m.checkpointLastGuard = "unaccepted"
+    if m.sourceAccepted <> true then return
+    m.checkpointLastGuard = "not-played"
+    if m.hasPlayed <> true then return
+    m.checkpointLastGuard = "retrying"
+    if m.retryPending = true then return
+    m.checkpointLastGuard = "no-context"
+    if m.playParams = invalid or m.stores = invalid then return
+    m.checkpointLastGuard = "diagnostic"
+    if m.playParams.diagnostic = true then return
+    m.checkpointLastGuard = "live"
     if m.stores.library.callFunc("LibraryIsChannelType",PlaybackInfo_Text(m.playParams.metaType)) then return
     snapshot = PlaybackPosition_Snapshot()
+    m.checkpointLastGuard = "unchanged"
     if m.lastDurablePosition = Int(snapshot.position) and m.lastDurableDuration = Int(snapshot.duration) then return
+    m.checkpointLastGuard = "attempted"
     m.saved = false
     clock = CheckpointTiming_Start()
     SavePosition()
@@ -1991,6 +2016,8 @@ end sub
 ' its acknowledgement, or create additional writes. Keep fixed scalar totals
 ' for this player entry; no title, source URL or per-sample history is retained.
 sub CheckpointTiming_Reset()
+    m.checkpointFireCount = 0
+    m.checkpointLastGuard = "not-fired"
     m.checkpointTimingCount = 0
     m.checkpointTimingLastMilliseconds = invalid
     m.checkpointTimingMaxMilliseconds = invalid
@@ -2029,12 +2056,17 @@ sub CheckpointTiming_Finish(clock as dynamic)
 end sub
 
 function CheckpointTiming_Status() as object
-    result = {count:0,lastMilliseconds:invalid,maxMilliseconds:invalid}
-    values = {count:m.checkpointTimingCount,lastMilliseconds:m.checkpointTimingLastMilliseconds,maxMilliseconds:m.checkpointTimingMaxMilliseconds}
+    result = {count:0,fireCount:0,lastGuard:"not-fired",timerPresent:m.checkpointTimer <> invalid,requestedControl:"none",lastMilliseconds:invalid,maxMilliseconds:invalid}
+    ' These are requested commands, not a claim that the native Timer runs.
+    if m.checkpointTimerRequested = "start" or m.checkpointTimerRequested = "stop" then result.requestedControl = m.checkpointTimerRequested
+    for each guard in ["inactive","unaccepted","not-played","retrying","no-context","diagnostic","live","unchanged","attempted"]
+        if m.checkpointLastGuard = guard then result.lastGuard = guard
+    end for
+    values = {count:m.checkpointTimingCount,fireCount:m.checkpointFireCount,lastMilliseconds:m.checkpointTimingLastMilliseconds,maxMilliseconds:m.checkpointTimingMaxMilliseconds}
     for each key in values
         value = values[key]
         kind = Type(value)
-        if kind = "Integer" or kind = "roInt" or kind = "Float" or kind = "roFloat" or kind = "Double" or kind = "roDouble" or kind = "LongInteger" or kind = "roInt64"
+        if kind = "Integer" or kind = "roInt" or kind = "roInteger" or kind = "Float" or kind = "roFloat" or kind = "Double" or kind = "roDouble" or kind = "LongInteger" or kind = "roLongInteger" or kind = "roInt64"
             if value >= 0 and value <= 2147483647 then result[key] = Int(value)
         end if
     end for
