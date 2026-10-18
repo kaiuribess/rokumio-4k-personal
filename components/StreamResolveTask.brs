@@ -1,7 +1,8 @@
 ' StreamResolveTask — resolve a torrent stream to a playable URL off the UI
 ' thread, and make sure the streaming server will actually serve it.
 '
-' Direct-URL streams never get here (the screen plays them as-is).
+' Direct-URL streams also pass through this worker for bounded container and
+' audio inspection before the native player receives its content node.
 '
 ' The task owns the wait, and that is the point of it. Building the URL needs no
 ' request, but the Video node's first request is a cold engine: the server has to
@@ -109,7 +110,17 @@ sub resolve()
             end try
         end if
         if resolved.ok and resolved.mode = "direct"
-            resolved.media = NativeMedia_Read(resolved,m.top.id)
+            try
+                resolved.media = NativeMedia_Read(resolved,m.top.id)
+                if resolved.streamFormat = "" and resolved.media.streamFormat = "mkv"
+                    resolved.streamFormat = "mkv"
+                end if
+            catch inspectError
+                ' Optional header evidence must never erase an otherwise valid
+                ' delivery URL. The native English/decoder/progress guards still
+                ' apply if a host or inspection primitive is unavailable.
+                resolved.media = {complete:false,tracks:[],reason:"inspection-error"}
+            end try
             resolved.audioPolicy = NativeMedia_AudioPolicy(resolved.media,m.top.audioMode)
         end if
         m.top.result = resolved

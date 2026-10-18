@@ -37,9 +37,18 @@ async function main() {
     const memoryScreen = fs.readFileSync(path.join(root,'components/PlayerSourceMemory.brs'),'utf8').replace(/SourceMemory_Fingerprint\(/g,'PlayerTest_Fingerprint(').replace(/ProviderPriority_StreamKey\(/g,'PlayerTest_ProviderKey(').replace(/CreateObject\(/gi,'MockNativeObject(');
     const support = fs.readFileSync(path.join(root,'source/util/TimerGuard.brs'),'utf8').replace(/CreateObject\(/gi,'MockNativeObject(') + '\n' + fs.readFileSync(path.join(root,'components/PlayerPosition.brs'),'utf8');
     const audioRecovery = fs.readFileSync(path.join(root,'components/PlayerAudioRecovery.brs'),'utf8');
+    // Exercise the production resolver and header acquisition through native
+    // I/O substitutes, then deliver its real result to the player callback.
+    const resolver = /^sub resolve\(\)[^]*?^end sub/mi.exec(fs.readFileSync(path.join(root,'components/StreamResolveTask.brs'),'utf8'))[0]
+        .replace(/^sub resolve\(\)/,'sub NativeBoundaryResolve()');
+    const nativeMedia = fs.readFileSync(path.join(root,'source/util/NativeMedia.brs'),'utf8')
+        .replaceAll('CreateObject(','NativeBoundaryObject(')
+        .replace(/\bWait\(/g,'NativeBoundaryWait(')
+        .replace('Type(event) = "roUrlEvent"','NativeBoundaryEventType(event) = "roUrlEvent"')
+        .replace('data.ReadFile(path)','NativeBoundaryRead(data,path)');
     fs.writeFileSync(combined, ['harness.brs', 'mocks.brs', 'player-handoff.test.brs']
-        .map(f => fs.readFileSync(path.join(__dirname, f), 'utf8')).join('\n') + '\n' + ['AccountEpoch.brs', 'ProviderPriority.brs', 'MetadataOrigin.brs', 'EnglishAudio.brs', 'AudioCapabilities.brs', 'AutoPlayback.brs', 'CinemaStreams.brs', 'NativeMedia.brs'].map(f => fs.readFileSync(path.join(root, 'source/util', f), 'utf8')).join('\n') + '\n' + screen + '\n' +
-        memoryScreen + '\n' + support + '\n' + audioRecovery + '\n' + fs.readFileSync(path.join(root, 'source/util/NextEpisode.brs'), 'utf8') + '\n' + fs.readFileSync(path.join(root, 'components/PlayerNextEpisode.brs'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'playback-native.test.brs'), 'utf8'));
+        .map(f => fs.readFileSync(path.join(__dirname, f), 'utf8')).join('\n') + '\n' + ['AccountEpoch.brs', 'ProviderPriority.brs', 'MetadataOrigin.brs', 'EnglishAudio.brs', 'AudioCapabilities.brs', 'AutoPlayback.brs', 'CinemaStreams.brs'].map(f => fs.readFileSync(path.join(root, 'source/util', f), 'utf8')).join('\n') + '\n' + nativeMedia + '\n' + resolver + '\n' + screen + '\n' +
+        memoryScreen + '\n' + support + '\n' + audioRecovery + '\n' + fs.readFileSync(path.join(root, 'source/util/NextEpisode.brs'), 'utf8') + '\n' + fs.readFileSync(path.join(root, 'components/PlayerNextEpisode.brs'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname,'native-resolve-boundary.test.brs'),'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'playback-native.test.brs'), 'utf8'));
     const result = spawnSync(process.execPath, [
         path.join(root, 'node_modules', '@rokucommunity', 'brs', 'bin', 'cli.js'),
         '--root', staging, path.join(staging, 'source', 'bslib.brs'),
