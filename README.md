@@ -2,13 +2,13 @@
 
 A native Roku client with a dark red interface for browsing Stremio-compatible catalogs, searching movies and shows, and playing compatible direct streams with the Roku remote. This community derivative adds English audio selection, projector/surround preferences, clearer source cards, automatic source recovery, next-episode playback, and add-on checks. The repository and ZIP filename remain `rokumio-4k-personal` so existing links and build instructions continue to work.
 
-**Version 0.5.28 prefers lighter 4K candidates before very large UHD files during automatic selection.** This bounded size heuristic runs after source memory and before host rotation, so a remembered giant file cannot bypass the preference. Large UHD remains eligible before HD fallback; manual choices remain available. Fresh lookups, English checks, host diversity and recovery budgets are preserved. Private checkpoint diagnostics now distinguish callback delivery from save eligibility. These changes do not increase a file host's transfer allowance or prove uninterrupted UHD for every title. This remains an experimental prerelease. See [validation](docs/VALIDATION.md).
+**Version 0.5.29 shares Home previews across catalog providers and repairs paging for providers returning 20 items per page.** Later providers can now contribute Home rows without increasing the existing request/poster budgets. Discover preserves raw offsets and handles repeated pages safely. The 0.5.28 automatic preference for lighter UHD, English checks, source recovery and private checkpoint diagnostics remain. Catalogs supply browsing information; each user supplies compatible stream providers. Uninterrupted UHD and audible surround remain unverified for every title. This remains an experimental prerelease. See [validation](docs/VALIDATION.md).
 
-**[Download the Roku install ZIP — 0.5.28](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.28/rokumio-4k-personal-0.5.28.zip)**
+**[Download the Roku install ZIP — 0.5.29](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.29/rokumio-4k-personal-0.5.29.zip)**
 
 Upload that ZIP without extracting it. GitHub's green Code button and “Source code” archives are for developers; they are not the Roku install package.
 
-[Release notes and checksum](https://github.com/kaiuribess/rokumio-4k-personal/releases/tag/v0.5.28) · [Installation](docs/INSTALL.md) · [Add-on checks](docs/ADDON_CHECKS.md) · [Playback and 4K](docs/PLAYBACK.md) · [Development](docs/DEVELOPMENT.md) · [Changes](CHANGELOG.md)
+[Release notes and checksum](https://github.com/kaiuribess/rokumio-4k-personal/releases/tag/v0.5.29) · [Installation](docs/INSTALL.md) · [Add-on checks](docs/ADDON_CHECKS.md) · [Playback and 4K](docs/PLAYBACK.md) · [Development](docs/DEVELOPMENT.md) · [Changes](CHANGELOG.md)
 
 ## What you can do
 

@@ -12,7 +12,7 @@ const source = read('components/DiscoverScreen.brs');
 const names = ['CatalogSignature', 'EnsureSources', 'onSourcesLoaded', 'onDiscoverLoaded',
     'OnEnter', 'RefreshDiscoverIfStale', 'BlurFocus',
     'NextDiscoverWorkerId', 'DiscoverText', 'DiscoverUsableMetas', 'DiscoverVisibleRows',
-    'FetchDiscover', 'LoadMore', 'ResetDiscover', 'UpdateGrid', 'AppendRestorePosition',
+    'FetchDiscover', 'DiscoverPageSize', 'DiscoverBoundedCount', 'LoadMore', 'ResetDiscover', 'UpdateGrid', 'AppendRestorePosition',
     'onResultSelected', 'onGridFocused', 'onKeyEvent', 'LandingChipsFocus', 'CancelLoad', 'CancelSources'];
 const functions = names.map(name => {
     const match = new RegExp(`^(?:sub|function) ${name}\\([^]*?^end (?:sub|function)`, 'mi').exec(source);

@@ -1,3 +1,26 @@
+# Release validation — 0.5.29
+
+Prepared on October 17, 2026 from default-branch commit `b01fab3f244d0a637a2ecbbcca328ffd3c0bc46f`. Experimental prerelease; software, catalog/provider checks and native playback are separate evidence.
+
+| Command/check | Result |
+|---|---|
+| `npm ci --ignore-scripts` | Exit 0; pinned development dependency tree unchanged. |
+| `npm test` | Exit 0; 6,385 BrightScript assertions across 36 runs plus 142 cinema-policy assertions = **6,527**. Separate 56 Node cases, 29 MP4 checks and 50 playlist assertions passed. |
+| `npm run build` | Exit 0. |
+| `python scripts/verify-package.py` | Exit 0; 207 members, 52 XML components, 273 root/3 relative script references, 164 interfaces. |
+| Focused production regressions | Home97, catalog store/worker/screen79, Discover64, Home refresh44 passed. |
+| Independent source review | Case-sensitive IDs and later genre-descriptor previews were repaired during review; final request/row/poster bounds and raw-offset handling passed. |
+| Literal private-data check | The authorized private key and complete configured URLs were absent from all 340 tracked files and 207 packaged members. Only ignored private setup files contain them. |
+| `git diff --check` | Passed. |
+
+Before repair, production Home regressions failed four checks: earlier providers spent the preview budget before TMDB, and a failed first provider took its second request before the next provider's first. The prior transpiled CatalogStore also classified a full advertised 20-item page as terminal. New tests execute real Home planning, catalog store, Discover task and screen callbacks, preserving eight base/eight genre requests, twelve rows, 24-poster previews, raw skip offsets, explicit end markers, stale-worker rejection and case-sensitive opaque identifiers. Empty or repeated pages terminate safely. No assertion was weakened.
+
+The optional account-free TMDB ElfHosted configuration was checked with both IMDb flags enabled. Latest Releases movies and Trending movie/show rows returned IMDb IDs, and Family Guy metadata supplied 483 season/episode records with compatible IDs. The user confirmed one successful import. This configuration supplies metadata; generic catalog-only IMDb metadata fallback remains a separate limitation. See [catalog setup](FREE-SOURCES.md).
+
+A separate owner-authorized TorBox/Comet configuration returned a valid manifest, 16 HTTPS movie candidates (eight UHD-labelled) and one episode candidate. The user confirmed one successful import. The first PC range check followed a redirect to a TorBox CDN, which returned HTTP403 with zero media bytes; it is not a native UHD/audio or sustained-delivery success. Direct Torrentio public-manifest and TorBox API checks from the PC were also refused, so those results alone do not identify invalid credentials. Personal configured paths, key, URLs and responses are excluded from repository, package and public reports. No subscription purchase, account deletion, credential rotation or remote Stremio-account modification was performed by this work.
+
+---
+
 # Release validation — 0.5.28
 
 Prepared on October 17, 2026 from latest default-branch commit `98c2d3c04f7775d7ba4f3f8a46dafffcefa95844`. Experimental prerelease; no sustained native UHD or audible-surround certification.

@@ -20,7 +20,7 @@ sub discover()
             parts = []
             if m.top.genre <> "" then parts.Push("genre=" + http.EncodeQueryValue(m.top.genre))
             parts.Push("skip=" + m.top.pageOffset.ToStr())
-            answer = catalog.Catalog(m.top.addonAddress, m.top.metaType, m.top.catalogId, parts.Join("&"))
+            answer = catalog.Catalog(m.top.addonAddress, m.top.metaType, m.top.catalogId, parts.Join("&"), m.top.pageSize)
             result.ok = answer.ok
             result.error = answer.error
             result.hasMore = answer.hasMore

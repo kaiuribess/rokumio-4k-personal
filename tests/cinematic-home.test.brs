@@ -167,7 +167,7 @@ end function},manifestCalls:0,Manifest:function(address as string) as object
     m.manifestCalls=m.manifestCalls+1
     return {ok:false}
 end function,Catalog:function(address as string,kind as string,id as string,extra="" as string) as object
-    m.calls.Push({id:id,extra:extra})
+    m.calls.Push({address:address,id:id,extra:extra})
     if id="broken" then return {ok:false}
     return {ok:true,metas:m.pool}
 end function}
@@ -193,6 +193,56 @@ end for
 m.top={addons:unknown}:load()
 Harness_Equal(m.fixtureCatalog.manifestCalls,8,"unknown manifests cannot create unbounded Home requests")
 Harness_Ok(m.top.result.done,"manifest exhaustion leaves working navigation and terminal result")
+
+Harness_Suite("Home worker fairly shares existing preview budget across catalog providers")
+cinemeta=[]:streaming=[]:tmdb=[]
+for index=0 to 11
+    descriptor={id:"catalog"+index.ToStr(),type:"movie",name:"Catalog "+index.ToStr(),extra:extra}
+    streaming.Push(descriptor)
+    if index<4 then cinemeta.Push(descriptor)
+    if index<3 then tmdb.Push(descriptor)
+end for
+m.fixtureCatalog.calls=[]
+m.top={addons:[
+    {address:"https://cinemeta.example",catalogs:cinemeta},
+    {address:"https://streaming.example",catalogs:streaming},
+    {address:"https://tmdb.example",catalogs:tmdb}
+]}:load()
+Harness_Equal(m.fixtureCatalog.calls[0].address,"https://cinemeta.example","first provider retains first preview")
+Harness_Equal(m.fixtureCatalog.calls[1].address,"https://streaming.example","second provider gets a turn before a second Cinemeta row")
+Harness_Equal(m.fixtureCatalog.calls[2].address,"https://tmdb.example","new catalog provider is not starved by early provider rows")
+baseCalls=0:tmdbCalls=0:genreCalls=0
+for each call in m.fixtureCatalog.calls
+    if call.extra=""
+        baseCalls=baseCalls+1
+        if call.address="https://tmdb.example" then tmdbCalls=tmdbCalls+1
+    else
+        genreCalls=genreCalls+1
+    end if
+end for
+Harness_Equal(baseCalls,8,"fair scheduling retains eight base request attempts")
+Harness_Equal(tmdbCalls,2,"new third provider receives two usable Home previews")
+Harness_Ok(genreCalls<=8,"genre attempts remain bounded")
+Harness_Equal(m.top.result.rows.Count(),12,"fair scheduling preserves twelve-row poster budget")
+Harness_Equal(streaming.Count(),12,"Home scheduling does not delete full Discover catalog descriptors")
+Harness_Equal(tmdb.Count(),3,"the third TMDB row remains available in Discover")
+
+m.fixtureCatalog.calls=[]
+m.top={addons:[{address:"https://broken.example",catalogs:[{id:"broken",type:"movie"},{id:"broken",type:"series"}]},{address:"https://working.example",catalogs:[{id:"ok",type:"movie"}]}]}:load()
+Harness_Equal(m.fixtureCatalog.calls[1].address,"https://working.example","failed first provider still yields its first round turn")
+Harness_Equal(m.top.result.rows.Count(),1,"failed previews cannot hide a successful later provider")
+
+Harness_Suite("Later genre descriptors survive the bounded base-preview queue")
+plain=[]
+for index=0 to 7
+    plain.Push({id:"plain"+index.ToStr(),type:"movie"})
+end for
+plain.Push({id:"later",type:"movie",extra:[{name:"genre",options:["Action"]}]})
+m.fixtureCatalog.calls=[]:m.top={addons:[{address:"https://catalog.example",catalogs:plain}]}:load()
+Harness_Equal(m.fixtureCatalog.calls.Count(),9,"eight base requests still allow one later descriptor genre request")
+Harness_Equal(m.fixtureCatalog.calls[8].id,"later","genre-capable ninth descriptor remains usable")
+Harness_Equal(m.fixtureCatalog.calls[8].extra,"genre=Action","later genre uses only its advertised filter")
+Harness_Equal(m.top.result.rows.Count(),9,"genre preservation stays within twelve Home rows")
 
 Harness_Suite("Home worker fetches only safe provider-advertised current-year feeds")
 yearExtra=[{name:"genre",options:["2031","2030"],isRequired:true},{name:"skip"}]
