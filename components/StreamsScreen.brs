@@ -106,6 +106,7 @@ function OnEnter(params as object) as void
     if params = invalid
         if m.accountGeneration <> invalid and AccountEpoch_Read(m.top) <> m.accountGeneration then return
         m.sourcesSuspended = false
+        m.freshnessRefreshUsed = false
         if m.reloadNeeded = true
             ' Completed batches retain one invalid task slot per provider.
             ' Disown that batch before LoadStreams, whose duplicate-load guard
@@ -118,7 +119,8 @@ function OnEnter(params as object) as void
         if m.prefetchNode <> invalid and m.prefetchContext <> invalid
             reentryContext = SourcePrefetch_Context(m.stores,m.params)
             if reentryContext <> invalid and reentryContext.key = m.prefetchContext.key then m.prefetchNode.callFunc("SetPriority",reentryContext.key,reentryContext.providerPriority)
-            m.prefetchNode.callFunc("Resume",m.prefetchContext.key)
+            resumed = m.prefetchNode.callFunc("Resume",m.prefetchContext.key)
+            if Type(resumed) = "roAssociativeArray" and resumed.refreshed = true then m.freshnessRefreshUsed = true
         end if
         onSourcePrefetchChanged()
         PumpProviderSources()
@@ -144,9 +146,11 @@ function OnEnter(params as object) as void
     sameContext = currentContext <> invalid and currentContext.key = m.loadContextKey
     if m.pendingCount > 0 and m.loadKey <> "" and EpisodeKey(params) = m.loadKey and sameContext
         m.sourcesSuspended = false
+        m.freshnessRefreshUsed = false
         if m.prefetchNode <> invalid and m.prefetchContext <> invalid
             m.prefetchNode.callFunc("SetPriority",currentContext.key,currentContext.providerPriority)
-            m.prefetchNode.callFunc("Resume",m.prefetchContext.key)
+            resumed = m.prefetchNode.callFunc("Resume",m.prefetchContext.key)
+            if Type(resumed) = "roAssociativeArray" and resumed.refreshed = true then m.freshnessRefreshUsed = true
         end if
         onSourcePrefetchChanged()
         PumpProviderSources()
@@ -283,6 +287,7 @@ sub LoadStreams(params as object, allowPrefetch = true as boolean)
     m.sourceQueue = []
     m.sourceRevision = 0
     m.selectionRevision = -1
+    m.freshnessRefreshUsed = false
     CancelAutomaticGrace()
     for i = 0 to providers.Count() - 1
         m.loadTasks.Push(invalid)
@@ -296,6 +301,7 @@ sub LoadStreams(params as object, allowPrefetch = true as boolean)
             m.prefetchNode.ObserveField("revision", "onSourcePrefetchChanged")
             if not allowPrefetch then m.prefetchNode.callFunc("Cancel",m.prefetchContext.key)
             snapshot = m.prefetchNode.callFunc("Adopt", m.prefetchContext)
+            if Type(snapshot) = "roAssociativeArray" and snapshot.refreshed = true then m.freshnessRefreshUsed = true
         end if
     end if
 
@@ -395,12 +401,30 @@ sub onSourcePrefetchChanged()
     m.prefetchNode.callFunc("SetPriority",context.key,context.providerPriority)
     snapshot = m.prefetchNode.callFunc("Snapshot", context.key)
     for i = 0 to m.prefetchWaiting.Count() - 1
-        if m.prefetchWaiting[i] <> true then continue for
         entry = invalid
         if Type(snapshot) = "roAssociativeArray" and Type(snapshot.entries) = "roArray"
             if i < snapshot.entries.Count() then entry = snapshot.entries[i]
         end if
-        if Type(entry) = "roAssociativeArray" and (entry.status = "pending" or entry.status = "queued") then continue for
+        if Type(entry) = "roAssociativeArray" and (entry.status = "pending" or entry.status = "queued")
+            if m.prefetchWaiting[i] <> true
+                ' A completed result expired before a new selection. Keep the
+                ' batch token and existing workers, but remove its old URLs.
+                m.prefetchWaiting[i] = true
+                m.providers[i].streams = []
+                m.providers[i].readyStreams = []
+                m.providers[i].uhdCount = 0
+                m.providers[i].error = ""
+                m.providers[i].sourceDiagnostics = invalid
+                m.pendingCount = m.pendingCount + 1
+                m.sourceRevision = m.sourceRevision + 1
+                if i = m.activeIndex and m.top.screenActive and m.sourcesSuspended <> true
+                    ResetSourcePagination()
+                    RenderActiveProvider()
+                end if
+            end if
+            continue for
+        end if
+        if m.prefetchWaiting[i] <> true then continue for
         m.prefetchWaiting[i] = false
         if Type(entry) = "roAssociativeArray" and (entry.status = "ready" or entry.status = "failed")
             ApplyProviderSources(i, entry.result)
@@ -414,6 +438,21 @@ sub onSourcePrefetchChanged()
     if m.top.screenActive and m.sourcesSuspended <> true then UpdateStreamsStatus()
     MaybeStartAutomaticPlayback()
 end sub
+
+' Called only before a NEW automatic/manual handoff. Passive status reads do
+' not refresh links, and a hidden/suspended source screen cannot launch work.
+function RefreshExpiredSourceResults() as boolean
+    if not m.top.screenActive or m.sourcesSuspended = true then return false
+    ' One sweep per play/return action: a long Compare-providers batch must not
+    ' continually age out earlier completions and requeue itself forever.
+    if m.freshnessRefreshUsed = true then return false
+    if m.prefetchNode = invalid or m.prefetchContext = invalid then return false
+    snapshot = m.prefetchNode.callFunc("Snapshot",m.prefetchContext.key,true)
+    if Type(snapshot) <> "roAssociativeArray" or snapshot.refreshed <> true then return false
+    m.freshnessRefreshUsed = true
+    onSourcePrefetchChanged()
+    return true
+end function
 
 sub CancelAutomaticGrace()
     if m.autoGraceTimer <> invalid then m.autoGraceTimer.control = "stop"
@@ -490,6 +529,7 @@ sub onAutomaticSourcesReady(event as object)
     m.selectionTask = invalid
     AsyncTask_Reap(task, m.top, false)
     if not m.top.screenActive or m.sourcesSuspended = true or m.autoPlayEnabled <> true or m.autoPlaySent = true then return
+    if RefreshExpiredSourceResults() then return
     if task.fourKOnly <> m.fourKOnly or task.audioMode <> CurrentAudioMode()
         m.selectionRevision = -1
         MaybeStartAutomaticPlayback()
@@ -516,7 +556,7 @@ sub PushAutomaticPlayer(first as object, candidates as object, remembered = fals
     serverAddress = ""
     prefs = PlaybackPreferences(m.stores,m.params)
     if m.stores <> invalid then serverAddress = m.stores.settings.callFunc("SettingsGetServerAddress")
-    m.top.pushRequest = {screen:"playerScreen",params:{stream:first,candidates:candidates,excludedUrls:m.recoveryExcluded,recoveryRound:m.recoveryRound,rememberedSource:remembered,fourKOnly:m.fourKOnly = true,serverAddress:serverAddress,audioMode:CurrentAudioMode(),diagnostic:m.params.diagnostic = true,metaType:m.params.metaType,metaId:m.params.metaId,videoId:m.params.videoId,season:m.params.season,episode:m.params.episode,position:m.params.position,name:m.headTitle.text,poster:m.params.poster,posterShape:m.params.posterShape,logo:m.params.logo,background:m.params.background,addonAddress:m.params.addonAddress,seriesMeta:m.params.seriesMeta,autoNextEpisode:prefs.autoNextEpisode,autoSourceRetry:prefs.autoSourceRetry,waitForProviders:prefs.waitForProviders}}
+    m.top.pushRequest = {screen:"playerScreen",params:{stream:first,candidates:candidates,excludedUrls:m.recoveryExcluded,recoveryRound:m.recoveryRound,rememberedSource:remembered,preferUhd:m.autoPlayEnabled = true,fourKOnly:m.fourKOnly = true,serverAddress:serverAddress,audioMode:CurrentAudioMode(),diagnostic:m.params.diagnostic = true,metaType:m.params.metaType,metaId:m.params.metaId,videoId:m.params.videoId,season:m.params.season,episode:m.params.episode,position:m.params.position,name:m.headTitle.text,poster:m.params.poster,posterShape:m.params.posterShape,logo:m.params.logo,background:m.params.background,addonAddress:m.params.addonAddress,seriesMeta:m.params.seriesMeta,autoNextEpisode:prefs.autoNextEpisode,autoSourceRetry:prefs.autoSourceRetry,waitForProviders:prefs.waitForProviders}}
 end sub
 
 ' A single provider's stream list landed (or failed). The task reports which
@@ -1249,6 +1289,8 @@ sub onStreamSelected(event = invalid as dynamic)
     index = choice.index
     if Type(m.streams) <> "roArray" or index < 0 or index >= m.streams.Count() then return
     DisableAutomaticForManualBrowse()
+    m.freshnessRefreshUsed = false
+    if RefreshExpiredSourceResults() then return
     SuspendSourceLoading()
     PushAutomaticPlayer(m.streams[index], m.streams)
 end sub
@@ -1365,13 +1407,21 @@ sub onSourceProgress()
 end sub
 
 function SourceLoadStatus() as object
-    info = {active:m.top.screenActive = true,pending:m.pendingCount,requesting:0,queued:0,elapsedSeconds:0,selectionRunning:m.selectionTask <> invalid}
+    info = {active:m.top.screenActive = true,pending:m.pendingCount,requesting:0,queued:0,elapsedSeconds:0,selectionRunning:m.selectionTask <> invalid,providers:0,completed:0,failed:0,readyCandidates:0,uhdLabelCandidates:0}
     if m.autoClock <> invalid and m.loadStartedAt <> invalid then info.elapsedSeconds = Int((m.autoClock.TotalMilliseconds() - m.loadStartedAt) / 1000)
     if Type(m.providers) = "roArray"
+        info.providers = m.providers.Count()
         for i = 0 to m.providers.Count() - 1
             state = ProviderRequestState(i)
             if state = "pending" then info.requesting = info.requesting + 1
             if state = "queued" then info.queued = info.queued + 1
+            if state <> "pending" and state <> "queued"
+                info.completed = info.completed + 1
+                provider = m.providers[i]
+                if provider.error <> invalid and provider.error <> "" then info.failed = info.failed + 1
+                if Type(provider.readyStreams) = "roArray" then info.readyCandidates = info.readyCandidates + provider.readyStreams.Count()
+                if provider.uhdCount <> invalid then info.uhdLabelCandidates = info.uhdLabelCandidates + provider.uhdCount
+            end if
         end for
     end if
     return info
