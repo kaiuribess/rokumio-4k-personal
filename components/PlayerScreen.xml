@@ -49,6 +49,7 @@
     <script type="text/brightscript" uri="pkg:/components/PlayerAudioRecovery.brs" />
     <script type="text/brightscript" uri="pkg:/components/PlayerBufferingRecovery.brs" />
     <script type="text/brightscript" uri="pkg:/components/PlayerDeliveryInfo.brs" />
+    <script type="text/brightscript" uri="pkg:/components/PlayerProgressRecovery.brs" />
     <script type="text/brightscript" uri="pkg:/source/util/NextEpisode.brs" />
     <script type="text/brightscript" uri="pkg:/components/PlayerNextEpisode.brs" />
 
@@ -164,6 +165,7 @@
         <Timer id="autoSourceRetry" duration="0.5" repeat="false" />
         <Timer id="sourceStartupLimit" duration="35" repeat="false" />
         <Timer id="rebufferHealthTick" duration="1" repeat="false" />
+        <Timer id="progressHealthTick" duration="3" repeat="false" />
         <Timer id="sourceProofTick" duration="5" repeat="true" />
         <Timer id="sourceMemoryPump" duration="0.1" repeat="false" />
         <Timer id="nextEpisodeSetup" duration="0.1" repeat="false" />

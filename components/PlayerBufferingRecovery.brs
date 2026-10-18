@@ -143,7 +143,7 @@ end sub
 
 function BufferingRecovery_Status() as object
     stats = BufferingRecovery_Stats(BufferingRecovery_Now())
-    snapshot = {underruns:stats.count,bufferedSeconds:Int(stats.milliseconds/1000),windowSeconds:120,recoveryIssued:m.rebufferRecoveryIssued = true,isUnderrun:invalid,percentage:invalid}
+    snapshot = {underruns:stats.count,bufferedSeconds:Int(stats.milliseconds/1000),bufferedMilliseconds:stats.milliseconds,windowSeconds:120,recoveryIssued:m.rebufferRecoveryIssued = true,isUnderrun:invalid,percentage:invalid}
     if m.video = invalid or m.video.state <> "buffering" or not m.video.HasField("bufferingStatus") then return snapshot
     status = m.video.bufferingStatus
     if Type(status) <> "roAssociativeArray" then return snapshot

@@ -132,3 +132,33 @@ function PlaybackInfo_DeviceFacts(info as dynamic) as string
     if Type(info) <> "roAssociativeArray" then info = {}
     return "HDMI output at start: " + PlaybackInfo_OutputMode(info.outputMode) + " (signal only)" + Chr(10) + "Capabilities at start: HEVC " + PlaybackInfo_Capability(info.hevcSupported) + " | HDR10 " + PlaybackInfo_Capability(info.hdr10Supported)
 end function
+
+' Average container rate is a size/duration estimate. It is neither the peak
+' video bitrate nor the host's measured download speed. No URL/filename exits.
+function PlaybackInfo_FileFacts(media as dynamic, duration as dynamic) as object
+    result = {declaredFileBytes:invalid,nativeDurationSeconds:invalid,averageContainerBitsPerSecond:invalid,measurement:"server-declared-size-divided-by-native-duration"}
+    if Type(media) = "roAssociativeArray"
+        size = media.declaredFileBytes
+        if PlaybackInfo_BoundedNumber(size,1,1099511627776#)
+            ' Int returns a 32-bit value on Roku; check only the small residual
+            ' so ordinary multi-gigabyte totals do not overflow or saturate.
+            millions = Int(size / 1000000#)
+            residual = size - millions * 1000000#
+            if Int(residual) = residual then result.declaredFileBytes = size
+        end if
+    end if
+    ' Caller supplies only a fresh, source-generation-correlated duration
+    ' event. Polling the reused Video node can return a previous file's value.
+    if PlaybackInfo_BoundedNumber(duration,1,604800) then result.nativeDurationSeconds = duration
+    if result.declaredFileBytes <> invalid and result.nativeDurationSeconds <> invalid
+        rate = result.declaredFileBytes * 8# / result.nativeDurationSeconds
+        if PlaybackInfo_BoundedNumber(rate,1,2147483647) then result.averageContainerBitsPerSecond = rate
+    end if
+    return result
+end function
+
+function PlaybackInfo_BoundedNumber(value as dynamic, minimum as double, maximum as double) as boolean
+    kind = Type(value)
+    if kind <> "Integer" and kind <> "roInt" and kind <> "roInteger" and kind <> "LongInteger" and kind <> "roLongInteger" and kind <> "Float" and kind <> "roFloat" and kind <> "Double" and kind <> "roDouble" then return false
+    return value >= minimum and value <= maximum
+end function

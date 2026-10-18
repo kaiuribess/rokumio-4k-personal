@@ -215,7 +215,10 @@ Harness_Equal(m.rebufferEpisodes.Count(),32,"very short interruptions cannot gro
 
 Harness_Suite("Diagnostic health fields contain bounded scalars only")
 UnderrunSetup():UnderrunBegin()
+UnderrunAdvance(275)
 snapshot = BufferingRecovery_Status()
+Harness_Equal(snapshot.bufferedSeconds,0,"whole-second compatibility field may round down a short observed interval")
+Harness_Equal(snapshot.bufferedMilliseconds,275,"millisecond field preserves short observed intervals")
 Harness_Equal(snapshot.isUnderrun,true,"diagnostics expose native underrun fact")
 Harness_Equal(snapshot.percentage,20,"diagnostics expose native completion percentage")
 m.video.bufferingStatus = {isUnderrun:"private",percentage:"https://private.invalid/token",streamUrl:"https://private.invalid/token"}

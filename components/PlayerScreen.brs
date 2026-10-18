@@ -98,6 +98,7 @@ sub init()
     InitAudioRecovery()
     InitBufferingRecovery()
     InitDeliveryInfo()
+    InitProgressRecovery()
     InitNextEpisode()
 
     m.resolveTask = invalid
@@ -126,7 +127,9 @@ sub init()
 end sub
 
 function OnEnter(params as object) as void
+    ResetProgressRecovery()
     ResetDeliveryInfo()
+    CheckpointTiming_Reset()
     m.accountGeneration = AccountEpoch_Read(m.top)
     if params = invalid or params.stream = invalid then return
     ResetAudioRecovery()
@@ -987,6 +990,7 @@ end sub
 ' defaults an unset streamFormat to MP4, so an MKV or an HLS manifest handed over
 ' with nothing declared buffers and then errors.
 sub StartPlayback(url as string, streamFormat = "" as string)
+    ResetProgressRecovery()
     ResetBufferingRecovery()
     ResetDeliveryInfo()
     m.lastPlaybackPosition = 0
@@ -1110,7 +1114,7 @@ sub onVideoStateChanged()
     state = m.video.state
     if state = invalid then return
     BufferingRecovery_StateChanged()
-    onEnglishAudioFactsChanged()
+    if state <> "playing" then onEnglishAudioFactsChanged()
     if state = "playing"
         m.naturalEnd = false
         if m.nextEpisodePending = true then CancelNextEpisode()
@@ -1120,7 +1124,9 @@ sub onVideoStateChanged()
         m.status.text = ""
         HideBuffering()
         HidePlaybackInfo()
-        onPlaybackFactsChanged()
+        ' One facts pass per state event, after clearing old playback messages
+        ' so the audio guard can retain its provisional-checking status. Native
+        ' codec/track notifications remain independently observed.
         onEnglishAudioFactsChanged()
         onPlaybackPositionChanged()
         if m.audioGuardActive and m.video.mute and not m.audioGuardArmed
@@ -1193,6 +1199,7 @@ sub onVideoStateChanged()
         HideBuffering()
         HidePlaybackInfo()
     end if
+    ProgressRecovery_Update()
 end sub
 
 ' True when the failure is this device's capability, not the network: the
@@ -1322,13 +1329,14 @@ function CurrentEnglishAudioFacts() as object
     return result
 end function
 
-function CurrentEnglishAudioCheck() as object
-    result = CurrentEnglishAudioFacts()
+function CurrentEnglishAudioCheck(facts = invalid as dynamic) as object
+    result = facts
+    if Type(result) <> "roAssociativeArray" then result = CurrentEnglishAudioFacts()
     if result.verified <> true or m.sourceAccepted = true then return result
     if m.audioProgressPassed = true and m.audioProvenTrack = AudioRecovery_TrackKey() and m.audioProvenCodec = AudioRecovery_Codec() then return result
-    result.verified = false
-    result.reason = "waiting-rendered-audio"
-    return result
+    ' Keep provisional native facts intact: they authorize sound while the
+    ' independent advancing-sample check still gates acceptance and history.
+    return {verified:false,reason:"waiting-rendered-audio",englishTracks:result.englishTracks}
 end function
 
 sub onEnglishAudioFactsChanged()
@@ -1336,7 +1344,7 @@ sub onEnglishAudioFactsChanged()
     AudioRecovery_SyncState()
     if m.audioRecoveryPending = true then return
     facts = CurrentEnglishAudioFacts()
-    result = CurrentEnglishAudioCheck()
+    result = CurrentEnglishAudioCheck(facts)
     signature = result.reason
     if m.video.HasField("audioFormat") then signature = signature + " / " + PlaybackInfo_Codec(m.video.audioFormat, true)
     if m.audioLogSignature <> signature
@@ -1387,6 +1395,7 @@ sub onEnglishAudioFactsChanged()
     if result.verified
         if m.video.state = "playing" then StopSourceStartupLimit()
         m.sourceAccepted = true
+        ProgressRecovery_Update()
         m.hasPlayed = true
         m.lastEnglishCodec = AudioRecovery_Codec()
         StopAudioRecoveryTimers()
@@ -1627,7 +1636,7 @@ function PlaybackStatus() as object
     segment = PlaybackInfo_Segment(m.playingSegment)
     remembered = false
     if Type(m.playParams) = "roAssociativeArray" then remembered = m.playParams.rememberedSource = true
-    return {rememberedSource:remembered,memorySaved:m.memorySaved = true,device:m.devicePlaybackInfo,segment:segment,position:position,videoCodec:videoCodec,muted:muted,samples:samples,diagnostic:diagnostic,inspection:NativeMedia_Reason(media),format:format,state:state,audioCodec:codec,englishVerified:audio.verified,audioReason:audio.reason,englishTrackCount:audio.englishTracks.Count(),attempt:m.sourceIndex + 1,retrying:m.retryPending,resolution:NativeMedia_Resolution(media),active:m.playbackActive,buffering:BufferingRecovery_Status(),delivery:DeliveryInfo_Status()}
+    return {rememberedSource:remembered,memorySaved:m.memorySaved = true,device:m.devicePlaybackInfo,segment:segment,position:position,videoCodec:videoCodec,muted:muted,samples:samples,diagnostic:diagnostic,inspection:NativeMedia_Reason(media),format:format,state:state,audioCodec:codec,englishVerified:audio.verified,audioReason:audio.reason,englishTrackCount:audio.englishTracks.Count(),attempt:m.sourceIndex + 1,retrying:m.retryPending,resolution:NativeMedia_Resolution(media),active:m.playbackActive,buffering:BufferingRecovery_Status(),delivery:DeliveryInfo_Status(),checkpoint:CheckpointTiming_Status(),progress:ProgressRecovery_Status(),file:PlaybackInfo_FileFacts(media,DeliveryInfo_Duration())}
 end function
 
 sub ShowPlaybackInfo()
@@ -1783,6 +1792,7 @@ end function
 ' off the node by the time this runs, and the stop goes before the blank so the
 ' node is not still holding a stream when we detach from it.
 sub ResetVideoNode()
+    ResetProgressRecovery()
     ResetBufferingRecovery()
     ResetDeliveryInfo()
     m.lastPlaybackPosition = 0
@@ -1912,10 +1922,66 @@ sub onLocalCheckpoint()
     snapshot = PlaybackPosition_Snapshot()
     if m.lastDurablePosition = Int(snapshot.position) and m.lastDurableDuration = Int(snapshot.duration) then return
     m.saved = false
+    clock = CheckpointTiming_Start()
     SavePosition()
+    CheckpointTiming_Finish(clock)
     ' Final exit must still save newer progress after this checkpoint.
     m.saved = false
 end sub
+
+' Passive timing only. A clock failure must not prevent a checkpoint, change
+' its acknowledgement, or create additional writes. Keep fixed scalar totals
+' for this player entry; no title, source URL or per-sample history is retained.
+sub CheckpointTiming_Reset()
+    m.checkpointTimingCount = 0
+    m.checkpointTimingLastMilliseconds = invalid
+    m.checkpointTimingMaxMilliseconds = invalid
+end sub
+
+function CheckpointTiming_Start() as dynamic
+    clock = invalid
+    try
+        clock = CreateObject("roTimespan")
+        if clock <> invalid then clock.Mark()
+    catch e
+        clock = invalid
+    end try
+    return clock
+end function
+
+sub CheckpointTiming_Finish(clock as dynamic)
+    previous = CheckpointTiming_Status()
+    m.checkpointTimingCount = previous.count
+    if m.checkpointTimingCount < 2147483647 then m.checkpointTimingCount = m.checkpointTimingCount + 1
+    m.checkpointTimingMaxMilliseconds = previous.maxMilliseconds
+    m.checkpointTimingLastMilliseconds = invalid
+    try
+        if clock <> invalid then m.checkpointTimingLastMilliseconds = clock.TotalMilliseconds()
+    catch e
+    end try
+    current = CheckpointTiming_Status()
+    m.checkpointTimingLastMilliseconds = current.lastMilliseconds
+    if current.lastMilliseconds <> invalid
+        if current.maxMilliseconds = invalid
+            m.checkpointTimingMaxMilliseconds = current.lastMilliseconds
+        else if current.lastMilliseconds > current.maxMilliseconds
+            m.checkpointTimingMaxMilliseconds = current.lastMilliseconds
+        end if
+    end if
+end sub
+
+function CheckpointTiming_Status() as object
+    result = {count:0,lastMilliseconds:invalid,maxMilliseconds:invalid}
+    values = {count:m.checkpointTimingCount,lastMilliseconds:m.checkpointTimingLastMilliseconds,maxMilliseconds:m.checkpointTimingMaxMilliseconds}
+    for each key in values
+        value = values[key]
+        kind = Type(value)
+        if kind = "Integer" or kind = "roInt" or kind = "Float" or kind = "roFloat" or kind = "Double" or kind = "roDouble" or kind = "LongInteger" or kind = "roInt64"
+            if value >= 0 and value <= 2147483647 then result[key] = Int(value)
+        end if
+    end for
+    return result
+end function
 
 ' Publish the current playback position through the watchStateUpdate field for
 ' MainScene to push back to Stremio (a stremio session only). Fired on pause

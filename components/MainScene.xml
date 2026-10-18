@@ -42,6 +42,7 @@
          SubtitlesStore), which is why sharing them is not needed. -->
     <script type="text/brightscript" uri="pkg:/source/core/ScreenStack.bs" />
     <script type="text/brightscript" uri="pkg:/components/PlaybackDiagnostics.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/NetworkHealth.brs" />
     <script type="text/brightscript" uri="pkg:/source/core/AsyncTask.bs" />
     <script type="text/brightscript" uri="pkg:/source/stores/Transport.bs" />
     <script type="text/brightscript" uri="pkg:/source/stores/SettingsStore.bs" />

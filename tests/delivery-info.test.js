@@ -13,8 +13,11 @@ try {
   const status = /^function PlaybackStatus\([^]*?^end function/mi.exec(player);
   if (!status) throw new Error('Missing production PlaybackStatus boundary');
   if (!status[0].includes('delivery:DeliveryInfo_Status()')) throw new Error('Native delivery status is not wired into PlaybackStatus');
-  const combined = [read('tests/harness.brs'), read('source/util/PlaybackInfo.brs'),
-    read('components/PlayerDeliveryInfo.brs'), status[0], read('tests/delivery-info.test.brs')].join('\n');
+  if (!status[0].includes('PlaybackInfo_FileFacts(media,DeliveryInfo_Duration())')) throw new Error('File facts must use source-correlated duration instead of a retained native field');
+  const checkpoint = /^function CheckpointTiming_Status\([^]*?^end function/mi.exec(player);
+  if (status[0].includes('CheckpointTiming_Status()') && !checkpoint) throw new Error('Missing production checkpoint timing dependency');
+  const combined = [read('tests/harness.brs'), read('source/util/PlaybackInfo.brs'),read('components/PlayerProgressRecovery.brs').replaceAll('CreateObject("roTimespan")','DeliveryFixtureClock()'),
+    read('components/PlayerDeliveryInfo.brs').replace('CreateObject("roTimespan")','DeliveryFixtureClock()'), checkpoint?.[0] || '', status[0], read('tests/delivery-info.test.brs')].join('\n');
   const file = path.join(staging, 'delivery-info.brs');
   fs.writeFileSync(file, combined);
   const result = spawnSync(process.execPath, [path.join(root,'node_modules/@rokucommunity/brs/bin/cli.js'), '--root', staging, file], {cwd:staging,encoding:'utf8'});
