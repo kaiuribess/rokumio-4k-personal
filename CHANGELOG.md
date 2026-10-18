@@ -1,5 +1,14 @@
 # Changes
 
+## 0.5.26 — 2026-10-17
+
+Follow-up repairs from production-path review of the 0.5.25 candidate. This remains experimental; source coverage and uninterrupted native UHD are not guaranteed.
+
+- Disown completed provider batches before a recovery reload. Their retained empty task slots previously blocked LoadStreams, leaving recovery to re-rank stale results. Preserve pending requests, the two-worker budget, accepted resume position, failed URL exclusions and the bounded discovery round. Regression tests reproduced eight failing checks before the repair.
+- Give explicit foreign-language-only annotations priority over an English word in a title. Keep mixed-language sources eligible for actual English track verification.
+- Retain unsuccessful source-memory outcome batches with bounded retries and same-file coalescing. Newer outcomes must win over older in-flight writes; persistence failure must not silently leave old working hints preferred.
+- Retain the 0.5.25 progress watchdog, reduced audio scans and private delivery diagnostics. No new accounts, sources, streaming credentials or external server are bundled.
+
 ## 0.5.25 — 2026-10-17
 
 Recovery for stalled native progress, callback efficiency and buffering diagnosis, based on default-branch commit `766701d`. Experimental prerelease; this patch has not yet been installed for physical verification and does not claim a measured playback-speed increase.

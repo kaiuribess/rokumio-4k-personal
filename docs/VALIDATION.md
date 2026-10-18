@@ -1,6 +1,32 @@
-# Release validation — 0.5.25
+# Release validation — 0.5.26
 
-Prepared on 2026-10-17 from latest default-branch commit `766701d9cfc6d9bc6a61f093591cc2ba382e9acf`. The software verification below passed. This remains an experimental prerelease. Version 0.5.25 has not been installed or physically measured; do not treat software checks as playback-speed, audible-surround or full-film proof.
+Prepared on 2026-10-17 from default-branch commit `766701d9cfc6d9bc6a61f093591cc2ba382e9acf`, with the preceding 0.5.25 candidate and further production-path repairs. This remains an experimental prerelease.
+
+| Command/check | Fresh result |
+|---|---|
+| `npm ci --ignore-scripts` | Exit 0; 207 installed, 208 audited; lifecycle scripts disabled. |
+| `npm test` | Exit 0 after final runtime edits; 5,848 BrightScript assertions in 36 interpreter runs plus 142 cinema-policy assertions = **5,990**. Separate Node suites: 56 passing test cases; MP4 metadata: 29 checks; playlist handling: 50 assertions. |
+| `npm run build` | Exit 0; compiled 0.5.26 developer-install ZIP. |
+| `python scripts/verify-package.py` | Exit 0; 207 members, 52 XML components, 273 root/3 relative script references and 164 implemented interfaces. Integrity, manifest, paths, references and exclusions passed. |
+| Secret/content and license review | Changed-source review passed; no credentials, private manifests or startup harness code added. MIT/upstream NOTICE, third-party licenses and Open Sans OFL retained. Final ZIP review accompanies the CI artifact check. |
+| `git diff --check` | Passed. |
+| `npm audit --json` | Exit 1; unchanged 9 development dependency entries from two underlying advisories (7 high, 2 moderate, 0 critical). Node dependencies are excluded from the install ZIP. |
+
+The completed-provider regression executes PrepareSourceRecovery, re-entry, cancellation and actual coordinator result delivery. Before the repair, eight checks failed: no fresh requests, stale ownership/pending state and old results retained. The fixed path preserves pending transfers, accepted resume, exclusions and the two-worker budget. Source-memory regressions execute production queue, write worker, RegistryIO and result callbacks with Write/Flush refusal, held/stale/duplicate results, launch failure, newest-per-file coalescing and bounded retries. Failed data stays pending in memory; permanent registry refusal or process termination can still prevent durability. Language regressions include foreign-only labels with English in a title and labels split across different fields; hints do not replace native track checks.
+
+### Bounded physical evidence from the 0.5.25 player
+
+A private test harness used the exact CI 0.5.25 package with only `source/main.brs` changed to start the existing public control after normal app startup. That test package is not the release ZIP. The Apple HLS control reached native `finished`; 38 playing samples covered position 21.398 to 97.075 over 76.109 seconds. Every sampled audio/video timestamp advanced. Fresh native segment metadata reported 3840 x 2160 SDR with HEVC/AAC. The source-scoped event trace contained no post-start buffering or underrun, and memory level remained normal. The native connection estimate at stream selection was 34,012,160 bits/second; it is not a continuous host speed measurement.
+
+A separate private harness starting the public Microsoft HEVC/AAC MP4 control obtained no playing samples and logged native error -5 (internal 3), although a PC HEAD request returned HTTP 200. It is a failed control, not a pass for progressive MP4 or evidence that all HEVC files are unsupported. Investigation must keep file-specific constraints distinct from the successful HLS path.
+
+These control paths intentionally bypass ordinary English-language authorization and exclude automatic recovery/history writes. They do not prove English movie selection, audible sound, surround, HDR, a long MKV, real-source recovery, full-film endurance or the exact unmodified 0.5.26 package. Only fresh native segment data supports the UHD observation; HDMI output and source labels do not. The normal CI package must replace the temporary harness after testing. Publish the exact tested CI artifact unchanged with checksum and provenance, and record further device evidence separately with its precise scope.
+
+---
+
+# Historical 0.5.25 candidate validation
+
+Prepared on 2026-10-17 from latest default-branch commit `766701d9cfc6d9bc6a61f093591cc2ba382e9acf`. The software verification below passed. This remains an experimental prerelease. The exact CI artifact was subsequently installed: the installer reported matching size and MD5, Install Success, and runtime status version 0.5.25. Passive network diagnostics returned bounded facts. An attempted developer-debugger control launch did not yield a successful playback test and made the status service unresponsive; that debugging attempt is excluded from playback evidence. It does not establish a stream failure. No playback-speed, audible-surround or full-film proof was obtained.
 
 | Command/check | Fresh result |
 |---|---|
