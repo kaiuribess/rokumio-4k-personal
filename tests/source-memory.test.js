@@ -342,6 +342,77 @@ let code = [
     m.selectionNow = now
     TestAutomaticChoose()
     Harness_Equal(m.top.result.streams.Count(),0,"explicit 4K-only never silently bypasses policy with HD")
+    Harness_Suite("Real automatic worker diversifies delivery hosts within quality tiers")
+    m.selectionRegistry = MockRegistry()
+    hostA1 = {url:"https://one.example/a1?signature=private-fixture",title:"Movie English 2160p",sourceMemoryProvider:"provider.one"}
+    hostA2 = {url:"https://ONE.EXAMPLE:443/a2",title:"Movie English 2160p",sourceMemoryProvider:"provider.two"}
+    hostA3 = {url:"https://one.example./a3",title:"Movie English 2160p"}
+    hostB1 = {url:"https://two.example/b1",title:"Movie English 2160p"}
+    hostB2 = {url:"https://two.example/b2",title:"Movie English 2160p"}
+    hostC1 = {url:"https://three.example/c1",title:"Movie English 2160p"}
+    hdA1 = {url:"https://one.example/hd1",title:"Movie English 1080p"}
+    hdA2 = {url:"https://one.example/hd2",title:"Movie English 1080p"}
+    hdB = {url:"https://two.example/hd",title:"Movie English 1080p"}
+    hdC = {url:"https://three.example/hd",title:"Movie English 1080p"}
+    providerOne = [hostA1,hostA2,hostA3,hdA1,hdA2]
+    providerTwo = [hostA1,hostB1,hostB2,hdB]
+    providerThree = [hostC1,hdC]
+    beforeGroups = FormatJson(providerOne) + "|" + FormatJson(providerTwo) + "|" + FormatJson(providerThree)
+    m.top = {providerGroups:[providerOne,providerTwo,providerThree],excludedUrls:[],videoId:"tt100001",audioMode:"projector",fourKOnly:false}
+    TestAutomaticChoose()
+    diverse = m.top.result.streams
+    Harness_Equal(diverse.Count(),6,"automatic initial pool keeps six-source budget")
+    Harness_Equal(diverse[0].url,hostA1.url,"highest ranked first UHD remains first")
+    Harness_Equal(diverse[1].url,hostB1.url,"second delivery host precedes another file from the first host")
+    Harness_Equal(diverse[2].url,hostC1.url,"third delivery host survives the three-UHD budget")
+    Harness_Equal(diverse[3].url,hdA1.url,"HD starts only after the bounded UHD tier")
+    Harness_Equal(diverse[4].url,hdB.url,"HD fallback tier independently diversifies hosts")
+    Harness_Equal(diverse[5].url,hdC.url,"third HD host is retained over repeated first-host HD")
+    afterGroups = FormatJson(m.top.providerGroups[0]) + "|" + FormatJson(m.top.providerGroups[1]) + "|" + FormatJson(m.top.providerGroups[2])
+    Harness_Equal(afterGroups,beforeGroups,"diversity never mutates provider source arrays or records")
+    Harness_Ok(not diverse[0].DoesExist("host") and not diverse[0].DoesExist("deliveryHost"),"private bucket identity is not attached to returned source records")
+    manual = AutoPlayback_Candidates(hostA1,[hostA1,hostA2,hostA3,hostB1,hostC1,hdA1],6,3)
+    Harness_Equal(manual[1].url,hostA2.url,"manual queue retains original source order")
+    Harness_Equal(manual[2].url,hostA3.url,"manual queue is not silently diversified")
+    m.top.excludedUrls = [hostB1.url,hostB2.url]
+    TestAutomaticChoose()
+    Harness_Equal(m.top.result.streams[1].url,hostC1.url,"automatic exclusions are applied before host rounds")
+    Harness_Equal(m.top.result.streams[2].url,hostA2.url,"after distinct hosts, second round keeps original within-host order")
+    m.top.excludedUrls = []
+    m.top.fourKOnly = true
+    TestAutomaticChoose()
+    Harness_Equal(m.top.result.streams.Count(),6,"UHD-only pool retains six unique UHD candidates")
+    Harness_Equal(m.top.result.streams[1].url,hostB1.url,"UHD-only first round diversifies hosts")
+    Harness_Equal(m.top.result.streams[2].url,hostC1.url,"UHD-only retains a third host before duplicate-host alternatives")
+    Harness_Equal(m.top.result.streams[3].url,hostA2.url,"second round revisits first host without dropping candidates")
+    Harness_Equal(m.top.result.streams[4].url,hostB2.url,"second round revisits second host")
+    Harness_Equal(m.top.result.streams[5].url,hostA3.url,"final source from only remaining host is retained")
+    memory = SourceMemory_Record(SourceMemory_Empty(),keyD,"working",now)
+    SourceMemory_Save(m.selectionRegistry,memory,now)
+    m.top = {providerGroups:[[a,d,hostB1,c,e]],excludedUrls:[],videoId:"tt100001",audioMode:"projector",fourKOnly:false}
+    TestAutomaticChoose()
+    Harness_Equal(m.top.result.streams[0].url,d.url,"remembered working UHD stays first before diversity rounds")
+    Harness_Ok(m.top.result.rememberedSource,"worker retains remembered-first flag")
+    Harness_Equal(m.top.result.streams[1].url,hostB1.url,"other UHD delivery host precedes repeated remembered host")
+    Harness_Equal(m.top.result.streams[2].url,a.url,"untried UHD from remembered host remains a later fallback")
+    Harness_Equal(m.top.result.streams[3].url,c.url,"remembered priority never lifts HD above eligible UHD")
+    repeated = []
+    for index = 1 to 20
+        repeated.Push(hostA1)
+    end for
+    repeated.Push(hostA2):repeated.Push(hostA3):repeated.Push(hdA1)
+    m.top = {providerGroups:[repeated],excludedUrls:[],videoId:"tt100001",audioMode:"projector",fourKOnly:false}
+    TestAutomaticChoose()
+    Harness_Equal(m.top.result.streams.Count(),4,"duplicate-heavy one-host pool retains three unique UHD and its HD fallback")
+    Harness_Equal(m.top.result.streams[2].url,hostA3.url,"bucket bound is applied after exact-URL deduplication")
+    Harness_Equal(m.top.result.streams[3].url,hdA1.url,"single host cannot bypass the three-UHD-before-HD policy")
+    ipA = {url:"https://[2001:db8::1]/a",title:"Movie English 2160p"}
+    ipA2 = {url:"https://[2001:DB8::1]:8443/b",title:"Movie English 2160p"}
+    ipB = {url:"https://[2001:db8::2]/c",title:"Movie English 2160p"}
+    m.top = {providerGroups:[[ipA,ipA2,ipB,hdA1]],excludedUrls:[],videoId:"tt100001",audioMode:"projector",fourKOnly:false}
+    TestAutomaticChoose()
+    Harness_Equal(m.top.result.streams[1].url,ipB.url,"IPv6 address and port parsing preserves distinct delivery hosts")
+    Harness_Equal(m.top.result.streams[2].url,ipA2.url,"same IPv6 host with another port waits until the next round")
     Harness_Finish()`
 ].join('\n');
 
