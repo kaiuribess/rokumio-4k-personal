@@ -7,6 +7,7 @@ Follow-up repairs from production-path review of the 0.5.25 candidate. This rema
 - Disown completed provider batches before a recovery reload. Their retained empty task slots previously blocked LoadStreams, leaving recovery to re-rank stale results. Preserve pending requests, the two-worker budget, accepted resume position, failed URL exclusions and the bounded discovery round. Regression tests reproduced eight failing checks before the repair.
 - Give explicit foreign-language-only annotations priority over an English word in a title. Keep mixed-language sources eligible for actual English track verification.
 - Retain unsuccessful source-memory outcome batches with bounded retries and same-file coalescing. Newer outcomes must win over older in-flight writes; persistence failure must not silently leave old working hints preferred.
+- Accept boxed/64-bit native playback positions for relative voice seeks, parse bounded decimal offsets without float overflow, validate duration and preserve paused playback. Production callback regressions cover real boxed numeric objects and unchanged native control behavior.
 - Retain the 0.5.25 progress watchdog, reduced audio scans and private delivery diagnostics. No new accounts, sources, streaming credentials or external server are bundled.
 
 ## 0.5.25 — 2026-10-17
