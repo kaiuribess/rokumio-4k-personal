@@ -180,6 +180,7 @@ function CinemaSourcePatterns() as object
         dv: CreateObject("roRegex", "(^|[^a-z0-9])(dv|dolby vision)([^a-z0-9]|$)", "i")
         download: CreateObject("roRegex", "\[(tb|rd|ad|dl|pm|oc|ed|hw|putio)[ ]+download\]", "i")
         providerError: CreateObject("roRegex", "(^|[^a-z0-9])(tb|rd|ad|dl|pm|oc|ed|hw|putio)[ ]+error([^a-z0-9]|$)", "i")
+        sizeLabel: CreateObject("roRegex", "(^|[ \t\r\n|:])([0-9]{1,6}([.][0-9]{1,3})?)[ ]*(gib|gb|mib|mb)($|[ \t\r\n|,;])", "i")
     }
 end function
 
@@ -346,6 +347,53 @@ function CinemaCleanSourceLines(stream as object, audioMode as string) as object
     return lines
 end function
 
+' A bounded file-size hint for automatic startup, never a bitrate measurement.
+' Numeric metadata wins. Malformed explicit metadata and conflicting labels
+' remain unknown. Never parse signed URLs, configured paths, or filenames.
+function CinemaStreamSizeBytes(stream as dynamic, patterns = invalid as dynamic) as dynamic
+    if Type(stream) <> "roAssociativeArray" then return invalid
+    hints = stream.behaviorHints
+    if Type(hints) = "roAssociativeArray"
+        if hints.videoSize <> invalid then return CinemaSizeNumber(hints.videoSize)
+    end if
+    if patterns = invalid then patterns = CinemaSourcePatterns()
+    result = invalid
+    for each field in ["name","title","description"]
+        text = CinemaOptionalText(stream[field])
+        if Len(text) > 512 then continue for
+        matches = patterns.sizeLabel.Match(text)
+        if matches.Count() < 6 then continue for
+        ' More than one annotation in a field can describe a season pack and
+        ' a single episode; no preference is safer than choosing either one.
+        if patterns.sizeLabel.IsMatch(text.Replace(matches[0]," ")) then return invalid
+        amount = Val(matches[2]) * 1.0#
+        unit = LCase(matches[4])
+        multiplier = 1000000#
+        if unit = "mib" then multiplier = 1048576#
+        if unit = "gb" then multiplier = 1000000000#
+        if unit = "gib" then multiplier = 1073741824#
+        size = CinemaSizeNumber(amount * multiplier)
+        if size = invalid then return invalid
+        if result <> invalid
+            if result <> size then return invalid
+        end if
+        result = size
+    end for
+    return result
+end function
+
+function CinemaSizeNumber(value as dynamic) as dynamic
+    kind = Type(value)
+    if kind <> "Integer" and kind <> "roInt" and kind <> "roInteger" and kind <> "LongInteger" and kind <> "roLongInteger" and kind <> "roInt64" and kind <> "Float" and kind <> "roFloat" and kind <> "Double" and kind <> "roDouble" then return invalid
+    ' Double arithmetic avoids 32-bit Int overflow and native boxed types.
+    ' Use the documented value getters for boxed floating-point objects.
+    if kind = "roFloat" then value = value.GetFloat()
+    if kind = "roDouble" then value = value.GetDouble()
+    number = value * 1.0#
+    if not (number >= 1# and number <= 1099511627776#) then return invalid
+    return number
+end function
+
 ' Retain only fields the native HTTPS player uses. Labels may be shortened;
 ' delivery URLs/headers are rejected when oversized, never silently truncated.
 function CinemaBudgetStreams(raw as dynamic, countLimit = invalid as dynamic, byteLimit = invalid as dynamic) as object
@@ -376,7 +424,15 @@ function CinemaBudgetStreams(raw as dynamic, countLimit = invalid as dynamic, by
             safeHints = {}
             if hints.downloadOnly = true then safeHints.downloadOnly = true
             if GetInterface(hints.filename,"ifString") <> invalid and Len(hints.filename) <= 512 then safeHints.filename = hints.filename
-            if Type(hints.videoSize) = "Integer" or Type(hints.videoSize) = "Double" or Type(hints.videoSize) = "Float" or Type(hints.videoSize) = "roInt" or Type(hints.videoSize) = "roDouble" or Type(hints.videoSize) = "roFloat" then safeHints.videoSize = hints.videoSize
+            size = CinemaSizeNumber(hints.videoSize)
+            if size <> invalid
+                safeHints.videoSize = size
+            else if hints.videoSize <> invalid
+                ' Retain an unknown sentinel, not malformed provider content;
+                ' otherwise budgeting could turn a rejected explicit value
+                ' into a confident preference from a conflicting size label.
+                safeHints.videoSize = 0
+            end if
             if Type(hints.proxyHeaders) = "roAssociativeArray"
                 proxy = {}
                 headerBytes = 0

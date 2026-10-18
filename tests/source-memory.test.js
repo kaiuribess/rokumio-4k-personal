@@ -413,6 +413,7 @@ let code = [
     TestAutomaticChoose()
     Harness_Equal(m.top.result.streams[1].url,ipB.url,"IPv6 address and port parsing preserves distinct delivery hosts")
     Harness_Equal(m.top.result.streams[2].url,ipA2.url,"same IPv6 host with another port waits until the next round")
+    ${fs.readFileSync(path.join(root,'tests/source-memory-practical.test.brs'),'utf8')}
     Harness_Finish()`
 ].join('\n');
 

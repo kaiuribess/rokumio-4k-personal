@@ -1,5 +1,5 @@
 ' Bounded, private in-memory source queue. Never log or persist source URLs.
-function AutoPlayback_Candidates(first as dynamic, candidates as dynamic, maxCandidates = 64 as integer, maxUhd = 16 as integer, diversifyHosts = false as boolean) as object
+function AutoPlayback_Candidates(first as dynamic, candidates as dynamic, maxCandidates = 64 as integer, maxUhd = 16 as integer, diversifyHosts = false as boolean, preferPracticalUhd = false as boolean) as object
     if maxCandidates < 1 or maxCandidates > 64 then maxCandidates = 64
     if maxUhd < 1 or maxUhd > maxCandidates then maxUhd = maxCandidates
     result = []
@@ -13,7 +13,7 @@ function AutoPlayback_Candidates(first as dynamic, candidates as dynamic, maxCan
     fourKCount = 0
     hasFallback = false
     patterns = CinemaSourcePatterns()
-    if diversifyHosts then return AutoPlayback_DiverseCandidates(pool,maxCandidates,maxUhd,patterns)
+    if diversifyHosts then return AutoPlayback_DiverseCandidates(pool,maxCandidates,maxUhd,patterns,preferPracticalUhd)
     for each stream in pool
         if CinemaIsHttpsStream(stream,patterns) and CinemaSourceBlockReason(stream,patterns) = "" and not CinemaIs4KLabel(stream,patterns) then hasFallback = true
     end for
@@ -41,7 +41,7 @@ end function
 ' each host's first choice. Manual queues retain the original ordered policy.
 ' All work stays on SourceSelectionTask; host keys are transient and never
 ' attached to a returned stream, logged, or written to source memory.
-function AutoPlayback_DiverseCandidates(pool as object, maxCandidates as integer, maxUhd as integer, patterns as object) as object
+function AutoPlayback_DiverseCandidates(pool as object, maxCandidates as integer, maxUhd as integer, patterns as object, preferPracticalUhd = false as boolean) as object
     tiers = []
     byRank = {}
     hasFallback = false
@@ -52,6 +52,18 @@ function AutoPlayback_DiverseCandidates(pool as object, maxCandidates as integer
         uhd = height = 2160
         if not uhd then hasFallback = true
         rank = CinemaQualityRank(height)
+        ' Automatic startup defers UHD files above 35 GiB within the UHD tier.
+        ' This is a file-size heuristic, not video bitrate, decoder capability,
+        ' or measured delivery speed. Unknown sizes stay ordinary candidates.
+        ' Splitting tiers before host rotation prevents a remembered large file
+        ' or another host from jumping ahead of ordinary UHD alternatives.
+        ' Heavy UHD remains above every HD tier, and manual ordering is intact.
+        if preferPracticalUhd and uhd
+            size = CinemaStreamSizeBytes(stream,patterns)
+            if size <> invalid
+                if size > 37580963840# then rank = rank - 1
+            end if
+        end if
         rankKey = rank.ToStr()
         if not byRank.DoesExist(rankKey)
             tier = {rank:rank,uhd:uhd,hosts:[],byHost:{}}
