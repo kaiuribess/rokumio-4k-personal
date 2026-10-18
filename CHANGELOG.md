@@ -1,5 +1,15 @@
 # Changes
 
+## 0.5.27 — 2026-10-17
+
+More reliable UHD candidate selection and fresh source discovery. Experimental prerelease; source labels and a short native test do not guarantee sustained 4K delivery.
+
+- Diversify delivery hostnames inside each automatic quality tier before repeating a host. Keep the highest-ranked/remembered UHD first, preserve the six-candidate initial pool and three-UHD-before-HD budget when fallback exists, and leave manual source order unchanged. Host buckets are transient and never logged or persisted.
+- When automatic 4K-first playback inspects a candidate and proves it is HD, retain it as fallback while later eligible UHD candidates are checked. Deferral is bounded, does not mark the file broken, and leaves manual choices, strict UHD and accepted playback protected.
+- Refresh aged completed provider results before a new selection without interrupting accepted playback or abandoning live requests. Preserve resume checkpoints, exclusions and the shared two-worker budget.
+- Accept native boxed integer UHD counts instead of reporting zero on a valid worker result. Clamp counts to returned candidates, reject malformed types, and expose effective quality/comparison modes in private status diagnostics.
+- Preserve saved 4K-first plus 1080p fallback, Compare providers, English track checks, source recovery, surround/projector preferences, source memory, subtitles, voice and next episode.
+
 ## 0.5.26 — 2026-10-17
 
 Follow-up repairs from production-path review of the 0.5.25 candidate. This remains experimental; source coverage and uninterrupted native UHD are not guaranteed.
