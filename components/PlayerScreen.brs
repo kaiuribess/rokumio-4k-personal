@@ -89,6 +89,7 @@ sub init()
     if m.startupLimit <> invalid then m.startupLimit.ObserveField("fire", "onSourceStartupTimeout")
     m.sourceQueue = []
     m.sourceIndex = 0
+    m.measuredHdUrls = []
     m.discoveryPending = false
     m.retryPending = false
     m.playbackActive = false
@@ -127,6 +128,7 @@ sub init()
 end sub
 
 function OnEnter(params as object) as void
+    m.measuredHdUrls = []
     ResetProgressRecovery()
     ResetDeliveryInfo()
     CheckpointTiming_Reset()
@@ -275,6 +277,9 @@ sub onResolveResult(event as object)
     m.resolveTask = invalid
     try
         AsyncTask_Reap(task, m.top, false)
+        ' Resolution belongs to startup only. A queued late result must not
+        ' replace accepted playback or undo an already scheduled handoff.
+        if m.playbackActive <> true or m.sourceAccepted = true or m.retryPending = true then return
         StopResolvePulse()
 
         ' The engine warm-up, printed on both paths and unconditionally within
@@ -365,12 +370,63 @@ sub onResolveResult(event as object)
             ScheduleNextSource("file-audio-incompatible")
             return
         end if
+        if DeferMeasuredHdCandidate(result.media) then return
         StartPlayback(result.url, result.streamFormat)
     catch e
         m.status.text = "The player could not start. Press Back and choose another source."
         ScheduleNextSource("handoff-failed")
     end try
 end sub
+
+' Automatic 4K-first selection starts from provider labels. If inspection
+' disproves one of those labels, keep that usable file as a fallback while
+' trying the remaining UHD-labelled candidates. This is a quality preference,
+' not a failed file, and never runs during accepted playback or manual play.
+function DeferMeasuredHdCandidate(media as dynamic) as boolean
+    if m.playbackActive <> true or m.sourceAccepted = true or m.retryPending = true or m.audioGuardBlocked = true then return false
+    if Type(m.playParams) <> "roAssociativeArray" then return false
+    if m.playParams.preferUhd <> true or m.playParams.autoSourceRetry = false or m.playParams.fourKOnly = true then return false
+    if m.playParams.diagnostic = true or m.playParams.diagnosticControl = true then return false
+    if not NativeMedia_KnownBelowUhd(media) then return false
+    if Type(m.sourceQueue) <> "roArray" or m.sourceQueue.Count() >= 64 then return false
+    if Type(m.sourceIndex) <> "Integer" and Type(m.sourceIndex) <> "roInt" then return false
+    if m.sourceIndex < 0 or m.sourceIndex >= m.sourceQueue.Count() then return false
+    patterns = CinemaSourcePatterns()
+    current = m.sourceQueue[m.sourceIndex]
+    if not CinemaIsHttpsStream(current,patterns) then return false
+    if Len(current.url) > 8192 then return false
+    if Type(m.measuredHdUrls) <> "roArray" then m.measuredHdUrls = []
+    if m.measuredHdUrls.Count() >= 64 then return false
+    for each known in m.measuredHdUrls
+        if known = current.url then return false
+    end for
+    m.measuredHdUrls.Push(current.url)
+    remainingUhd = false
+    for index = m.sourceIndex + 1 to m.sourceQueue.Count() - 1
+        candidate = m.sourceQueue[index]
+        if not CinemaIsHttpsStream(candidate,patterns) or CinemaSourceBlockReason(candidate,patterns) <> "" then continue for
+        if not CinemaIs4KLabel(candidate,patterns) or candidate.url = current.url then continue for
+        measuredHd = false
+        for each known in m.measuredHdUrls
+            if known = candidate.url then measuredHd = true
+        end for
+        if not measuredHd
+            remainingUhd = true
+            exit for
+        end if
+    end for
+    if not remainingUhd then return false
+    ' AutoPlayback_Candidates already deduplicates source URLs. Guard the tail
+    ' too so a malformed/duplicated input cannot append the same fallback.
+    retained = false
+    for index = m.sourceIndex + 1 to m.sourceQueue.Count() - 1
+        candidate = m.sourceQueue[index]
+        if Type(candidate) = "roAssociativeArray" and candidate.url = current.url then retained = true
+    end for
+    if not retained then m.sourceQueue.Push(current)
+    ScheduleNextSource("prefer-UHD")
+    return m.retryPending = true
+end function
 
 sub CancelResolve()
     if m.resolveTask <> invalid
@@ -1509,7 +1565,7 @@ sub ScheduleNextSource(reason as string)
     m.retryPending = true
     ' Quality preference is not a broken file or a network failure. A measured
     ' 1080p source may still be a good choice when the 4K-only filter is off.
-    if reason <> "below-UHD" then RememberSourceFailure()
+    if reason <> "below-UHD" and reason <> "prefer-UHD" then RememberSourceFailure()
     if m.audioGuardTimer <> invalid then m.audioGuardTimer.control = "stop"
     StopSourceStartupLimit()
     if m.video <> invalid
@@ -1532,6 +1588,7 @@ sub ScheduleNextSource(reason as string)
         return
     end if
     m.status.text = "Trying another English source automatically…" + Chr(10) + "Back cancels"
+    if reason = "prefer-UHD" then m.status.text = "Checking another 4K source; keeping this source as fallback…" + Chr(10) + "Back cancels"
     if Type(m.playParams) = "roAssociativeArray" and m.playParams.fourKOnly = true
         m.status.text = "Trying another English 4K source automatically…" + Chr(10) + "Back cancels"
     end if
@@ -1773,6 +1830,7 @@ function OnExit() as void
     SavePosition()
     ResetVideoNode()
     m.sourceQueue = []
+    m.measuredHdUrls = []
     m.playParams = invalid
 end function
 
