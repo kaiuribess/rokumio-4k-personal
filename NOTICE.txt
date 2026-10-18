@@ -1,4 +1,4 @@
-Crimson Cinema 0.5.23 (rokumio-4k-personal repository)
+Crimson Cinema 0.5.24 (rokumio-4k-personal repository)
 
 Based on gpratoe/rokumio-client, MIT licensed.
 Upstream: https://github.com/gpratoe/rokumio-client

@@ -48,3 +48,43 @@ function HomeCatalog_Genres(descriptor as dynamic) as object
     end for
     return result
 end function
+
+' Required year filters are safe only when the provider advertises this year.
+' Never invent a genre or submit a feed whose other required input is missing.
+function HomeCatalog_Feed(descriptor as dynamic) as object
+    result = {ok:false,genre:""}
+    if Type(descriptor) <> "roAssociativeArray" then return result
+    required = []
+    if Type(descriptor.extraRequired) = "roArray"
+        for each name in descriptor.extraRequired
+            required.Push(name)
+        end for
+    end if
+    options = invalid
+    if Type(descriptor.extra) = "roArray"
+        for each extra in descriptor.extra
+            if Type(extra) <> "roAssociativeArray" then continue for
+            if extra.isRequired = true then required.Push(extra.name)
+            if extra.name = "genre" and Type(extra.options) = "roArray" then options = extra.options
+        end for
+    end if
+    needsYear = false
+    for each name in required
+        if name = "genre"
+            needsYear = true
+        else if name <> "skip"
+            return result
+        end if
+    end for
+    if needsYear
+        if descriptor.type <> "movie" and descriptor.type <> "series" then return result
+        if Type(options) <> "roArray" then return result
+        year = CreateObject("roDateTime").GetYear().ToStr()
+        for each option in options
+            if HomeCatalog_Text(option) = year then result.genre = year:exit for
+        end for
+        if result.genre = "" then return result
+    end if
+    result.ok = true
+    return result
+end function

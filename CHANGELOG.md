@@ -1,5 +1,15 @@
 # Changes
 
+## 0.5.24 — 2026-10-17
+
+Repeated-buffering recovery and catalog freshness, based on default-branch commit `146141c`. Experimental prerelease; this is not a bandwidth increase or a guarantee of source availability.
+
+- Recover from repeated short native-confirmed underruns that previously reset the continuous-stall timer indefinitely. After accepted playback, three underruns totaling at least fifteen seconds within two minutes can request another source while an underrun is still active. Normal pause, seek/startup buffering, disabled automatic recovery, live channels and diagnostics are excluded. Accepted resume progress and bounded discovery are preserved.
+- Add allowlisted native delivery and buffering diagnostics. Source ownership/generation checks reject stale reports, and URLs remain private. Roku's network estimate is identified as a measurement at stream selection, not a continuous speed test. No undocumented buffer controls, transcoding or competing downloads are introduced.
+- Include Home year-filtered New feeds when the provider explicitly advertises the runtime current year. Unsupported/missing required extras remain excluded, and existing request/row/title limits remain.
+- Refresh Home and Discover after thirty minutes on active re-entry. Keep old titles while fetching, preserve selection where possible, retain prior data on failure, and cancel automatic refresh when leaving. No periodic catalog refresh runs underneath playback.
+- Document catalog-versus-stream availability and TorBox's removal of its official hosted Stremio add-on. No accounts, subscriptions or providers are added automatically.
+
 ## 0.5.23 — 2026-10-17
 
 Automatic source-selection repairs, starting from latest default-branch commit `1a7d351`. Experimental prerelease; physical playback sign-off remains incomplete.

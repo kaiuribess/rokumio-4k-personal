@@ -47,6 +47,10 @@ Source paging exposes later retained eligible candidates while keeping 48 real c
 
 ## Practical failure cases
 
+Version 0.5.24 adds a bounded repeated-underrun check alongside the existing continuous-stall deadline. It counts only explicit native underruns after accepted playback: at least three totaling fifteen seconds in a rolling two-minute window. Recovery is requested from a timer while the source is still buffering, never merely because an old callback arrives after healthy playback resumes. Pauses clear the window; seek/startup buffering, live channels, diagnostics and disabled automatic source recovery are excluded. The window retains at most thirty-two episodes. Accepted resume progress follows the existing source-recovery path.
+
+This does not speed up the file host. A single progressive MKV has no adaptive quality variants for Roku to switch between, and adaptive startup bitrate controls do not increase its transfer rate. The private local status endpoint exposes only allowlisted native stream-selection estimates and buffering facts, with current-source ownership checks. Missing measurements remain unavailable; the network estimate at selection is not a current speed test. Provider URLs, paths, signed queries and raw native metadata are not returned. See the [Roku Video reference](https://developer.roku.com/dev/docs/video) and [playback configuration metadata](https://developer.roku.com/dev/docs/content-metadata).
+
 | Problem | Behavior / next step |
 | --- | --- |
 | Expired URL, incompatible encoding or startup failure | Automatic bounded alternate-source attempts; refresh links on the source screen |

@@ -49,6 +49,9 @@ sub init()
     m.gridBuilt = false
     m.cwSignature = ""
     m.catalogSignature = ""
+    m.catalogRefreshClock = invalid
+    m.catalogRefreshing = false
+    m.catalogRefreshRows = []
     m.railBuilt = false
     m.homeVisited = false
     m.returnFocus = "rail"
@@ -60,7 +63,8 @@ end sub
 ' HomeCatalogsTask (a hung add-on then costs the worker, not startup); it
 ' republishes the row set after every completed catalog, and onCatalogState
 ' slots each new row into the grid immediately. Only the plain addon descriptors
-' cross the thread boundary. A no-op once started or finished.
+' cross the thread boundary. Once finished, only an active stale re-entry may
+' request a replacement while retaining the existing rows.
 '
 ' The walk records which add-on set it derived from (see CatalogSignature), which
 ' is the only way anything downstream can later tell that Home's rows have been
@@ -68,8 +72,9 @@ end sub
 ' walk that latched on an empty registry is exactly the state that must still be
 ' recognised as stale once add-ons arrive, and a signature left at "" would make
 ' that indistinguishable from a correct empty grid.
-sub StartCatalogLoad()
-    if m.catalogRowsBuilt or m.catalogTask <> invalid then return
+sub StartCatalogLoad(preserveRows = false as boolean)
+    if m.catalogTask <> invalid then return
+    if m.catalogRowsBuilt and not preserveRows then return
     if m.stores = invalid then
         m.catalogRowsBuilt = true
         return
@@ -85,6 +90,9 @@ sub StartCatalogLoad()
         return
     end if
     m.catalogStatus.text = "Updating movies and shows…"
+    m.catalogRefreshing = preserveRows and m.catalogRows.Count() > 0
+    if not m.catalogRefreshing then m.catalogRowsBuilt = false
+    m.catalogRefreshRows = []
     task = AsyncTask_Launch(m.top, "HomeCatalogsTask", "onCatalogState", { addons: addons }, NextHomeWorkerId("homeCatalog"))
     m.catalogTask = task
 end sub
@@ -106,8 +114,8 @@ function CatalogSignature() as string
     return FormatJson(parts)
 end function
 
-' Re-derive the grid if the add-on set has moved under it. Cheap when fresh, and
-' it is the ONLY thing that can notice Home is stale.
+' Re-derive the grid if the add-on set has moved under it. Time-based catalog
+' freshness is handled separately on active re-entry by RefreshHomeIfStale.
 '
 ' Why this exists. The add-on sync used to gate its rebuild on "at least one
 ' add-on was newly installed". That predicate is false on every run after the
@@ -133,12 +141,17 @@ end sub
 ' on the grid yet. The task assigns each row a stable index, so the slot is
 ' cwOffset + index whether the Continue Watching row is present or not.
 sub onCatalogState(event as object)
-    if m.catalogRowsBuilt then return
+    if m.catalogRowsBuilt and m.catalogRefreshing <> true then return
     if m.catalogTask = invalid then return
     sender = event.GetRoSGNode()
     if sender = invalid or sender.id <> m.catalogTask.id then return
     state = event.GetData()
     if state = invalid or state.rows = invalid or Type(state.rows) <> "roArray" then return
+    if m.catalogRefreshing = true
+        m.catalogRefreshRows = state.rows
+        if state.done = true then FinishCatalogLoad()
+        return
+    end if
     for each row in state.rows
         if row.index >= m.catalogRows.Count() then ApplyCatalogRow(row)
     end for
@@ -149,16 +162,7 @@ end sub
 ' ascending index order, so the grid stays in task order even though each
 ' snapshot is a full copy.
 sub ApplyCatalogRow(row as object)
-    descriptor = {
-        addonAddress: row.addonAddress
-        title: row.title
-        metaType: row.metaType
-        posterShape: TilePosterShape(row.metas)
-        metas: row.metas
-        catalogId: row.catalogId
-        genre: row.genre
-        browse: row.browse = true
-    }
+    descriptor = HomeCatalogDescriptor(row)
     m.catalogRows.Push(descriptor)
     if m.top.screenActive = false
         m.homeGridDirty = true
@@ -180,6 +184,19 @@ sub ApplyCatalogRow(row as object)
     HomeCinema_OnPosterFocus()
 end sub
 
+function HomeCatalogDescriptor(row as object) as object
+    return {
+        addonAddress: row.addonAddress
+        title: row.title
+        metaType: row.metaType
+        posterShape: TilePosterShape(row.metas)
+        metas: row.metas
+        catalogId: row.catalogId
+        genre: row.genre
+        browse: row.browse = true
+    }
+end function
+
 ' Rewrite row titles so duplicated catalog names carry their type suffix; only
 ' interesting once a later row turns a previously-unique name into a duplicate.
 ' A malformed (invalid/blank) title is coerced to "" so the histogram lookup
@@ -199,8 +216,32 @@ end sub
 ' The task finished (the walk completed or errored out): the rows already
 ' applied are the final row set. Tear the task node down.
 sub FinishCatalogLoad()
+    m.catalogRefreshClock = CreateObject("roTimespan")
+    m.catalogRefreshClock.Mark()
+    refreshFailed = false
+    if m.catalogRefreshing = true
+        if m.catalogRefreshRows.Count() > 0
+            selected = HomeCatalogSelection()
+            m.catalogRows = []
+            for each row in m.catalogRefreshRows
+                m.catalogRows.Push(HomeCatalogDescriptor(row))
+            end for
+            if m.top.screenActive = true
+                BuildRows()
+                RestoreHomeCatalogSelection(selected)
+            else
+                m.homeGridDirty = true
+            end if
+        else
+            refreshFailed = true
+        end if
+    end if
+    m.catalogRefreshing = false
+    m.catalogRefreshRows = []
     m.catalogRowsBuilt = true
-    if m.catalogRows.Count() = 0
+    if refreshFailed
+        m.catalogStatus.text = "Could not update. Showing previous titles; Play/Pause retries."
+    else if m.catalogRows.Count() = 0
         m.catalogStatus.text = "Catalog unavailable. Play/Pause to retry, or use Search."
     else
         m.catalogStatus.text = ""
@@ -210,6 +251,48 @@ sub FinishCatalogLoad()
         m.catalogTask = invalid
         AsyncTask_Reap(task, m.top, false)
     end if
+end sub
+
+' Only an interactive re-entry may refresh. No timer/network work is started
+' underneath a movie. Retain the old rows until a useful replacement completes.
+sub RefreshHomeIfStale()
+    if m.top.screenActive <> true or m.catalogRowsBuilt <> true or m.catalogTask <> invalid then return
+    if m.catalogRefreshClock <> invalid
+        if m.catalogRefreshClock.TotalMilliseconds() < 1800000 then return
+    end if
+    StartCatalogLoad(true)
+end sub
+
+function HomeCatalogSelection() as object
+    result = {row:0,column:0,id:"",address:"",catalog:"",genre:"",kind:""}
+    pair = m.catalog.rowItemFocused
+    if Type(pair) <> "roArray" or pair.Count() < 2 then return result
+    result.row = pair[0]:result.column = pair[1]
+    if pair[0] < 0 or pair[0] >= m.gridRows.Count() then return result
+    row = m.gridRows[pair[0]]
+    result.address = row.addonAddress:result.catalog = row.catalogId:result.genre = row.genre:result.kind = row.metaType
+    if Type(row.metas) = "roArray" and pair[1] >= 0 and pair[1] < row.metas.Count() then result.id = row.metas[pair[1]].id
+    return result
+end function
+
+sub RestoreHomeCatalogSelection(selected as object)
+    if m.gridRows.Count() = 0 then return
+    for r = 0 to m.gridRows.Count() - 1
+        row = m.gridRows[r]
+        if row.addonAddress = selected.address and row.catalogId = selected.catalog and row.genre = selected.genre and row.metaType = selected.kind
+            if Type(row.metas) = "roArray"
+                for c = 0 to row.metas.Count() - 1
+                    if row.metas[c].id = selected.id then m.catalog.jumpToRowItem = [r,c]:return
+                end for
+                lastColumn = row.metas.Count() - 1
+                if row.browse = true then lastColumn = row.metas.Count()
+                if selected.column > lastColumn then selected.column = lastColumn
+            end if
+            if selected.column < 0 then selected.column = 0
+            m.catalog.jumpToRowItem = [r,selected.column]:return
+        end if
+    end for
+    m.catalog.jumpToRowItem = [0,0]
 end sub
 
 ' Assemble the visible grid: Continue Watching (when the local library has
@@ -245,6 +328,7 @@ end sub
 ' rows one at a time behind it, and the existing guards (gridBuilt /
 ' catalogRowsBuilt / catalogTask) keep later OnEnter visits consistent.
 function RebuildRows() as void
+    m.catalogRefreshing = false:m.catalogRefreshRows = []:m.catalogRefreshClock = invalid
     if m.catalogTask <> invalid
         ' STOP, and not a bare RemoveChild. The walk is a Task on its own thread,
         ' so removing a running Task node frees the node WITHOUT killing the
@@ -492,6 +576,7 @@ function HomeVisibleRows(count as integer) as integer
 end function
 
 function OnEnter(params as object) as void
+    if m.top.screenActive = false then return
     HomeCinema_OnEnter()
     if m.homeGridDirty = true
         selected = m.catalog.rowItemFocused
@@ -515,6 +600,7 @@ function OnEnter(params as object) as void
     ' as well means leaving for another screen and coming back repairs a stale
     ' grid, instead of the staleness being permanent until a relaunch.
     EnsureCurrentRows()
+    RefreshHomeIfStale()
     if not m.homeVisited
         if m.quick <> invalid then m.returnFocus = "quick":m.quick.SetFocus(true) else m.returnFocus = "rail":m.rail.SetFocus(true)
         m.homeVisited = true
@@ -546,6 +632,10 @@ end function
 ' flight is cancelled: the user moved on, so its Details push must not land on
 ' the next screen.
 sub BlurFocus()
+    if m.catalogRefreshing = true
+        if m.catalogTask <> invalid then AsyncTask_Reap(m.catalogTask, m.top, true)
+        m.catalogTask = invalid:m.catalogRefreshing = false:m.catalogRefreshRows = []:m.catalogRefreshClock = invalid
+    end if
     if m.rail.IsInFocusChain()
         m.returnFocus = "rail"
     else if m.catalog.IsInFocusChain()

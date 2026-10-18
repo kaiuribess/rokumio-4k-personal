@@ -387,7 +387,7 @@ Harness_Finish()
   const code = ['tests/harness.brs','tests/mocks.brs','tests/player-handoff.test.brs',
     'source/util/PlaybackInfo.brs','source/util/ProviderPriority.brs','source/util/MetadataOrigin.brs','source/util/AutoPlayback.brs','source/util/CinemaStreams.brs','source/util/EnglishAudio.brs','source/util/NativeMedia.brs','source/util/AudioCapabilities.brs']
     .map(name => name.endsWith('player-handoff.test.brs') ? read(name).replace(/^sub PublishWatchState\([^]*?^end sub\s*/mi,'') : read(name)).join('\n') + '\n' + selected + '\n' + memory + '\n' +
-    read('source/util/TimerGuard.brs').replace(/CreateObject\(/gi,'MockNativeObject(') + '\n' + read('components/PlayerPosition.brs') + '\n' + read('components/PlayerAudioRecovery.brs') + '\n' + read('source/util/NextEpisode.brs') + '\n' + read('components/PlayerNextEpisode.brs') + '\n' + fixtures;
+    read('source/util/TimerGuard.brs').replace(/CreateObject\(/gi,'MockNativeObject(') + '\n' + read('components/PlayerPosition.brs') + '\n' + read('components/PlayerDeliveryInfo.brs') + '\n' + read('components/PlayerAudioRecovery.brs') + '\n' + read('components/PlayerBufferingRecovery.brs').replace(/CreateObject\(/gi,'MockNativeObject(') + '\n' + read('source/util/NextEpisode.brs') + '\n' + read('components/PlayerNextEpisode.brs') + '\n' + fixtures;
   const file = path.join(staging,'audio-tests.brs');
   fs.writeFileSync(file, code);
   const run = spawnSync(process.execPath,[path.join(root,'node_modules/@rokucommunity/brs/bin/cli.js'),'--root',staging,file],{cwd:root,encoding:'utf8'});

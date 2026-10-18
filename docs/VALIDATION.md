@@ -1,4 +1,28 @@
-# Release validation — 0.5.23
+# Release validation — 0.5.24
+
+Validated in software on 2026-10-17, starting from default-branch commit `146141c87217811d57a9f2e05fc8b7429cc043cd`. This remains an experimental prerelease. Read-only observations of an already-playing 0.5.23 stream informed the diagnosis; 0.5.24 was not installed during that movie.
+
+| Command/check | Fresh result |
+|---|---|
+| `npm ci --ignore-scripts` | Exit 0; 207 packages installed, 208 audited. |
+| `npm test` | Exit 0; 5,329 BrightScript assertions in 32 interpreter runs plus 129 cinema-policy assertions = **5,458**. Separate Node suites: 56 passing test cases. MP4 metadata: 29 checks; playlist handling: 50 assertions. Remaining native-interface/static checks passed. |
+| `npm run build` | Exit 0; compiled version 0.5.24 developer-install ZIP. |
+| `python scripts/verify-package.py` | Exit 0; 205 members, 52 XML components, 271 root/3 relative script references, 164 implemented interface functions. Integrity, manifest, references and development-file exclusion passed. |
+| Secret/content and license review | PASS for changed public source and final local ZIP; intentional regression fixtures classified separately. No personal credentials or signed media URLs found. MIT/upstream NOTICE, third-party licenses and Open Sans OFL preserved. |
+| `git diff --check` | Passed. |
+| `npm audit --json` | Exit 1; unchanged 9 development dependency entries from 2 underlying advisories (7 high, 2 moderate, 0 critical). These dependencies are excluded from the Roku ZIP; see DEVELOPMENT.md. |
+
+Repeated-underrun regressions execute production native-state/status callbacks, timer recovery, accepted-progress persistence and exhausted-pool discovery. They cover both native callback orders, duplicate events, pause/seek/startup exclusions, disabled recovery, live/diagnostic playback, stale timers, rolling-window clipping and the 32-episode bound. Delivery regressions execute the actual observer and status serializer with stale source/generation/node events, missing/malformed native fields and private URL fixtures. Home/Discover tests cover required current-year extras, unchanged request limits, thirty-minute re-entry refresh, failure retention, focus cancellation and selection bounds.
+
+The initial full test run exposed a next-episode test-loader dependency missing the new production buffering helper. The loader now includes the actual helper; the full chain was rerun successfully without weakening assertions.
+
+The observed 0.5.23 stream resumed after short buffering episodes and had inspected 3840 x 2160 HEVC file headers, English track metadata and E-AC3. Roku did not report current decoded segment dimensions. Neither those facts nor the reported HDMI mode proves sustained UHD, audible English/surround or the cause of buffering. No host throughput measurement was available, and no competing download, source change or live setting change was used. The new delivery estimate is native information recorded at stream selection, not a continuous speed test or a bandwidth increase.
+
+Publication promotes the exact successful CI ZIP unchanged, with checksum, package-check.json and artifact-provenance.json; the public asset is then compared byte-for-byte. Local and CI ZIP hashes can differ because of build-platform metadata. Physical checks of the new native event context, buffering recovery, remote responsiveness, audio route, HDR/UHD and long-film endurance remain required. A catalog listing does not guarantee a playable source or current release availability.
+
+---
+
+# Historical 0.5.23 validation
 
 Validated in software on 2026-10-17, starting from latest default-branch commit `1a7d351`. This remains an experimental prerelease. Existing public provider responses were inspected separately; these checks do not establish native playback, audible English/surround or sustained UHD on the Roku.
 

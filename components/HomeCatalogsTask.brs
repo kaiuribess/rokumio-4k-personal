@@ -36,10 +36,12 @@ sub load()
             for each descriptor in catalogs
                 if baseAttempts >= 8 and genreJobs.Count() >= 8 then exit for
                 if Type(descriptor) <> "roAssociativeArray" then continue for
-                if HomeCatalog_Text(descriptor.id) = "" or HomeCatalog_Text(descriptor.type) = "" or not CatalogBrowsable(descriptor) then continue for
+                if HomeCatalog_Text(descriptor.id) = "" or HomeCatalog_Text(descriptor.type) = "" then continue for
+                feed = HomeCatalog_Feed(descriptor)
+                if not feed.ok then continue for
                 if rows.Count() < 8 and baseAttempts < 8
                     baseAttempts = baseAttempts + 1
-                    HomeFetchRow(catalog,rows,address,descriptor.type,descriptor.id,CatalogTitle(descriptor,addon),"")
+                    HomeFetchRow(catalog,rows,address,descriptor.type,descriptor.id,CatalogTitle(descriptor,addon),feed.genre)
                 end if
                 if genreJobs.Count() < 8
                     for each genre in HomeCatalog_Genres(descriptor)
@@ -86,22 +88,7 @@ end sub
 ' plain skip=0 browse supplies (the same rule the old synchronous Home walk
 ' applied).
 function CatalogBrowsable(catalog as object) as boolean
-    if Type(catalog) <> "roAssociativeArray" then return false
-    required = catalog.extraRequired
-    if required <> invalid and Type(required) = "roArray"
-        for each name in required
-            if name <> "skip" then return false
-        end for
-    end if
-    extras = catalog.extra
-    if extras <> invalid and Type(extras) = "roArray"
-        for each extra in extras
-            if Type(extra) = "roAssociativeArray"
-                if extra.isRequired = true and extra.name <> "skip" then return false
-            end if
-        end for
-    end if
-    return true
+    return HomeCatalog_Feed(catalog).ok
 end function
 
 ' A row title that is always a non-empty string. Real-world manifests (Stremio's

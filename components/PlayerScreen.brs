@@ -96,6 +96,8 @@ sub init()
     m.lastEnglishTrack = ""
     InitSourceMemory()
     InitAudioRecovery()
+    InitBufferingRecovery()
+    InitDeliveryInfo()
     InitNextEpisode()
 
     m.resolveTask = invalid
@@ -124,6 +126,7 @@ sub init()
 end sub
 
 function OnEnter(params as object) as void
+    ResetDeliveryInfo()
     m.accountGeneration = AccountEpoch_Read(m.top)
     if params = invalid or params.stream = invalid then return
     ResetAudioRecovery()
@@ -984,6 +987,8 @@ end sub
 ' defaults an unset streamFormat to MP4, so an MKV or an HLS manifest handed over
 ' with nothing declared buffers and then errors.
 sub StartPlayback(url as string, streamFormat = "" as string)
+    ResetBufferingRecovery()
+    ResetDeliveryInfo()
     m.lastPlaybackPosition = 0
     m.lastPlaybackDuration = 0
     m.naturalEnd = false
@@ -1057,6 +1062,7 @@ sub StartPlayback(url as string, streamFormat = "" as string)
     ' nothing; position still reads back, it just is not tracked by the node.
     if m.video.HasField("enablePositionTracking") then m.video.enablePositionTracking = true
     ApplySubtitleIndex(content)
+    BeginDeliveryInfo(url)
     m.video.content = content
     m.video.SetFocus(true)
 
@@ -1103,6 +1109,7 @@ sub onVideoStateChanged()
     if m.retryPending = true or m.audioGuardBlocked = true then return
     state = m.video.state
     if state = invalid then return
+    BufferingRecovery_StateChanged()
     onEnglishAudioFactsChanged()
     if state = "playing"
         m.naturalEnd = false
@@ -1140,6 +1147,7 @@ sub onVideoStateChanged()
         LogVideoError()
         ScheduleNextSource("native-playback-error")
     else if state = "buffering"
+        BufferingRecovery_StatusChanged(m.video.bufferingStatus)
         StopResolvePulse()
         if HasLogo() then m.bufferingGroup.visible = true
         m.status.text = "Buffering…" + Chr(10) + "Back returns to sources"
@@ -1514,7 +1522,7 @@ sub ScheduleNextSource(reason as string)
         if m.playParams.autoSourceRetry <> false then QueueSourceDiscovery(false)
         return
     end if
-    m.status.text = "Trying another English audio source automatically…" + Chr(10) + "Back cancels"
+    m.status.text = "Trying another English source automatically…" + Chr(10) + "Back cancels"
     if Type(m.playParams) = "roAssociativeArray" and m.playParams.fourKOnly = true
         m.status.text = "Trying another English 4K source automatically…" + Chr(10) + "Back cancels"
     end if
@@ -1619,7 +1627,7 @@ function PlaybackStatus() as object
     segment = PlaybackInfo_Segment(m.playingSegment)
     remembered = false
     if Type(m.playParams) = "roAssociativeArray" then remembered = m.playParams.rememberedSource = true
-    return {rememberedSource:remembered,memorySaved:m.memorySaved = true,device:m.devicePlaybackInfo,segment:segment,position:position,videoCodec:videoCodec,muted:muted,samples:samples,diagnostic:diagnostic,inspection:NativeMedia_Reason(media),format:format,state:state,audioCodec:codec,englishVerified:audio.verified,audioReason:audio.reason,englishTrackCount:audio.englishTracks.Count(),attempt:m.sourceIndex + 1,retrying:m.retryPending,resolution:NativeMedia_Resolution(media),active:m.playbackActive}
+    return {rememberedSource:remembered,memorySaved:m.memorySaved = true,device:m.devicePlaybackInfo,segment:segment,position:position,videoCodec:videoCodec,muted:muted,samples:samples,diagnostic:diagnostic,inspection:NativeMedia_Reason(media),format:format,state:state,audioCodec:codec,englishVerified:audio.verified,audioReason:audio.reason,englishTrackCount:audio.englishTracks.Count(),attempt:m.sourceIndex + 1,retrying:m.retryPending,resolution:NativeMedia_Resolution(media),active:m.playbackActive,buffering:BufferingRecovery_Status(),delivery:DeliveryInfo_Status()}
 end function
 
 sub ShowPlaybackInfo()
@@ -1703,6 +1711,7 @@ sub onBufferingStatusChanged()
     if m.video = invalid or m.playbackActive <> true then return
     if m.retryPending = true or m.audioGuardBlocked = true then return
     status = m.video.bufferingStatus
+    BufferingRecovery_StatusChanged(status)
     if status = invalid
         HideBuffering()
         return
@@ -1774,6 +1783,8 @@ end function
 ' off the node by the time this runs, and the stop goes before the blank so the
 ' node is not still holding a stream when we detach from it.
 sub ResetVideoNode()
+    ResetBufferingRecovery()
+    ResetDeliveryInfo()
     m.lastPlaybackPosition = 0
     m.lastPlaybackDuration = 0
     ResetSourceProof()
