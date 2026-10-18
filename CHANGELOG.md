@@ -1,5 +1,14 @@
 # Changes
 
+## 0.5.29 — 2026-10-17
+
+Fair catalog previews and correct smaller-page browsing. Experimental prerelease; catalog availability is separate from stream delivery.
+
+- Share the existing eight base Home requests across installed providers before taking a second row from one provider. Retain eight maximum genre requests, twelve populated rows and 24-poster previews; keep later genre descriptors available.
+- Pass validated catalog page sizes through Discover's screen, task and store. Use raw provider offsets, respect explicit end markers, stop empty/repeated pages, and preserve case-sensitive opaque IDs.
+- Document an optional account-free TMDB catalog configuration that returns IMDb-compatible movie/show and episode IDs. No provider or account is bundled or silently added.
+- Preserve practical-UHD selection, English/audio checks, playback recovery, voice, subtitles, next episode and acknowledged persistence.
+
 ## 0.5.28 — 2026-10-17
 
 Prefer practical UHD encodes during automatic selection and clarify private checkpoint observations. Experimental prerelease; no source-speed or complete hardware certification.
