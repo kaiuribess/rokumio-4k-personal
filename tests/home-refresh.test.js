@@ -7,16 +7,18 @@ const root = path.resolve(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const source = read('components/HomeScreen.brs');
 const functions = ['StartCatalogLoad','CatalogSignature','onCatalogState','FinishCatalogLoad',
-  'RebuildRows','onKeyEvent','CancelOpen','onContinueWatchingLoaded','NextHomeWorkerId'].map(name => {
+  'RebuildRows','onKeyEvent','CancelOpen','onContinueWatchingLoaded','NextHomeWorkerId',
+  'HomeCatalogDescriptor','RefreshHomeIfStale','HomeCatalogSelection','RestoreHomeCatalogSelection',
+  'OnEnter','EnsureCurrentRows','BlurFocus'].map(name => {
     const match = new RegExp(`^(?:sub|function) ${name}\\([^]*?^end (?:sub|function)`, 'mi').exec(source);
     assert.ok(match, `Home callback ${name} exists`);
-    return match[0];
+    return match[0].replace('CreateObject("roTimespan")','HomeClock()');
   });
 assert.match(read('components/HomeScreen.xml'), /Play\/Pause\s+Refresh/);
 const out = path.join(root, 'out-test', 'home-refresh');
 fs.mkdirSync(out, { recursive:true });
 const file = path.join(out, 'home.brs');
-fs.writeFileSync(file, [read('tests/harness.brs'),read('components/HomeCinema.brs'),read('source/util/HomeCatalogPolicy.brs'),read('source/util/TimerGuard.brs'), ...functions, read('tests/home-refresh.test.brs')].join('\n'));
+fs.writeFileSync(file, [read('tests/harness.brs'),read('source/core/TileSize.bs'),read('components/HomeCinema.brs'),read('source/util/HomeCatalogPolicy.brs'),read('source/util/TimerGuard.brs'), ...functions, read('tests/home-refresh.test.brs')].join('\n'));
 const result = spawnSync(process.execPath, [path.join(root,'node_modules/@rokucommunity/brs/bin/cli.js'), '--root', out, file], { cwd:out, encoding:'utf8' });
 process.stdout.write(result.stdout || ''); process.stderr.write(result.stderr || '');
 process.exit(result.status === 0 && !(result.stderr || '').trim() && /RESULT: PASS/.test(result.stdout || '') ? 0 : 1);

@@ -19,6 +19,22 @@ sub AsyncTask_Reap(task as object, parent as object, doStop as boolean)
 end sub
 sub BuildRows()
     m.builds = m.builds + 1
+    m.gridRows = m.catalogRows
+end sub
+function HomeClock() as object
+    return {elapsed:0,Mark:sub()
+        m.elapsed=0
+    end sub,TotalMilliseconds:function() as integer
+        return m.elapsed
+    end function}
+end function
+function ContinueWatchingSignature() as string
+    return "same"
+end function
+sub RefreshContinueWatching()
+end sub
+sub BuildRail()
+    m.railBuilt=true
 end sub
 sub ApplyCatalogRow(row as object)
     m.catalogRows.Push(row)
@@ -27,11 +43,14 @@ sub ShowHomeBusy(show as boolean)
     m.busy = show
 end sub
 sub HomeReset()
-    m.top = {}
+    m.top = {screenActive:true}
     m.workerSequence = 0
     m.catalogRowsBuilt = false
     m.catalogTask = invalid
     m.catalogRows = []
+    m.catalogRefreshClock=invalid:m.catalogRefreshing=false:m.catalogRefreshRows=[]
+    m.gridBuilt=true:m.railBuilt=true:m.homeGridDirty=false:m.homeVisited=true:m.returnFocus="rail":m.cwSignature="same"
+    m.quick=invalid:m.heroTitle=invalid
     m.gridRows = []
     m.launched = []
     m.reaped = []
@@ -48,6 +67,9 @@ sub HomeReset()
             m.focused = on
         end sub
         HasFocus:function() as boolean
+            return m.focused
+        end function
+        IsInFocusChain:function() as boolean
             return m.focused
         end function
     }
@@ -113,6 +135,49 @@ Harness_Equal(m.top.pushRequest.params.meta.id, "current", "current selected tit
 Harness_Equal(m.top.pushRequest.params.resume.position, 5, "resume point preserved")
 Harness_Equal(m.pendingOpen, invalid, "selection context cleared after completion")
 Harness_Equal(m.openTask, invalid, "current title worker disposed")
+
+Harness_Suite("Home re-entry refreshes stale catalogs without clearing usable titles")
+HomeReset()
+StartCatalogLoad():task=m.catalogTask
+oldRow={index:0,title:"Popular",addonAddress:"https://catalog.example",catalogId:"top",genre:"",metaType:"movie",metas:[{id:"one",name:"One",type:"movie"},{id:"two",name:"Two",type:"movie"}]}
+onCatalogState(HomeEvent(task,{rows:[oldRow],done:true}))
+m.gridRows=m.catalogRows:m.catalog.rowItemFocused=[0,1]
+OnEnter(invalid)
+Harness_Equal(m.launched.Count(),1,"fresh production OnEnter does not refetch")
+m.catalogRefreshClock.elapsed=1799999:OnEnter(invalid)
+Harness_Equal(m.launched.Count(),1,"catalog remains fresh just before thirty minutes")
+m.catalogRefreshClock.elapsed=1800000:OnEnter(invalid)
+Harness_Equal(m.launched.Count(),2,"stale production OnEnter starts one refresh")
+current=m.catalogTask
+Harness_Equal(m.catalogRows[0].title,"Popular","stale refresh keeps the old visible model")
+OnEnter(invalid)
+Harness_Equal(m.launched.Count(),2,"repeated OnEnter cannot duplicate pending refresh")
+newRow={index:0,title:"Updated",addonAddress:"https://catalog.example",catalogId:"top",genre:"",metaType:"movie",metas:[{id:"two",name:"Two",type:"movie"},{id:"one",name:"One",type:"movie"}]}
+onCatalogState(HomeEvent(current,{rows:[newRow],done:false}))
+Harness_Equal(m.catalogRows[0].title,"Popular","partial progress does not replace the current grid")
+onCatalogState(HomeEvent(current,{rows:[newRow],done:true}))
+Harness_Equal(m.catalogRows[0].title,"Updated","completed refresh adopts current titles")
+Harness_Equal(m.catalog.jumpToRowItem[1],0,"selected title is restored after provider reordering")
+Harness_Ok(m.rail.focused,"refresh completion does not steal remote focus")
+m.catalogRefreshClock.elapsed=1800000:OnEnter(invalid):current=m.catalogTask
+onCatalogState(HomeEvent(current,{rows:[],done:true,error:"unavailable"}))
+Harness_Equal(m.catalogRows[0].title,"Updated","failed refresh preserves the last usable titles")
+Harness_Ok(m.catalogStatus.text.InStr("previous")>=0,"failed retained refresh is explained honestly")
+m.catalogRefreshClock.elapsed=1800000:m.top.screenActive=false:OnEnter(invalid)
+Harness_Equal(m.launched.Count(),3,"hidden production OnEnter cannot start work during playback")
+m.top.screenActive=true:OnEnter(invalid):current=m.catalogTask
+BlurFocus()
+Harness_Equal(m.catalogTask,invalid,"leaving Home cancels an automatic refresh")
+onCatalogState(HomeEvent(current,{rows:[oldRow],done:true}))
+Harness_Equal(m.catalogRows[0].title,"Updated","canceled refresh cannot replace data underneath playback")
+m.gridRows=[{source:"library",metas:[{id:"remaining",type:"movie",name:"Remaining"}]}]
+RestoreHomeCatalogSelection({row:0,column:1,id:"removed"})
+Harness_Equal(m.catalog.jumpToRowItem[1],0,"Continue Watching without See all clamps to an existing tile")
+HomeReset():StartCatalogLoad():current=m.catalogTask
+onCatalogState(HomeEvent(current,{rows:[],done:true}))
+m.catalogRefreshClock.elapsed=1800000:OnEnter(invalid):current=m.catalogTask
+onCatalogState(HomeEvent(current,{rows:[oldRow],done:true}))
+Harness_Equal(m.catalogRows.Count(),1,"a previously empty catalog can recover on stale re-entry")
 Harness_Finish()
 if m.failed > 0
     failure = invalid

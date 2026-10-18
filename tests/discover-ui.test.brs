@@ -11,7 +11,12 @@ function DiscoverTest_Event(task as object, data as dynamic) as object
     }
 end function
 
-function MockDiscoverNativeObject(kind as string, nodeType as string) as object
+function MockDiscoverNativeObject(kind as string, nodeType = "" as string) as object
+    if kind="roTimespan" then return {elapsed:0,Mark:sub()
+        m.elapsed=0
+    end sub,TotalMilliseconds:function() as integer
+        return m.elapsed
+    end function}
     node = { children: [] }
     node.CreateChild = function(childType as string) as object
         child = MockDiscoverNativeObject("roSGNode", childType)
@@ -24,6 +29,7 @@ end function
 sub DiscoverTest_Reset()
     m.workerSequence = 0
     m.nextPageOffset = 0
+    m.catalogRefreshClock=invalid:m.catalogRefreshing=false
     m.sourcesTask = invalid
     m.loadTask = invalid
     m.sources = []
@@ -213,6 +219,44 @@ DiscoverTest_Reset():m.selectedCatalog=invalid:m.sourcesSignature="stale"
 m.stores.addons.values=[{address:"https://manifest.example",catalogs:invalid}]
 ignored=onKeyEvent("play",true)
 Harness_Ok(m.sourcesTask<>invalid,"retry can recover a manifest-source failure")
+
+Harness_Suite("Discover re-entry refreshes current feeds without blanking or stealing focus")
+DiscoverTest_Reset():m.sourcesSignature=CatalogSignature()
+FetchDiscover():task=m.loadTask
+onDiscoverLoaded(DiscoverTest_Event(task,{ok:true,metas:[{id:"one",type:"movie",name:"One"},{id:"two",type:"movie",name:"Two"}],hasMore:true}))
+m.grid.rowItemFocused=[0,1]
+OnEnter(invalid)
+Harness_Equal(m.launched.Count(),1,"fresh production OnEnter reuses its current page")
+m.catalogRefreshClock.elapsed=1799999:OnEnter(invalid)
+Harness_Equal(m.launched.Count(),1,"fresh page is kept until thirty minutes")
+m.catalogRefreshClock.elapsed=1800000:OnEnter(invalid)
+Harness_Equal(m.launched.Count(),2,"stale production OnEnter requests a fresh page zero")
+current=m.loadTask
+Harness_Equal(m.metas.Count(),2,"stale reload keeps existing titles navigable")
+Harness_Equal(m.nextPageOffset,2,"old pagination is preserved until successful replacement")
+OnEnter(invalid)
+Harness_Equal(m.launched.Count(),2,"a pending refresh is not duplicated")
+beforeFocus=m.filterBar.chipFocusCount
+onDiscoverLoaded(DiscoverTest_Event(current,{ok:true,metas:[{id:"two",type:"movie",name:"Two"},{id:"new",type:"movie",name:"New"}],hasMore:false}))
+Harness_Equal(m.metas[1].id,"new","fresh titles replace the old snapshot")
+Harness_Equal(m.grid.jumpToRowItem[1],0,"selected title stays selected after reordering")
+Harness_Equal(m.filterBar.chipFocusCount,beforeFocus,"automatic refresh does not move focus to filters")
+Harness_Ok(m.allLoaded,"replacement page updates pagination state")
+m.catalogRefreshClock.elapsed=1800000:OnEnter(invalid):current=m.loadTask
+onDiscoverLoaded(DiscoverTest_Event(current,{ok:false,error:"provider unavailable"}))
+Harness_Equal(m.metas.Count(),2,"failed refresh keeps previous titles")
+Harness_Ok(m.status.text.InStr("previous")>=0,"failed refresh explains that old data remains")
+m.catalogRefreshClock.elapsed=1800000:m.top.screenActive=false:OnEnter(invalid)
+Harness_Equal(m.launched.Count(),3,"hidden production OnEnter starts no refresh underneath playback")
+m.top.screenActive=true:OnEnter(invalid):current=m.loadTask
+BlurFocus()
+Harness_Equal(m.loadTask,invalid,"leaving for Details or Video cancels the automatic refresh")
+onDiscoverLoaded(DiscoverTest_Event(current,{ok:true,metas:[{id:"late",type:"movie",name:"Late"}],hasMore:false}))
+Harness_Equal(m.metas[0].id,"two","late canceled refresh does not replace the retained title")
+m.top.screenActive=true:OnEnter(invalid):current=m.loadTask
+m.top.screenActive=false
+onDiscoverLoaded(DiscoverTest_Event(current,{ok:true,metas:[{id:"hidden",type:"movie",name:"Hidden"}],hasMore:false}))
+Harness_Equal(m.metas[0].id,"two","even a hidden race cannot rebuild the grid during playback")
 
 Harness_Finish()
 if m.failed > 0

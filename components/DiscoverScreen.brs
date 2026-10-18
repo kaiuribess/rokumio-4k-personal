@@ -53,9 +53,12 @@ sub init()
     m.loadTask = invalid
     m.workerSequence = 0
     m.nextPageOffset = 0
+    m.catalogRefreshClock = invalid
+    m.catalogRefreshing = false
 end sub
 
 function OnEnter(params as object) as void
+    if m.top.screenActive = false then return
     if m.filterBar.callFunc("IsMenuOpen") then m.filterBar.callFunc("HideMenu")
 
     ' The add-on set can move while Discover is off-screen (install/uninstall,
@@ -75,6 +78,7 @@ function OnEnter(params as object) as void
     ' Re-entry after Details: results are still here, just take focus back.
     if m.metas.Count() > 0
         m.grid.SetFocus(true)
+        RefreshDiscoverIfStale()
         return
     end if
 
@@ -91,6 +95,21 @@ function OnBackPressed() as boolean
 end function
 
 sub BlurFocus()
+    if m.catalogRefreshing = true
+        CancelLoad()
+        m.catalogRefreshing = false:m.catalogRefreshClock = invalid
+    end if
+end sub
+
+' A retained page is refreshed only on an interactive re-entry after 30 minutes.
+' No periodic job runs behind playback; the current grid remains usable while
+' the replacement page is requested, and a failed refresh keeps its old data.
+sub RefreshDiscoverIfStale()
+    if m.top.screenActive <> true or m.loaded <> true or m.loadTask <> invalid then return
+    if m.catalogRefreshClock <> invalid
+        if m.catalogRefreshClock.TotalMilliseconds() < 1800000 then return
+    end if
+    FetchDiscover(true)
 end sub
 
 ' --- sources (which add-ons serve which catalogs) ---------------------------
@@ -582,6 +601,7 @@ end sub
 ' A fresh filter set: start back at page 0.
 sub ResetDiscover()
     CancelLoad()
+    m.catalogRefreshing = false:m.catalogRefreshClock = invalid
     m.metas = []
     m.nextPageOffset = 0
     m.allLoaded = false
@@ -597,9 +617,10 @@ end sub
 ' so picks never queue behind a stale load. The wanted offset is
 ' captured so a page that lands after the user changed filters (or exited) is
 ' dropped instead of appended to the wrong list.
-sub FetchDiscover()
+sub FetchDiscover(preserveRows = false as boolean)
     if m.selectedCatalog = invalid then return
     CancelLoad()
+    m.catalogRefreshing = preserveRows and m.metas.Count() > 0
 
     m.status.text = "Loading titles…     Back cancels"
     task = AsyncTask_Launch(m.top, "DiscoverLoaderTask", "onDiscoverLoaded", {
@@ -666,11 +687,23 @@ sub onDiscoverLoaded(event as object)
     AsyncTask_Reap(task, m.top, false)
 
     wantedOffset = task.pageOffset
-    if wantedOffset <> m.nextPageOffset then return
+    refreshing = m.catalogRefreshing = true and wantedOffset = 0
+    m.catalogRefreshing = false
+    if refreshing and m.top.screenActive <> true
+        m.catalogRefreshClock = invalid
+        return
+    end if
+    if not refreshing and wantedOffset <> m.nextPageOffset then return
+    if wantedOffset = 0
+        m.catalogRefreshClock = CreateObject("roTimespan")
+        m.catalogRefreshClock.Mark()
+    end if
 
     label = DiscoverLabel()
     if Type(result) <> "roAssociativeArray" or result.ok <> true or Type(result.metas) <> "roArray"
-        if m.metas.Count() = 0
+        if refreshing
+            m.status.text = "Could not update. Showing previous titles; Play/Pause retries."
+        else if m.metas.Count() = 0
             m.status.text = "Could not load " + Chr(34) + label + Chr(34) + ". Play/Pause retries."
             LandingChipsFocus()
         end if
@@ -678,6 +711,25 @@ sub onDiscoverLoaded(event as object)
     end if
 
     usable = DiscoverUsableMetas(result.metas)
+    if refreshing
+        if usable.Count() = 0
+            m.status.text = "Provider returned no titles. Showing previous results; Play/Pause retries."
+            return
+        end if
+        selectedId = "":selectedType = ""
+        selectedIndex = 0
+        selected = m.grid.rowItemFocused
+        if Type(selected) = "roArray" and selected.Count() > 1 then selectedIndex = selected[0] * m.chunk + selected[1]
+        if selectedIndex >= 0 and selectedIndex < m.metas.Count()
+            selectedId = m.metas[selectedIndex].id:selectedType = m.metas[selectedIndex].type
+        end if
+        for index = 0 to usable.Count() - 1
+            if usable[index].id = selectedId and usable[index].type = selectedType then selectedIndex = index:exit for
+        end for
+        if selectedIndex < 0 then selectedIndex = 0
+        if selectedIndex >= usable.Count() then selectedIndex = usable.Count() - 1
+        restorePosition = [Int(selectedIndex / m.chunk), selectedIndex MOD m.chunk]
+    end if
     consumed = result.metas.Count()
     if Type(result.rawCount) = "Integer" or Type(result.rawCount) = "roInteger"
         if result.rawCount >= consumed then consumed = result.rawCount
@@ -695,9 +747,9 @@ sub onDiscoverLoaded(event as object)
             LandingChipsFocus()
             return
         end if
-        UpdateGrid()
+        if refreshing then UpdateGrid(restorePosition) else UpdateGrid()
         m.status.text = ""
-        LandingChipsFocus()
+        if not refreshing then LandingChipsFocus()
     else
         for each meta in usable
             m.metas.Push(meta)

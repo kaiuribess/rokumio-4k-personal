@@ -20,6 +20,11 @@ function CinemaClock() as object
         return m.elapsed
     end function}
 end function
+function CinemaDate() as object
+    return {GetYear:function() as integer
+        return 2031
+    end function}
+end function
 function CinemaList(name as string,state as object) as object
     return {name:name,state:state,rowItemFocused:[0,0],rowItemSelected:[0,0],content:CinemaContent(),ObserveField:sub(key as string,callback as string)
     end sub,SetFocus:sub(value as boolean)
@@ -188,6 +193,33 @@ end for
 m.top={addons:unknown}:load()
 Harness_Equal(m.fixtureCatalog.manifestCalls,8,"unknown manifests cannot create unbounded Home requests")
 Harness_Ok(m.top.result.done,"manifest exhaustion leaves working navigation and terminal result")
+
+Harness_Suite("Home worker fetches only safe provider-advertised current-year feeds")
+yearExtra=[{name:"genre",options:["2031","2030"],isRequired:true},{name:"skip"}]
+legacy={id:"legacy",name:"Legacy New",type:"movie",extraRequired:["genre"],extra:[{name:"genre",options:["2031"],isRequired:true}]}
+m.fixtureCatalog.calls=[]
+m.top={addons:[{address:"https://catalog.example",name:"Catalog",catalogs:[
+    {id:"year",name:"New",type:"movie",extra:yearExtra},
+    {id:"year",name:"New",type:"series",extra:yearExtra},
+    {id:"missing",name:"Missing options",type:"movie",extra:[{name:"genre",isRequired:true}]},
+    {id:"stale",name:"Old only",type:"movie",extra:[{name:"genre",isRequired:true,options:["2030"]}]},
+    {id:"bad",name:"Wrong options",type:"movie",extra:[{name:"genre",isRequired:true,options:[2031,{},invalid]}]},
+    {id:"other",name:"Other required",type:"movie",extra:[{name:"genre",isRequired:true,options:["2031"]},{name:"privateListId",isRequired:true}]},
+    legacy
+]}]}
+load()
+Harness_Equal(m.fixtureCatalog.calls.Count(),3,"actual worker requests only two valid New feeds and legacy year descriptor")
+Harness_Equal(m.fixtureCatalog.calls[0].extra,"genre=2031","year is derived at runtime and sent as provider input")
+Harness_Equal(m.top.result.rows[1].genre,"2031","New shows retain their year for See all")
+Harness_Equal(legacy.extraRequired.Count(),1,"feed validation cannot mutate persisted manifest extras")
+Harness_Ok(not CatalogBrowsable({type:"movie",extraRequired:["search"]}),"search-only feed is not requested without a query")
+many=[]
+for index=0 to 49
+    many.Push({id:"year"+index.ToStr(),name:"New",type:"movie",extra:yearExtra})
+end for
+m.fixtureCatalog.calls=[]:m.top={addons:[{address:"https://catalog.example",catalogs:many}]}:load()
+Harness_Equal(m.fixtureCatalog.calls.Count(),8,"many year catalogs retain the existing eight base-request budget")
+Harness_Equal(m.top.result.rows.Count(),8,"new catalog support does not bypass bounded Home rows")
 
 Harness_Suite("Full-browser entry consumes shortcut presets before requesting data")
 m.entryRequest={metaType:"series",addonAddress:"https://catalog.example",catalogId:"tv",genre:"Drama",focusGenres:true}
