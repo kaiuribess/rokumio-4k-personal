@@ -8,6 +8,8 @@
         <field id="audioMode" type="string" value="projector" />
         <field id="fourKOnly" type="boolean" value="false" />
         <field id="loadToken" type="string" value="" />
+        <field id="sourceRevision" type="integer" value="0" />
+        <field id="skipRecentFailures" type="boolean" value="true" />
         <field id="result" type="assocarray" alwaysNotify="true" />
     </interface>
     <script type="text/brightscript" uri="pkg:/source/util/CinemaStreams.brs" />

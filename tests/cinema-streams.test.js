@@ -7,7 +7,9 @@ fs.mkdirSync(isolated, { recursive: true });
 const combined = path.join(isolated, '_cinema.brs');
 const production = fs.readFileSync(path.join(root, 'source/util/CinemaStreams.brs'), 'utf8')
   .replace(/(function CinemaStreamRank\([^\n]*\n)/, '$1    m.cinemaRankCalls = m.cinemaRankCalls + 1\n');
-fs.writeFileSync(combined, production + '\n' + fs.readFileSync(path.join(root, 'tests/cinema-streams.test.brs'), 'utf8'));
+fs.writeFileSync(combined, production + '\n'
+  + fs.readFileSync(path.join(root, 'source/util/AutoPlayback.brs'), 'utf8') + '\n'
+  + fs.readFileSync(path.join(root, 'tests/cinema-streams.test.brs'), 'utf8'));
 const result = spawnSync(process.execPath, [
   path.join(root, 'node_modules/@rokucommunity/brs/bin/cli.js'),
   '--root', isolated, combined

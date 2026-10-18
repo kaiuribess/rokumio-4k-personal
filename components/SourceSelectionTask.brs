@@ -29,7 +29,7 @@ sub choose()
     try
         now = SourceMemory_Now()
         data = SourceMemory_Load(CreateObject("roRegistrySection", "playbackMemory"),now)
-        streams = SourceMemory_Order(streams,data,m.top.videoId,m.top.audioMode,now)
+        streams = SourceMemory_Order(streams,data,m.top.videoId,m.top.audioMode,now,invalid,m.top.skipRecentFailures <> false)
         streams = CinemaPreferUhdFirst(streams)
         if streams.Count() > 0
             key = SourceMemory_Fingerprint(streams[0],m.top.videoId,m.top.audioMode)
@@ -40,6 +40,8 @@ sub choose()
     catch e
         ' Memory is an optimization. Keep fresh provider results if it fails.
     end try
-    if streams.Count() > 0 then streams = AutoPlayback_Candidates(streams[0],streams)
+    ' Automatic startup samples a small ranked pool, then asks the coordinator
+    ' for remaining/fresh providers. Manual browsing keeps its full source list.
+    if streams.Count() > 0 then streams = AutoPlayback_Candidates(streams[0],streams,6,3)
     m.top.result = {streams:streams,rememberedSource:remembered}
 end sub

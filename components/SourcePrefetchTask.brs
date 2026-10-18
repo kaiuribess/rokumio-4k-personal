@@ -21,7 +21,7 @@ function SourcePrefetch_LimitStreams(streams as dynamic, audioMode as string, vi
     fourKCount = 0
     patterns = CinemaSourcePatterns()
     for each stream in ranked
-        fourK = patterns.fourK.IsMatch(CinemaStreamText(stream))
+                fourK = CinemaResolutionHint(stream,patterns) = 2160
         ' HD stereo hints can outrank an unknown 4K layout. Keep a minimum
         ' reserve of up to 64 unique 4K labels so a later explicit 4K filter
         ' does not become empty merely because browsing used a bounded cache.
@@ -89,7 +89,8 @@ sub load()
         diagnostics = CinemaSkippedSources(raw)
         diagnostics.rawCount = answer.streams.Count()
         diagnostics.budgetSkipped = answer.streams.Count() - raw.Count()
-        m.top.result = {ok:true, streams:streams, readyStreams:CinemaChooseStreams(streams, false, m.top.audioMode, false), sourceDiagnostics:diagnostics, error:""}
+        ready = CinemaChooseStreams(streams, false, m.top.audioMode, false)
+        m.top.result = {ok:true, streams:streams, readyStreams:ready, uhdCount:CinemaFilterReadyStreams(ready,true).Count(), sourceDiagnostics:diagnostics, error:""}
     catch e
         m.top.result = {ok:false}
     end try

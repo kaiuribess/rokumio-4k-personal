@@ -41,7 +41,7 @@ sub ShowPlaybackOption(kind as string)
     else if kind = "recovery"
         ShowSettingsAudioDialog("Source recovery",["On automatically tries compatible alternatives when a source fails or stalls.","Off keeps playback on the selected source. English audio checks remain enabled. Changes apply to new playback."],["On","Off","Cancel"],kind)
     else if kind = "autoStart"
-        ShowSettingsAudioDialog("Automatic Play",["Start sooner briefly compares available candidates, then starts without waiting for every provider. Later providers may have better choices.","Compare providers waits for all eligible add-ons before choosing. Your quality and English audio checks still apply."],["Start sooner","Compare providers","Cancel"],kind)
+        ShowSettingsAudioDialog("Automatic Play",["Start sooner prefers 4K. When only HD is ready, it gives pending providers up to four seconds to return UHD before using a fallback.","Compare providers waits for all eligible add-ons. Failed and download-only links are skipped; English audio is checked during playback."],["Start sooner","Compare providers","Cancel"],kind)
     else if kind = "onlineSubtitles"
         ShowSettingsAudioDialog("Online subtitles",["Off uses the file's embedded captions and your Roku caption preferences.","On adds online subtitle choices. They may target another release or have different timing. Use * during playback to select a track or turn captions off."],["On","Off","Cancel"],kind)
     end if

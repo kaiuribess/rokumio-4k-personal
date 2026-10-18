@@ -1,4 +1,28 @@
-# Release validation — 0.5.22
+# Release validation — 0.5.23
+
+Validated in software on 2026-10-17, starting from latest default-branch commit `1a7d351`. This remains an experimental prerelease. Existing public provider responses were inspected separately; these checks do not establish native playback, audible English/surround or sustained UHD on the Roku.
+
+| Command/check | Fresh result |
+|---|---|
+| `npm ci --ignore-scripts` | Exit 0; 207 packages installed, 208 audited. |
+| `npm test` | Exit 0; 5,177 BrightScript assertions in 31 interpreter runs plus 129 cinema-policy assertions = **5,306**. Separate Node suites: 56 passing test cases. MP4 metadata: 29 checks; playlist handling: 50 assertions. Remaining native-interface/static checks passed. |
+| `npm run build` | Exit 0; compiled version 0.5.23 developer-install ZIP. |
+| `python scripts/verify-package.py` | Exit 0; 203 members, 52 XML components, 269 root/3 relative script references, 164 implemented interface functions. Integrity, manifest, references and development-file exclusion passed. |
+| Secret/content and license review | PASS for current public files and built ZIP; matches reviewed as synthetic test fixtures. No private credentials or signed media URLs found. MIT/upstream NOTICE, third-party licenses and Open Sans OFL preserved. |
+| `git diff --check` | Passed. |
+| `npm audit --json` | Exit 1; unchanged 9 development dependency entries from 2 underlying advisories (7 high, 2 moderate, 0 critical). These dependencies are excluded from the Roku ZIP; see DEVELOPMENT.md. |
+
+New executable regressions cover provider branding versus actual resolution hints, download-only and non-English-only filtering, bounded automatic UHD/HD pools, delayed UHD within the grace period, stale ranking results, worker-produced UHD counts, recent-failure cooldown and explicit fresh retry. Native resolver tests execute the production callback with injected file/transport boundaries for opaque MKV detection, malformed ranges, cleanup and preserved playable URLs after inspection failure. Existing account isolation, durable outbox, registry failure, checkpoint, source recovery, subtitle, voice and next-episode suites remain in the full test chain.
+
+The automatic pool is six candidates, with at most three UHD candidates when eligible fallback exists. This bounds each pool, not total startup time: native checks, network timeouts and the existing two bounded discovery rounds still take time. Ten-minute temporary-failure suppression requires a stable file fingerprint; opaque URLs without one retain only in-session exact-URL exclusion. Source labels and inspected dimensions remain distinct from native decoded video evidence. Unknown audio language remains subject to the English verification guard.
+
+Publication promotes the exact successful CI ZIP unchanged, with its checksum, package-check.json and artifact-provenance.json. The public ZIP is downloaded and compared against that artifact. The local build is not substituted. Optional public providers are documented in [Free sources](FREE-SOURCES.md), without silent installation, bundled credentials or promises of every title, permanent uptime or universal 4K.
+
+Physical upgrade, remote responsiveness, audible English/projector/surround output, full-film endurance, HDR and sustained native UHD still require device checks for this version. Previous native observations below apply only to their named versions.
+
+---
+
+# Historical 0.5.22 validation
 
 Validated in software on 2026-10-15, starting from latest default-branch commit `bcd32111d9b0996b35285b1a684513d88f66b0c1`. This remains an experimental prerelease. No physical Roku, authenticated Stremio account, personal credential or movie stream was accessed for this update. Earlier physical observations below apply to their identified versions only.
 

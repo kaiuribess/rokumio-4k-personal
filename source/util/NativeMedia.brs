@@ -1,8 +1,10 @@
 
-' Inspect a bounded MKV header on the worker. No filenames or signed URLs logged.
+' Inspect a bounded MKV header on the worker. An opaque direct URL also needs
+' this check: an unset native streamFormat means MP4, not automatic detection.
+' Known playlist/MP4 transports retain their existing path. No URLs are logged.
 function NativeMedia_Read(resolved as object, workerId as string) as object
-    unknown = {complete:false,tracks:[],reason:"not-MKV"}
-    if resolved.streamFormat <> "mkv" then return unknown
+    unknown = {complete:false,tracks:[],streamFormat:"",reason:"not-MKV"}
+    if resolved.streamFormat <> "mkv" and resolved.streamFormat <> "" then return unknown
     unknown.reason = "header-unavailable"
     transfer = CreateObject("roUrlTransfer")
     port = CreateObject("roMessagePort")
@@ -38,14 +40,12 @@ function NativeMedia_Read(resolved as object, workerId as string) as object
                     print "[inspect] header HTTP "; event.GetResponseCode()
                     if event.GetResponseCode() = 206
                         headers = event.GetResponseHeaders()
-                        range = ""
-                        for each name in headers
-                            if LCase(name) = "content-range" then range = headers[name]
-                        end for
                         stat = fs.Stat(path)
-                        if Left(LCase(range),8) = "bytes 0-" and NativeMedia_HasSize(stat) and stat.size <= 1048576
-                            data = CreateObject("roByteArray")
-                            if not data.ReadFile(path) then data = invalid
+                        if NativeMedia_HasSize(stat)
+                            if NativeMedia_ValidHeaderRange(headers,stat.size)
+                                data = CreateObject("roByteArray")
+                                if not data.ReadFile(path) then data = invalid
+                            end if
                         end if
                     end if
                     exit for
@@ -59,14 +59,52 @@ function NativeMedia_Read(resolved as object, workerId as string) as object
     end try
     transfer.AsyncCancel()
     fs.Delete(path)
+    fs.Delete(path + ".tmp")
     if data = invalid
         print "[inspect] "; unknown.reason
         return unknown
     end if
     print "[inspect] header bytes "; data.Count()
+    ' A provider label, Content-Type, or merely the four EBML magic bytes is
+    ' insufficient. Require an in-bounds EBML header followed by a Segment.
+    ' Tracks may legitimately sit beyond our read budget; container evidence
+    ' still lets the native MKV decoder perform its own audio verification.
+    if NativeMedia_HeaderFormat(data) <> "mkv"
+        unknown.reason = "unrecognized-header"
+        return unknown
+    end if
     parsed = NativeMedia_Parse(data)
+    parsed.streamFormat = "mkv"
     print "[inspect] complete "; parsed.complete; " tracks "; parsed.tracks.Count()
     return parsed
+end function
+
+function NativeMedia_ValidHeaderRange(headers as dynamic, size as integer) as boolean
+    if Type(headers) <> "roAssociativeArray" or size <= 0 or size > 1048576 then return false
+    range = ""
+    for each name in headers
+        if LCase(name) = "content-range"
+            if GetInterface(headers[name],"ifString") = invalid then return false
+            range = LCase(headers[name].Trim())
+        end if
+    end for
+    pattern = CreateObject("roRegex","^bytes 0-([0-9]+)/([0-9]+|\*)$","")
+    parts = pattern.Match(range)
+    if parts.Count() <> 3 then return false
+    if Val(parts[1]) <> size - 1 then return false
+    if parts[2] <> "*" and Val(parts[2]) < size then return false
+    return true
+end function
+
+function NativeMedia_HeaderFormat(data as object) as string
+    limit = data.Count()
+    if limit < 10 or limit > 1048576 then return ""
+    header = NativeMedia_Element(data,0,limit)
+    if header = invalid or header.id <> &h1a45dfa3 or header.unknown then return ""
+    if header.finish >= limit then return ""
+    segment = NativeMedia_Element(data,Int(header.finish),limit)
+    if segment = invalid or segment.id <> &h18538067 then return ""
+    return "mkv"
 end function
 
 function NativeMedia_Vint(data as object, cursor as integer, limit as integer, isId as boolean) as dynamic

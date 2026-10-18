@@ -1,0 +1,51 @@
+# Optional free sources
+
+Crimson Cinema can use free add-ons, but each add-on has a different role. The two playback providers below are **optional imports**, not bundled accounts or default streaming services. No account or paid key was required for the configurations checked on **October 17, 2026**. Availability, host limits and provider terms can change; free access today is not a lifetime guarantee.
+
+Install your own compatible provider manifest and use content you are authorized to access. Listing an add-on here does not establish permission to watch every title it returns, an affiliation with its operator, or a guarantee of playback.
+
+## Browsing and captions
+
+| Add-on | What it supplies | Public manifest |
+| --- | --- | --- |
+| Cinemeta | Movie/show search and title metadata. Normally already available in the local profile. | [Cinemeta](https://v3-cinemeta.strem.io/manifest.json) |
+| Streaming Catalogs | Extra browsing rows grouped by streaming service. These rows do not grant access to those services. | [Streaming Catalogs](https://7a82163c306e-stremio-netflix-catalog-addon.baby-beamup.club/manifest.json) |
+| OpenSubtitles v3 | Subtitle choices; language and timing depend on the selected track. | [OpenSubtitles v3](https://opensubtitles-v3.strem.io/manifest.json) |
+
+**None of these three supplies movie streams.** Check the installed Add-ons list before importing a duplicate. Provider references: [Stremio's official add-on collection](https://github.com/Stremio/stremio-official-addons/blob/master/index.json) and [Streaming Catalogs source](https://github.com/rleroi/Stremio-Streaming-Catalogs-Addon).
+
+## HDHub: optional on-demand sources
+
+[HDHub's configuration page](https://hdhub.thevolecitor.qzz.io/) supplies direct movie/episode sources. The public configuration below requests 2160p and 1080p, descending quality, at most five results per quality/provider, and no extra catalogs. It contains **no account key**; the encoded TorBox setting is the literal value `unset`.
+
+```text
+https://hdhub.thevolecitor.qzz.io/eyJ0b3Jib3giOiJ1bnNldCIsInF1YWxpdGllcyI6IjIxNjBwLDEwODBwIiwic29ydCI6ImRlc2MiLCJtcSI6NSwibXAiOjUsImNhdGFsb2dzIjoiIn0/manifest.json
+```
+
+The checked manifest was `com.stremio.HdHub` version 1.0.7. Bounded media-header checks found seekable HTTPS Matroska files, including encoded 3840x2160 HEVC video with explicitly tagged English AAC or E-AC-3 tracks, and 1080p alternatives. Other results had uncertain audio language or failed range requests. These checks did not play a complete title or establish audible audio, surround output, sustained Roku decoding, or whether a source master was upscaled.
+
+Some results use Pixeldrain. Its [current plan page](https://pixeldrain.com/home) advertises a 6 GB free allowance and reduced speed of 1 MiB/s after the limit. Its [FAQ](https://docs.pixeldrain.com/questions_and_answers/#how-does-the-transfer-limit-work) explains that free usage is tracked per IP over a rolling 24-hour window; hotlink protection can also interrupt access. We have not established that this add-on's links are exempt. Large files can exhaust that allowance, so this is not an unlimited free 4K service.
+
+The provider can also return **Download Only** entries that do not support reliable seeking. Version 0.5.23 excludes recognized download-only and 10Gbps delivery annotations from selection; 0.5.22 does not. The provider's configuration does not itself guarantee English audio. A filename, language label or quality label remains a hint until usable track/dimension evidence is available.
+
+## Pluto TV: optional live channels
+
+```text
+https://dev.nebulawp.org/stremio/pluto-tv-addon/manifest.json
+```
+
+This is a [community Pluto TV add-on](https://stremio-addons.net/addons/pluto-tv), not the official Pluto app. The checked manifest was `org.plutotv` version 1.0.0 and provided catalogs, metadata and live streams. Sample requests returned direct HTTPS HLS playlists on Pluto's delivery service. The sampled playlists advertised English stereo audio; a bounded clear audio segment contained AAC.
+
+It supplies scheduled live channels, not on-demand access to every movie or episode. Catalogs include different regions/languages, and individual channels may be unavailable locally. The checks did not establish 4K, audible surround or physical Roku playback.
+
+## Import only the providers you want
+
+1. Open **Crimson Cinema > Add-ons** on Roku and leave it open.
+2. On a phone/computer on the same network, open the local setup address displayed there.
+3. Paste one public manifest above and submit it.
+4. Select **Allow import** on the TV within 60 seconds, then read the final import summary. The browser acknowledgement alone does not confirm installation.
+5. Run **Add-ons > Check add-ons**. A reachable manifest confirms setup, not that every title or channel will play.
+
+For HD fallback, use **Settings > Picture quality > 4K first + 1080p**. Choose **TV / projector speakers** or **HDMI soundbar / receiver** under **Audio mode** to match the connected equipment. See [playback and 4K evidence](PLAYBACK.md) for the difference between source labels, encoded dimensions and native playback. Once a compatible direct stream starts, the setup phone/computer does not need to remain on.
+
+Keep configured URLs containing personal keys private. Only the account-free public examples above belong in shared documentation; never post signed media URLs, account manifests or credentials in an issue.
