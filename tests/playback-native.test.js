@@ -35,7 +35,7 @@ async function main() {
         return match[0].replace(/CreateObject\(/gi, 'MockNativeObject(');
     }).join('\n');
     const memoryScreen = fs.readFileSync(path.join(root,'components/PlayerSourceMemory.brs'),'utf8').replace(/SourceMemory_Fingerprint\(/g,'PlayerTest_Fingerprint(').replace(/ProviderPriority_StreamKey\(/g,'PlayerTest_ProviderKey(').replace(/CreateObject\(/gi,'MockNativeObject(');
-    const support = fs.readFileSync(path.join(root,'source/util/TimerGuard.brs'),'utf8').replace(/CreateObject\(/gi,'MockNativeObject(') + '\n' + fs.readFileSync(path.join(root,'components/PlayerPosition.brs'),'utf8');
+    const support = fs.readFileSync(path.join(root,'source/util/TimerGuard.brs'),'utf8').replace(/CreateObject\(/gi,'MockNativeObject(') + '\n' + fs.readFileSync(path.join(root,'components/PlayerPosition.brs'),'utf8') + '\n' + fs.readFileSync(path.join(root,'components/PlayerDeliveryInfo.brs'),'utf8') + '\n' + fs.readFileSync(path.join(root,'components/PlayerBufferingRecovery.brs'),'utf8').replace(/CreateObject\(/gi,'MockNativeObject(');
     const audioRecovery = fs.readFileSync(path.join(root,'components/PlayerAudioRecovery.brs'),'utf8');
     // Exercise the production resolver and header acquisition through native
     // I/O substitutes, then deliver its real result to the player callback.

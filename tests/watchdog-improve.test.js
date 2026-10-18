@@ -75,9 +75,6 @@ end sub
 function NotPlayableOnDevice() as boolean
     return false
 end function
-function PlaybackInfo_ErrorMessage(code as dynamic, category as dynamic, unsupported as dynamic) as string
-    return "error"
-end function
 
 Harness_Suite("Startup and continuous rebuffer deadlines stay bounded")
 WatchdogSetup()
@@ -226,7 +223,7 @@ Harness_Finish()
 `;
     const combined = path.join(staging, 'watchdog-tests.brs');
     fs.writeFileSync(combined, fs.readFileSync(path.join(__dirname, 'harness.brs'), 'utf8') + '\n' +
-        resume[0] + '\n' + fs.readFileSync(path.join(root,'source/util/TimerGuard.brs'),'utf8').replace('CreateObject("roTimespan")','WatchdogClock()') + '\n' + fs.readFileSync(path.join(root,'components/PlayerPosition.brs'),'utf8') + '\n' + production + '\n' + fs.readFileSync(path.join(root,'source/util/NextEpisode.brs'),'utf8') + '\n' + fs.readFileSync(path.join(root,'components/PlayerNextEpisode.brs'),'utf8') + '\n' + fixtures);
+        playbackInfo + '\n' + fs.readFileSync(path.join(root,'components/PlayerBufferingRecovery.brs'),'utf8').replace('CreateObject("roTimespan")','WatchdogClock()') + '\n' + fs.readFileSync(path.join(root,'source/util/TimerGuard.brs'),'utf8').replace('CreateObject("roTimespan")','WatchdogClock()') + '\n' + fs.readFileSync(path.join(root,'components/PlayerPosition.brs'),'utf8') + '\n' + fs.readFileSync(path.join(root,'components/PlayerDeliveryInfo.brs'),'utf8') + '\n' + production + '\n' + fs.readFileSync(path.join(root,'source/util/NextEpisode.brs'),'utf8') + '\n' + fs.readFileSync(path.join(root,'components/PlayerNextEpisode.brs'),'utf8') + '\n' + fixtures);
     const result = spawnSync(process.execPath, [
         path.join(root, 'node_modules/@rokucommunity/brs/bin/cli.js'), '--root', staging, combined
     ], { cwd: root, encoding: 'utf8' });
