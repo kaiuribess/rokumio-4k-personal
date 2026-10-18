@@ -1,5 +1,14 @@
 # Changes
 
+## 0.5.28 — 2026-10-17
+
+Prefer practical UHD encodes during automatic selection and clarify private checkpoint observations. Experimental prerelease; no source-speed or complete hardware certification.
+
+- Defer UHD files labelled or declared above 35 GiB until ordinary/unknown-size UHD candidates have had a turn. Apply this after source memory and within host diversification, before the bounded automatic pool is truncated. Large UHD remains eligible before 1080p; manual order and compatibility checks are unchanged.
+- Parse bounded numeric file-size hints before unambiguous GB/GiB/MB/MiB labels. Missing or conflicting evidence remains unknown. File size is a startup heuristic, not measured video bitrate, native quality proof or a permanent rejection.
+- Add passive acceptance/checkpoint guard diagnostics to distinguish a timer notification from a save attempt. Preserve acknowledged persistence and all existing save guards.
+- Document the observed large-file delivery mismatch, the limited steady-playing window and researched Roku alternatives without claiming universal free 4K or lifetime access.
+
 ## 0.5.27 — 2026-10-17
 
 More reliable UHD candidate selection and fresh source discovery. Experimental prerelease; source labels and a short native test do not guarantee sustained 4K delivery.
