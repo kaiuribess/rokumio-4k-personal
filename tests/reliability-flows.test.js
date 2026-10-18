@@ -21,7 +21,7 @@ async function main() {
         read('source/util/CinemaStreams.brs'),read('source/util/PlaybackInfo.brs'),read('source/util/AutoPlayback.brs'),
         read('source/util/TimerGuard.brs').replace('CreateObject("roTimespan")','ReliabilityClock()'),read('components/PlayerPosition.brs'),
         extract('components/StoreHost.brs',['LibrarySetPosition']),
-        extract('components/PlayerScreen.brs',['SavePosition','PublishWatchState','onLocalCheckpoint','QueueSourceDiscovery','CanRecoverSources','onAutoSourceRetry']),
+        extract('components/PlayerScreen.brs',['SavePosition','PublishWatchState','onLocalCheckpoint','CheckpointTiming_Reset','CheckpointTiming_Start','CheckpointTiming_Finish','CheckpointTiming_Status','QueueSourceDiscovery','CanRecoverSources','onAutoSourceRetry']).replace('CreateObject("roTimespan")','ReliabilityCheckpointClock()'),
         extract('components/StreamsScreen.brs',['PrepareSourceRecovery']),
         // Native digest/time/registry unavailable here; fresh ranking itself is real.
         extract('components/SourceSelectionTask.brs',['choose']).replace('sub choose()','sub ReliabilityChoose()').replace('SourceMemory_Now()','ReliabilityNoMemory()').replace('CreateObject("roRegistrySection", "playbackMemory")','invalid'),

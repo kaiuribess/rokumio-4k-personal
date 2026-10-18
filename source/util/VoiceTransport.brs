@@ -51,14 +51,23 @@ function VoicePlaybackDecision(info as dynamic, playback as dynamic) as object
         result.status = "error.generic"
         return result
     end if
-    if not CreateObject("roRegex", "^[0-9]+$", "").IsMatch(value)
+    if Len(value) > 10 or not CreateObject("roRegex", "^[0-9]+$", "").IsMatch(value)
         result.status = "error.generic"
         return result
     end if
-    offset = value.ToFloat()
+    ' Parse the bounded integer offset without single-precision rounding or
+    ' overflow from ToFloat. Native event durations are decimal strings.
+    offset = 0#
+    for index = 1 to Len(value)
+        offset = offset * 10# + Asc(Mid(value,index,1)) - 48
+    end for
+    if VoicePlayback_Number(offset) = invalid
+        result.status = "error.generic"
+        return result
+    end if
     if info.direction = "backward" then offset = -offset
-    position = playback.position
-    if Type(position) <> "Integer" and Type(position) <> "roInt" and Type(position) <> "Float" and Type(position) <> "Double"
+    position = VoicePlayback_Number(playback.position)
+    if position = invalid
         result.status = "error.generic"
         return result
     end if
@@ -68,14 +77,29 @@ function VoicePlaybackDecision(info as dynamic, playback as dynamic) as object
         target = 0
         result.status = "success.seek-start"
     end if
-    duration = playback.duration
+    duration = VoicePlayback_Number(playback.duration)
     if duration <> invalid and duration > 0 and target >= duration
         ' Avoid seeking exactly to EOF, which otherwise finishes the video.
         target = duration - 1
         if target < 0 then target = 0
         result.status = "success.seek-end"
     end if
+    if VoicePlayback_Number(target) = invalid
+        result.status = "error.generic"
+        return result
+    end if
     result.seek = target
     result.autoplayAfterSeek = playback.state = "playing"
     return result
+end function
+
+' SG numeric fields can arrive boxed. Accept their numeric interfaces while
+' rejecting strings, booleans, negative/nonfinite values and absurd offsets.
+' Arithmetic unboxes wrappers before assigning the native seek field.
+function VoicePlayback_Number(value as dynamic) as dynamic
+    kind = Type(value)
+    if kind <> "Integer" and kind <> "roInt" and kind <> "roInteger" and kind <> "LongInteger" and kind <> "roLongInteger" and kind <> "roInt64" and kind <> "Float" and kind <> "roFloat" and kind <> "Double" and kind <> "roDouble" then return invalid
+    value = value + 0#
+    if value >= 0 and value <= 2147483647 then return value
+    return invalid
 end function

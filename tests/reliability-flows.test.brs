@@ -5,6 +5,9 @@ function ReliabilityClock() as object
         return m.elapsed
     end function}
 end function
+function ReliabilityCheckpointClock() as dynamic
+    return m.checkpointTestClock
+end function
 function ReliabilityNoMemory() as dynamic
     return invalid
 end function
@@ -236,16 +239,31 @@ end function}
 m.playParams={metaId:"movie",metaType:"movie",videoId:"movie",name:"Movie",position:0}
 m.playbackActive=true:m.sourceAccepted=true:m.hasPlayed=true:m.retryPending=false:m.saved=false:m.naturalEnd=false
 m.lastPlaybackPosition=0:m.lastPlaybackDuration=0:m.lastDurablePosition=invalid:m.lastDurableDuration=invalid
+CheckpointTiming_Reset()
+m.checkpointTestClock={elapsed:7,Mark:sub()
+end sub,TotalMilliseconds:function() as dynamic
+    return m.elapsed
+end function}
 onLocalCheckpoint()
 Harness_Equal(m.storeHost.library.Position("movie"),60,"uninterrupted playback checkpoints locally")
 Harness_Equal(m.lastDurablePosition,60,"durable acknowledgement recorded")
+Harness_Equal(CheckpointTiming_Status().count,1,"only actual periodic save attempts are counted")
+Harness_Equal(CheckpointTiming_Status().lastMilliseconds,7,"actual checkpoint callback records injected monotonic elapsed time")
+Harness_Equal(CheckpointTiming_Status().maxMilliseconds,7,"first valid checkpoint establishes its maximum")
 snapshot=m.storeHost.native.durable[m.storeHost.library.RegistryKey()]
 onLocalCheckpoint()
 Harness_Equal(m.storeHost.native.durable[m.storeHost.library.RegistryKey()],snapshot,"unchanged playback does not rewrite checkpoint")
+Harness_Equal(CheckpointTiming_Status().count,1,"unchanged checkpoint does not add a timing sample")
+m.checkpointTestClock.elapsed=25
 m.video.position=90:m.storeHost.native.failFlushes=true:onLocalCheckpoint()
 Harness_Equal(m.lastDurablePosition,60,"failed flush cannot advance acknowledged checkpoint")
+Harness_Equal(CheckpointTiming_Status().count,2,"failed durable write remains a measured attempt")
+Harness_Equal(CheckpointTiming_Status().maxMilliseconds,25,"maximum includes failed persistence work")
+m.checkpointTestClock.elapsed=4
 m.storeHost.native.failFlushes=false:onLocalCheckpoint()
 Harness_Equal(m.lastDurablePosition,90,"next checkpoint retries dirty progress")
+Harness_Equal(CheckpointTiming_Status().lastMilliseconds,4,"new timing replaces the last scalar")
+Harness_Equal(CheckpointTiming_Status().maxMilliseconds,25,"faster later checkpoint preserves the maximum")
 reboot=MockRegistry():reboot.values[m.storeHost.library.RegistryKey()]=m.storeHost.native.durable[m.storeHost.library.RegistryKey()]
 Harness_Equal(LibraryStore(reboot,"stremio",String(64,"a")).Position("movie"),90,"process restart restores last durable checkpoint")
 m.video.position=120:m.sourceAccepted=false:onLocalCheckpoint()
@@ -254,9 +272,50 @@ m.sourceAccepted=true:m.playParams.diagnostic=true:onLocalCheckpoint()
 Harness_Equal(m.storeHost.library.Position("movie"),90,"diagnostic cannot write progress")
 m.playParams.diagnostic=false:m.playParams.metaType="channel":onLocalCheckpoint()
 Harness_Equal(m.storeHost.library.Position("movie"),90,"live channels excluded")
+Harness_Equal(CheckpointTiming_Status().count,3,"unaccepted, diagnostic and live content produce no checkpoint timing work")
 
 m.playParams.metaType="movie":m.video.position=0:onLocalCheckpoint()
 Harness_Equal(m.lastDurablePosition,0,"intentional active seek to zero is checkpointed")
+m.checkpointTestClock=invalid:m.video.position=90:onLocalCheckpoint()
+Harness_Equal(m.lastDurablePosition,90,"missing timing capability cannot prevent durable saving")
+Harness_Equal(CheckpointTiming_Status().count,5,"clock failure still counts the actual save attempt")
+Harness_Equal(CheckpointTiming_Status().lastMilliseconds,invalid,"missing clock duration remains unknown rather than zero")
+Harness_Equal(CheckpointTiming_Status().maxMilliseconds,25,"missing clock leaves prior measured maximum intact")
+
+Harness_Suite("Checkpoint timing exposes bounded scalars and remains separate from acknowledgement")
+m.checkpointTestClock={Mark:sub()
+    throw "clock unavailable"
+end sub}
+m.video.position=100:onLocalCheckpoint()
+Harness_Equal(m.lastDurablePosition,100,"clock initialization exception cannot block actual persistence")
+Harness_Equal(CheckpointTiming_Status().lastMilliseconds,invalid,"failed clock initialization is reported as unknown")
+m.checkpointTestClock={Mark:sub()
+end sub,TotalMilliseconds:function() as dynamic
+    throw "clock read unavailable"
+end function}
+m.video.position=110:onLocalCheckpoint()
+Harness_Equal(m.lastDurablePosition,110,"clock read exception cannot change durable acknowledgement")
+Harness_Equal(CheckpointTiming_Status().lastMilliseconds,invalid,"failed clock read does not fabricate a duration")
+m.checkpointTestClock={elapsed:"https://private.invalid/path?token=fixture",Mark:sub()
+end sub,TotalMilliseconds:function() as dynamic
+    return m.elapsed
+end function}
+m.video.position=120:onLocalCheckpoint()
+timing=CheckpointTiming_Status()
+Harness_Equal(timing.Keys().Count(),3,"timing status retains exactly three scalar fields")
+Harness_Equal(timing.lastMilliseconds,invalid,"nonnumeric native clock output is never exposed")
+Harness_Ok(FormatJson(timing).InStr("private")<0,"timing snapshot cannot carry arbitrary clock strings")
+m.checkpointTestClock.elapsed=-1:m.video.position=130:onLocalCheckpoint()
+Harness_Equal(CheckpointTiming_Status().lastMilliseconds,invalid,"negative native clock output stays unknown")
+m.checkpointTestClock.elapsed=2147483648#:m.video.position=140:onLocalCheckpoint()
+Harness_Equal(CheckpointTiming_Status().lastMilliseconds,invalid,"out-of-range duration stays unknown")
+m.checkpointTestClock.elapsed=0:m.video.position=150:onLocalCheckpoint()
+Harness_Equal(CheckpointTiming_Status().lastMilliseconds,0,"a valid zero-millisecond measurement is retained")
+m.checkpointTimingCount=2147483647:m.video.position=160:onLocalCheckpoint()
+Harness_Equal(CheckpointTiming_Status().count,2147483647,"attempt count saturates without integer overflow")
+CheckpointTiming_Reset()
+Harness_Equal(CheckpointTiming_Status().count,0,"a new player entry resets the bounded sample count")
+Harness_Equal(CheckpointTiming_Status().maxMilliseconds,invalid,"a new player entry has no inherited maximum")
 m.video.position=90:onLocalCheckpoint()
 
 Harness_Suite("Old screen exit after a switch cannot save into the new local store")

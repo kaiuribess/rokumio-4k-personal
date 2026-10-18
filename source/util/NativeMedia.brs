@@ -24,6 +24,7 @@ function NativeMedia_Read(resolved as object, workerId as string) as object
     path = "tmp:/mediaHeader-" + workerId + ".bin"
     fs = CreateObject("roFileSystem")
     data = invalid
+    declaredFileBytes = invalid
     try
         unknown.reason = "request-not-started"
         if transfer.AsyncGetToFile(path)
@@ -43,6 +44,7 @@ function NativeMedia_Read(resolved as object, workerId as string) as object
                         stat = fs.Stat(path)
                         if NativeMedia_HasSize(stat)
                             if NativeMedia_ValidHeaderRange(headers,stat.size)
+                                declaredFileBytes = NativeMedia_DeclaredFileBytes(headers)
                                 data = CreateObject("roByteArray")
                                 if not data.ReadFile(path) then data = invalid
                             end if
@@ -75,8 +77,41 @@ function NativeMedia_Read(resolved as object, workerId as string) as object
     end if
     parsed = NativeMedia_Parse(data)
     parsed.streamFormat = "mkv"
+    ' Reuse the response already acquired for inspection. This is a server
+    ' declaration, not a measured transfer rate or a reason to trust a label.
+    parsed.declaredFileBytes = declaredFileBytes
     print "[inspect] complete "; parsed.complete; " tracks "; parsed.tracks.Count()
     return parsed
+end function
+
+' Called only after ValidHeaderRange checks the received prefix length and
+' total >= body length. This helper extracts optional size, never authorizes
+' parsing a response body or enlarges the existing acquisition budget.
+function NativeMedia_DeclaredFileBytes(headers as dynamic) as dynamic
+    if Type(headers) <> "roAssociativeArray" then return invalid
+    total = invalid
+    found = false
+    for each name in headers
+        if LCase(name) = "content-range"
+            if found then return invalid
+            found = true
+            if GetInterface(headers[name],"ifString") = invalid then return invalid
+            value = LCase(headers[name].Trim())
+            if value.Len() > 80 then return invalid
+            parts = CreateObject("roRegex","^bytes 0-[0-9]+/([0-9]{1,13})$","").Match(value)
+            if parts.Count() <> 2 then return invalid
+            ' Decimal accumulation avoids Val's single-precision rounding on
+            ' ordinary multi-gigabyte files. Bound diagnostics to one TiB.
+            total = 0#
+            digits = parts[1]
+            for i = 0 to digits.Len()-1
+                total = total * 10 + Asc(digits.Mid(i,1)) - 48
+                if total > 1099511627776# then return invalid
+            end for
+            if total <= 0 then return invalid
+        end if
+    end for
+    return total
 end function
 
 function NativeMedia_ValidHeaderRange(headers as dynamic, size as integer) as boolean

@@ -58,12 +58,29 @@ end function
 function CinemaEnglishHint(stream as dynamic, patterns = invalid as dynamic) as integer
     if patterns = invalid then patterns = CinemaSourcePatterns()
     text = CinemaStreamText(stream)
+    foreignOnly = patterns.foreignOnly.IsMatch(text)
+    if Type(stream) = "roAssociativeArray"
+        if patterns.foreignName.IsMatch(CinemaOptionalText(stream.name)) then foreignOnly = true
+    end if
+    if foreignOnly
+        ' A film/provider name containing English cannot cancel an explicit
+        ' foreign-only audio annotation. Keep an actual English alternate or
+        ' contradictory multilingual annotation eligible for native inspection.
+        ' Keep annotation boundaries: title "Johnny English" followed by
+        ' description "Audio: Hindi only" must not synthesize English Audio.
+        if Type(stream) = "roAssociativeArray"
+            for each field in ["name","title","description","quality"]
+                if patterns.englishAudio.IsMatch(CinemaOptionalText(stream[field])) then return 1
+            end for
+            if Type(stream.behaviorHints) = "roAssociativeArray"
+                if patterns.englishAudio.IsMatch(CinemaOptionalText(stream.behaviorHints.filename)) then return 1
+            end if
+        end if
+        if patterns.multilingual.IsMatch(text) then return 0
+        return -1
+    end if
     if patterns.english.IsMatch(text) then return 1
     if patterns.multilingual.IsMatch(text) then return 0
-    if patterns.foreignOnly.IsMatch(text) then return -1
-    if Type(stream) = "roAssociativeArray"
-        if patterns.foreignName.IsMatch(CinemaOptionalText(stream.name)) then return -1
-    end if
     return 0
 end function
 
@@ -145,6 +162,7 @@ function CinemaSourcePatterns() as object
         whitespace: CreateObject("roRegex", "\s", "")
         fourK: quality.fourK
         english: CreateObject("roRegex", "(^|[^a-z])(english|eng)([^a-z]|$)", "i")
+        englishAudio: CreateObject("roRegex", "(^|[^a-z])(english|eng)[ ._-]*(audio|alternate|track|aac|ac[ ._-]?3|e[ ._-]?ac[ ._-]?3|ddp|dd|mp3|pcm)([^a-z]|$)|(^|[^a-z])(audio|language)[ ]*:[ ]*(english|eng)([^a-z]|$)|\[(english|eng)\]", "i")
         multilingual: CreateObject("roRegex", "(^|[^a-z])(dual[ ._-]*audio|multi[ ._-]*(audio|language|lingual))([^a-z]|$)", "i")
         foreignOnly: CreateObject("roRegex", "\[(" + languages + "([ ]+audio)?[ -]+only|only[ -]+" + languages + ")\]|(^|[^a-z])audio[ ]*:[ ]*" + languages + "[ ]+only([^a-z]|$)", "i")
         foreignName: CreateObject("roRegex", "^(" + languages + "([ ]+audio)?[ -]+only|only[ -]+" + languages + ")$", "i")

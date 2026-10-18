@@ -15,7 +15,7 @@ const coordinatorNames = ['Prepare','Adopt','SetPriority','PrefetchWarmQueue','S
 let coordinator = coordinatorNames.map(name => extract('components/SourcePrefetchCoordinator.brs', name)).join('\n').replace(/\bm\./g,'m.prefetchState.');
 for (const name of coordinatorNames) coordinator = coordinator.replace(new RegExp(`\\b${name}\\b`, 'g'), `PrefetchTest_${name}`);
 const screenNames = ['OnEnter','LoadStreams','LaunchProviderSources','ApplyProviderSources','onSourcePrefetchChanged',
-  'CancelStreamsLoad','onStreamsLoaded','RefreshStreams','CurrentAudioMode','EpisodeKey','ParamString','isTaskPending',
+  'CancelStreamsLoad','onStreamsLoaded','RefreshStreams','PrepareSourceRecovery','CurrentAudioMode','EpisodeKey','ParamString','isTaskPending',
   'UpdateStreamsStatus','UpdateProviderStatus','MaybeStartAutomaticPlayback','ProviderRequestState','ResetSourcePagination','ChangeSourcePage','DisableAutomaticForManualBrowse','CancelAutomaticGrace','onAutomaticGrace','SuspendSourceLoading','PumpProviderSources','onKeyEvent','BlurFocus','onStreamSelected','onAutomaticSourcesReady','onSourceProgress','SourceLoadStatus'];
 const screen = screenNames.map(name => extract('components/StreamsScreen.brs', name)).join('\n');
 const details = ['ScheduleDetailsPrefetch','DetailsPrefetchParams','onDetailsPrefetch','BlurFocus'].map(name => extract('components/DetailsScreen.brs', name)).join('\n').replace(/\bBlurFocus\b/g,'DetailsTest_BlurFocus');

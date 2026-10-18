@@ -27,6 +27,7 @@ async function main() {
         'onPlaybackFactsChanged', 'onStreamingSegmentChanged', 'NotPlayableOnDevice', 'NextPlayerWorkerId',
         'StartResolve', 'CancelResolve', 'LaunchSubtitleFetch', 'CancelSubtitles',
         'OnEnter', 'OnExit', 'SavePosition', 'ResolveOrdinal', 'onVideoStateChanged', 'onBufferingStatusChanged', 'HasLogo',
+        'CheckpointTiming_Reset', 'CheckpointTiming_Status',
         'CurrentEnglishAudioFacts', 'CurrentEnglishAudioCheck', 'onEnglishAudioFactsChanged', 'onEnglishAudioTimeout',
         'QueueSourceDiscovery', 'CanRecoverSources', 'ScheduleNextSource', 'onAutoSourceRetry', 'onSourceStartupTimeout', 'ArmSourceStartupLimit', 'StopSourceStartupLimit', 'PlaybackStatus', 'ShowEnglishAudioChoice', 'onEnglishAudioChoice', 'CloseEnglishAudioChoice'];
     const screen = functions.map(name => {
@@ -36,7 +37,7 @@ async function main() {
     }).join('\n');
     const memoryScreen = fs.readFileSync(path.join(root,'components/PlayerSourceMemory.brs'),'utf8').replace(/SourceMemory_Fingerprint\(/g,'PlayerTest_Fingerprint(').replace(/ProviderPriority_StreamKey\(/g,'PlayerTest_ProviderKey(').replace(/CreateObject\(/gi,'MockNativeObject(');
     const support = fs.readFileSync(path.join(root,'source/util/TimerGuard.brs'),'utf8').replace(/CreateObject\(/gi,'MockNativeObject(') + '\n' + fs.readFileSync(path.join(root,'components/PlayerPosition.brs'),'utf8') + '\n' + fs.readFileSync(path.join(root,'components/PlayerDeliveryInfo.brs'),'utf8') + '\n' + fs.readFileSync(path.join(root,'components/PlayerBufferingRecovery.brs'),'utf8').replace(/CreateObject\(/gi,'MockNativeObject(');
-    const audioRecovery = fs.readFileSync(path.join(root,'components/PlayerAudioRecovery.brs'),'utf8');
+    const audioRecovery = fs.readFileSync(path.join(root,'components/PlayerAudioRecovery.brs'),'utf8') + '\n' + fs.readFileSync(path.join(root,'components/PlayerProgressRecovery.brs'),'utf8').replace(/CreateObject\(/gi,'MockNativeObject(');
     // Exercise the production resolver and header acquisition through native
     // I/O substitutes, then deliver its real result to the player callback.
     const resolver = /^sub resolve\(\)[^]*?^end sub/mi.exec(fs.readFileSync(path.join(root,'components/StreamResolveTask.brs'),'utf8'))[0]

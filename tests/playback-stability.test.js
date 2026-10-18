@@ -3,7 +3,7 @@
 const fs=require('node:fs'),path=require('node:path'),{spawnSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..'), read=file=>fs.readFileSync(path.join(root,file),'utf8');
 const functions=['QueueSourceDiscovery','CanRecoverSources','onPlayKickFire','onAutoSourceRetry','ArmSourceStartupLimit','StopSourceStartupLimit','onSourceStartupTimeout','onEnglishAudioTimeout','ScheduleNextSource','onAudioTrackRepair','onVideoStateChanged','onBufferingStatusChanged','HasLogo'];
-const production=functions.map(name=>{
+const production=read('components/PlayerProgressRecovery.brs').replaceAll('CreateObject("roTimespan")','StabilityClock()')+'\n'+functions.map(name=>{
  const match=new RegExp(`^(?:sub|function) ${name}\\([^]*?^end (?:sub|function)`,'mi').exec(read(name==='onAudioTrackRepair'?'components/PlayerAudioRecovery.brs':'components/PlayerScreen.brs'));
  if(!match)throw new Error('Missing production function '+name);
  return match[0];

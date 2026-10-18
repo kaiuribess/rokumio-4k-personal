@@ -58,6 +58,57 @@ sub RecoveryAccept()
     end for
 end sub
 
+sub RecoveryCountNativeFacts()
+    m.video.trackFactsReads = 0
+    m.video.HasField = function(field as string) as boolean
+        if field = "availableAudioTracks" then m.trackFactsReads = m.trackFactsReads + 1
+        return m.DoesExist(field)
+    end function
+end sub
+
+Harness_Suite("One native facts snapshot per audio event preserves provisional sound and proof gating")
+RecoverySetup()
+RecoveryCountNativeFacts()
+facts = CurrentEnglishAudioFacts()
+Harness_Equal(m.video.trackFactsReads,1,"native snapshot reads tracks once")
+m.video.trackFactsReads = 0
+checked = CurrentEnglishAudioCheck(facts)
+Harness_Equal(m.video.trackFactsReads,0,"rendered proof checks reuse the supplied snapshot")
+Harness_Ok(facts.verified,"rendered proof does not mutate provisional English facts")
+Harness_Equal(checked.reason,"waiting-rendered-audio","snapshot reuse still requires actual sample progress")
+Harness_Ok(not checked.verified,"native metadata alone remains insufficient for acceptance")
+onEnglishAudioFactsChanged()
+Harness_Equal(m.video.trackFactsReads,1,"audio callback reads native tracks only once")
+Harness_Ok(not m.video.mute,"reusing facts still permits provisional English sound")
+Harness_Ok(not m.sourceAccepted and m.audioProgressArmed,"rendered-sample guard remains armed")
+m.video.trackFactsReads = 0
+onVideoStateChanged()
+Harness_Equal(m.video.trackFactsReads,1,"playing state callback performs one English facts pass")
+Harness_Ok(not m.sourceAccepted and not m.video.mute,"playing callback does not bypass proof or remute provisional audio")
+Harness_Ok(m.status.text.InStr("Checking English audio")>=0,"playing-state UI does not erase the remaining audio-proof status")
+RecoveryAccept()
+m.video.trackFactsReads = 0
+m.video.state = "paused"
+onVideoStateChanged()
+Harness_Equal(m.video.trackFactsReads,1,"pause callback independently checks current English facts once")
+Harness_Ok(m.sourceAccepted and not m.video.mute,"accepted pause preserves the chosen working audio")
+m.video.trackFactsReads = 0
+m.video.state = "playing"
+onVideoStateChanged()
+Harness_Equal(m.video.trackFactsReads,1,"resume callback checks once without replaying the same event")
+Harness_Ok(m.sourceAccepted and m.sourceProofArmed,"accepted resume still rearms source proof")
+m.video.trackFactsReads = 0
+m.video.currentAudioTrack = "foreign"
+m.video.availableAudioTracks = [{Track:"foreign",Language:"por",Name:"AAC stereo"}]
+onPlaybackFactsChanged()
+Harness_Equal(m.video.trackFactsReads,1,"independent native track notification still checks fresh facts")
+Harness_Ok(m.video.mute and m.audioExplicitRejection,"later explicit foreign track remains rejected")
+m.video.trackFactsReads = 0
+m.status.text = "old status"
+onVideoStateChanged()
+Harness_Equal(m.video.trackFactsReads,1,"accepted foreign-track playing event still checks only once")
+Harness_Ok(m.status.text.InStr("not English")>=0,"playing-state UI preserves the accepted-track rejection reason")
+
 Harness_Suite("Actual English decoder facts precede provisional sound and rendered acceptance")
 RecoverySetup()
 onEnglishAudioFactsChanged()
@@ -389,7 +440,7 @@ Harness_Finish()
     .map(name => name.endsWith('player-handoff.test.brs') ? read(name).replace(/^sub PublishWatchState\([^]*?^end sub\s*/mi,'') : read(name)).join('\n') + '\n' + selected + '\n' + memory + '\n' +
     read('source/util/TimerGuard.brs').replace(/CreateObject\(/gi,'MockNativeObject(') + '\n' + read('components/PlayerPosition.brs') + '\n' + read('components/PlayerDeliveryInfo.brs') + '\n' + read('components/PlayerAudioRecovery.brs') + '\n' + read('components/PlayerBufferingRecovery.brs').replace(/CreateObject\(/gi,'MockNativeObject(') + '\n' + read('source/util/NextEpisode.brs') + '\n' + read('components/PlayerNextEpisode.brs') + '\n' + fixtures;
   const file = path.join(staging,'audio-tests.brs');
-  fs.writeFileSync(file, code);
+  fs.writeFileSync(file, read('components/PlayerProgressRecovery.brs').replace(/CreateObject\(/gi,'MockNativeObject(') + '\n' + code);
   const run = spawnSync(process.execPath,[path.join(root,'node_modules/@rokucommunity/brs/bin/cli.js'),'--root',staging,file],{cwd:root,encoding:'utf8'});
   process.stdout.write(run.stdout || '');
   process.stderr.write(run.stderr || '');

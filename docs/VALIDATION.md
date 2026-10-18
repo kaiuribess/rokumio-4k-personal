@@ -1,4 +1,58 @@
-# Release validation — 0.5.24
+# Release validation — 0.5.26
+
+Prepared on 2026-10-17 from default-branch commit `766701d9cfc6d9bc6a61f093591cc2ba382e9acf`, with the preceding 0.5.25 candidate and further production-path repairs. This remains an experimental prerelease.
+
+| Command/check | Fresh result |
+|---|---|
+| `npm ci --ignore-scripts` | Exit 0; 207 installed, 208 audited; lifecycle scripts disabled. |
+| `npm test` | Exit 0 after final runtime edits; 5,962 BrightScript assertions in 36 interpreter runs plus 142 cinema-policy assertions = **6,104**. Separate Node suites: 56 passing test cases; MP4 metadata: 29 checks; playlist handling: 50 assertions. |
+| `npm run build` | Exit 0; compiled 0.5.26 developer-install ZIP. |
+| `python scripts/verify-package.py` | Exit 0; 207 members, 52 XML components, 273 root/3 relative script references and 164 implemented interfaces. Integrity, manifest, paths, references and exclusions passed. |
+| Secret/content and license review | Changed-source review passed; no credentials, private manifests or startup harness code added. MIT/upstream NOTICE, third-party licenses and Open Sans OFL retained. Final local ZIP review also passed: all 180 UTF-8-decodable members scanned without secret candidates, development files or media payloads; license files matched reviewed source. |
+| `git diff --check` | Passed. |
+| `npm audit --json` | Exit 1; unchanged 9 development dependency entries from two underlying advisories (7 high, 2 moderate, 0 critical). Node dependencies are excluded from the install ZIP. |
+
+The completed-provider regression executes PrepareSourceRecovery, re-entry, cancellation and actual coordinator result delivery. Before the repair, eight checks failed: no fresh requests, stale ownership/pending state and old results retained. The fixed path preserves pending transfers, accepted resume, exclusions and the two-worker budget. Source-memory regressions execute production queue, write worker, RegistryIO and result callbacks with Write/Flush refusal, held/stale/duplicate results, launch failure, newest-per-file coalescing and bounded retries. Failed data stays pending in memory; permanent registry refusal or process termination can still prevent durability. Language regressions include foreign-only labels with English in a title and labels split across different fields; hints do not replace native track checks.
+
+### Native English and seek regression
+
+An ordinary-English private HLS control removed the diagnostic-language bypass while retaining no-history safeguards. Of 47 playing samples, the first waited for advancing audio; the remaining 46 passed the production English guard. Fresh native metadata reported 3840 x 2160 SDR HEVC/AAC and unmuted playback, and the sample finished. Pause/resume succeeded. Relative voice-transport seeks returned error.generic, prompting a further repair: numeric wrappers and 64-bit positions must be accepted, with safe duration/offset/target bounds. Production MainScene callback tests reproduced 20 failures before that repair; all 151 voice assertions then passed. A subsequent private harness reproduced rejection of the public MP4, automatically reached attempt 2 using the pinned public HLS control, and reported English with native 3840 x 2160 HEVC/AAC. The repaired transport returned success for pause, resume, forward seek and backward seek. Native instrumentation confirmed the handler associative array stores position/duration as `roFloat`, which the previous admission check rejected. The harness changes only startup, diagnostic test configuration and scalar type logging; no-history safeguards remain. Automatic native-error fallback was exercised, while diagnostic exclusions mean this is not a hardware test of the 45-second frozen-progress watchdog or periodic resume persistence. A first fallback experiment used a local HTTP candidate that the ordinary HTTPS candidate filter correctly omitted; that invalid test setup is excluded from recovery evidence. This exercises native language metadata and advancing media clocks, not acoustic language recognition or audible surround. The control playlist itself declares English.
+
+### Bounded physical evidence from the 0.5.25 player
+
+A private test harness used the exact CI 0.5.25 package with only `source/main.brs` changed to start the existing public control after normal app startup. That test package is not the release ZIP. The Apple HLS control reached native `finished`; 38 playing samples covered position 21.398 to 97.075 over 76.109 seconds. Every sampled audio/video timestamp advanced. Fresh native segment metadata reported 3840 x 2160 SDR with HEVC/AAC. The source-scoped event trace contained no post-start buffering or underrun, and memory level remained normal. The native connection estimate at stream selection was 34,012,160 bits/second; it is not a continuous host speed measurement.
+
+A separate private harness starting the public Microsoft HEVC/AAC direct fragmented-MP4 control obtained no playing samples and logged native error -5 (internal 3), although a PC HEAD request returned HTTP 200. A bounded 1 MiB header inspection found clear fragmented MP4 with a `hev1` sample entry, HEVC Main 8-bit level 5.0 and AAC stereo. This is a failed control, not evidence that MP4/HEVC is universally unsupported: [Roku lists MP4 HEVC/AAC support](https://developer.roku.com/dev/docs/media). Fragment layout and `hev1` are observed differences, not a proven cause. [Microsoft identifies the sample as clear content](https://learn.microsoft.com/en-us/playready/advanced/testcontent/playready-3x-test-content#hevc-8-bit-video-protected-audio-clear); the hostname alone is not DRM evidence.
+
+These control paths intentionally bypass ordinary English-language authorization and exclude automatic recovery/history writes. They do not prove English movie selection, audible sound, surround, HDR, a long MKV, real-source recovery, full-film endurance or the exact unmodified 0.5.26 package. Only fresh native segment data supports the UHD observation; HDMI output and source labels do not. The normal CI package must replace the temporary harness after testing. Publish the exact tested CI artifact unchanged with checksum and provenance, and record further device evidence separately with its precise scope.
+
+---
+
+# Historical 0.5.25 candidate validation
+
+Prepared on 2026-10-17 from latest default-branch commit `766701d9cfc6d9bc6a61f093591cc2ba382e9acf`. The software verification below passed. This remains an experimental prerelease. The exact CI artifact was subsequently installed: the installer reported matching size and MD5, Install Success, and runtime status version 0.5.25. Passive network diagnostics returned bounded facts. An attempted developer-debugger control launch did not yield a successful playback test and made the status service unresponsive; that debugging attempt is excluded from playback evidence. It does not establish a stream failure. No playback-speed, audible-surround or full-film proof was obtained.
+
+| Command/check | Fresh result |
+|---|---|
+| `npm ci --ignore-scripts` | Exit 0; 207 packages installed, 208 audited; dependency lifecycle scripts disabled. |
+| `npm test` | Exit 0; 5,778 BrightScript assertions in 35 interpreter runs plus 129 cinema-policy assertions = **5,907**. Separate Node suites: 56 passing test cases; MP4 metadata: 29 checks; playlist handling: 50 assertions. Native-interface/static checks passed. |
+| `npm run build` | Exit 0; compiled version 0.5.25 developer-install ZIP. |
+| `python scripts/verify-package.py` | Exit 0; 207 members, 52 XML components, 273 root/3 relative script references and 164 implemented interface functions. Integrity, manifest, paths, references and development-file exclusion passed. |
+| Secret/content and license review | PASS; reviewed changed public source and 171 text members of the final local ZIP, with synthetic fixtures classified separately. No credential/configured-URL candidates or bundled movie/audio payloads found. MIT/upstream NOTICE, third-party licenses and Open Sans OFL preserved. |
+| `git diff --check` | Passed. |
+| `npm audit --json` | Exit 1; unchanged 9 development dependency entries from 2 underlying advisories (7 high, 2 moderate, 0 critical). Node dependencies are excluded from the Roku ZIP; see DEVELOPMENT.md. |
+
+New regressions execute production audio/state callbacks and checkpoint/store boundaries. They check one facts pass per event, preserved provisional sound/rendered acceptance/rejection messages, dirty checkpoint acknowledgement, failed clocks, bounded scalar metrics and unchanged skip guards. The new playing-state progress suite covers eligible 45-second stalls through the existing recovery/persistence path, normal movement, pause/seek/discontinuity, stale timer/source events, callback gaps, disabled recovery and live/diagnostic/startup exclusions. Native diagnostic tests cover stale source/node/generation events, distinct event/current snapshots, bounded trace retention, source-correlated duration, malformed/missing size facts and exact multi-gigabyte parsing. Passive network tests cover cache reuse including failures, reset/nonmonotonic counters, type changes, numeric bounds, private-field exclusion and caller-mutation isolation. The totals above include the new progress, network and file-facts runners in the ordinary npm chain. Focused regression work also caught and corrected single-precision large-file parsing and stale prior-source duration attribution before the full passing run.
+
+## Existing-device evidence collected before this patch
+
+Installed 0.5.24 was observed read-only during an existing movie. Three native-reported underruns were recorded. A later 22-sample window spanning 44.7 seconds retained `state=playing` while the native position and both audio/video timestamps stayed unchanged, on the same source attempt. That is evidence of stalled native progress without a reported buffering state, which the older buffering-state watchdog alone could not detect. Current measured host throughput remained unavailable; a raw native stream bitrate is not a download-speed measurement. These observations do not identify a provider/Wi-Fi/app cause or prove a physical improvement from 0.5.25, audible surround or sustained native UHD. No competing speed-test download, live setting change or replacement source was used to generate this evidence.
+
+Publication must promote the exact successful CI ZIP unchanged, with its SHA-256, package-check.json and artifact-provenance.json, then compare the public asset byte-for-byte. Local and CI ZIP hashes may differ because of build metadata. Physical verification of the new event context/duration, checkpoint timing, normal controls, actual audio route and long-film endurance remains required. All earlier hardware results below retain their original version and scope.
+
+---
+
+# Historical 0.5.24 validation
 
 Validated in software on 2026-10-17, starting from default-branch commit `146141c87217811d57a9f2e05fc8b7429cc043cd`. This remains an experimental prerelease. Read-only observations of an already-playing 0.5.23 stream informed the diagnosis; 0.5.24 was not installed during that movie.
 

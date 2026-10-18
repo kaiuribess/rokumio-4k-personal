@@ -16,7 +16,7 @@ try {
         if (!match) throw new Error(`Missing production watchdog handler: ${name}`);
         return match[0];
     }).join('\n');
-    const playbackInfo = fs.readFileSync(path.join(root, 'source/util/PlaybackInfo.brs'), 'utf8');
+    const playbackInfo = fs.readFileSync(path.join(root, 'source/util/PlaybackInfo.brs'), 'utf8') + '\n' + fs.readFileSync(path.join(root,'components/PlayerProgressRecovery.brs'),'utf8').replaceAll('CreateObject("roTimespan")','WatchdogClock()');
     const resume = /^function PlaybackInfo_ResumeOffset\([^]*?^end function/mi.exec(playbackInfo);
     if (!resume) throw new Error('Missing production resume number validator');
     const fixtures = `

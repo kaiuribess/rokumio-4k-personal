@@ -1,5 +1,29 @@
 # Changes
 
+## 0.5.26 — 2026-10-17
+
+Follow-up repairs from production-path review of the 0.5.25 candidate. This remains experimental; source coverage and uninterrupted native UHD are not guaranteed.
+
+- Disown completed provider batches before a recovery reload. Their retained empty task slots previously blocked LoadStreams, leaving recovery to re-rank stale results. Preserve pending requests, the two-worker budget, accepted resume position, failed URL exclusions and the bounded discovery round. Regression tests reproduced eight failing checks before the repair.
+- Give explicit foreign-language-only annotations priority over an English word in a title. Keep mixed-language sources eligible for actual English track verification.
+- Retain unsuccessful source-memory outcome batches with bounded retries and same-file coalescing. Newer outcomes must win over older in-flight writes; persistence failure must not silently leave old working hints preferred.
+- Accept boxed/64-bit native playback positions for relative voice seeks, parse bounded decimal offsets without float overflow, validate duration and preserve paused playback. Production callback regressions cover real boxed numeric objects and unchanged native control behavior.
+- Retain the 0.5.25 progress watchdog, reduced audio scans and private delivery diagnostics. No new accounts, sources, streaming credentials or external server are bundled.
+
+## 0.5.25 — 2026-10-17
+
+Recovery for stalled native progress, callback efficiency and buffering diagnosis, based on default-branch commit `766701d`. Experimental prerelease; this patch has not yet been installed for physical verification and does not claim a measured playback-speed increase.
+
+- Recover when accepted movie/episode playback remains labelled `playing` but its reported position and available media-clock fields stay unchanged for 45 seconds. A three-second timer uses current-source ownership and generation guards, restarts observation on movement/seek/pause/discontinuity, and discards gaps over nine seconds. Startup, diagnostics, live channels and disabled recovery are excluded. The existing bounded recovery coordinator preserves accepted resume progress; this is not proof of a slow host.
+- Reduce repeated English-facts inspection from six passes to one per playing-state event. Reuse one snapshot without mutating provisional audio facts; preserve rendered-sample acceptance, source proof, pause/resume and explicit rejection/status behavior.
+- Add passive network diagnostics with a ten-second cache, bounded connection/protocol/signal fields, transmit-failure/retry counters and general memory level. Unknown native throughput units remain explicitly unspecified. Counter differences are observations, not packet-loss rates or media-host speed tests. No network names, addresses, device identities or raw native records are retained.
+- Retain at most 64 source-scoped native state/buffering event samples. Event snapshots and callback-time fields remain separate, receipt timing is labelled accurately, and stale generation/node events are rejected. The diagnostic observer does not control playback.
+- Reuse the existing bounded range response for a declared total file size, including multi-gigabyte totals. Combine it only with a fresh source-correlated native duration event to estimate average container bits/second. Missing duration stays unknown; this is neither peak video bitrate nor download throughput, and adds no media request.
+- Time actual periodic checkpoint work with fixed count/last/maximum scalar metrics. Clock failures cannot block saves or fabricate duration, and the existing 30-second cadence, dirty-write retry and durable acknowledgement remain unchanged.
+- Add production callback and native-boundary regressions for playing-state freeze recovery, reduced audio work, checkpoint timing failures, private diagnostic fields, stale source events, network counter resets and source-specific size/duration estimates.
+
+Read-only observations of installed 0.5.24 recorded three native-reported underruns, then unchanged native position and audio/video timestamps across 22 samples over 44.7 seconds while the same source remained labelled `playing`. This establishes stalled native progress, not its root cause or a performance result for 0.5.25; measured host speed was unavailable. Earlier physical evidence remains separately identified in [Validation](docs/VALIDATION.md).
+
 ## 0.5.24 — 2026-10-17
 
 Repeated-buffering recovery and catalog freshness, based on default-branch commit `146141c`. Experimental prerelease; this is not a bandwidth increase or a guarantee of source availability.
