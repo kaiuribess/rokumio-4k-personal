@@ -1,5 +1,18 @@
 # Changes
 
+## 0.5.23 — 2026-10-17
+
+Automatic source-selection repairs, starting from latest default-branch commit `1a7d351`. Experimental prerelease; physical playback sign-off remains incomplete.
+
+- Skip recognized download-only, 10Gbps and explicitly non-English-only delivery entries. Keep mixed/unknown language candidates for real English track checks; filenames never authorize sound.
+- Distinguish release resolution from provider branding and remaster labels. Rank 2160p, then 1080p, then other/unknown qualities; prefer English hints and remembered working files within a quality tier.
+- Give pending providers up to four seconds to return UHD when only HD is ready. UHD starts a 750 ms comparison window; Compare providers still waits for all. Re-rank results that arrive before initial handoff, without replacing accepted playback.
+- Limit each automatic pool to six candidates, reserving fallback slots after three UHD attempts when eligible HD is present. Full manual browsing remains available. Existing two-round remaining-provider/fresh-link recovery stays bounded and excludes attempted URLs.
+- Skip recent temporary failures for ten minutes when a stable file fingerprint exists. Explicit fresh-link retry can reconsider temporary failures; proven file incompatibility remains excluded. Only opaque hashes/outcomes persist, never configured or signed URLs. Sources lacking a stable fingerprint still receive in-session exact-URL exclusion.
+- Inspect opaque direct URLs with the existing bounded byte-range worker. An evidenced Matroska container sets native MKV playback; known MP4/HLS/DASH paths retain their existing handling. Reject malformed/oversized/nonzero ranges, clean temporary outputs, and keep native English/codec/progress guards authoritative.
+- Count UHD on source workers rather than re-scan entire provider arrays on the render thread. Add callback integration regressions for delayed UHD, stale ranking, failed-source cooldown/retry and opaque MKV resolution.
+- Document optional account-free HDHub/Pluto setup and their limits. No providers, accounts, media or credentials are silently bundled.
+
 ## 0.5.22 — 2026-10-15
 
 Account sync and data-integrity repairs, based on the latest default branch `bcd32111d9b0996b35285b1a684513d88f66b0c1`. Experimental prerelease; no physical device validation for this update.

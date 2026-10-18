@@ -2,13 +2,13 @@
 
 A native Roku client with a dark red interface for browsing Stremio-compatible catalogs, searching movies and shows, and playing compatible direct streams with the Roku remote. This community derivative adds English audio selection, projector/surround preferences, clearer source cards, automatic source recovery, next-episode playback, and add-on checks. The repository and ZIP filename remain `rokumio-4k-personal` so existing links and build instructions continue to work.
 
-**Version 0.5.22 is an experimental account-sync and reliability update.** Stremio login imports supported account add-ons automatically, keeps useful entries when another is unsupported, and shows partial/failed/empty outcomes with retry. Catalog changes refresh Home, Search and Discover. Empty or stream-only accounts can explicitly add Cinemeta on this Roku without changing their remote account. Account-write recovery and browser import permissions are stronger. See the [audit and regression evidence](docs/AUDIT-0.5.22.md). This version has software validation; it has not received physical Roku sign-off. Provider compatibility, audible surround and sustained genuine 4K still depend on the actual source and equipment.
+**Version 0.5.23 improves automatic English source selection.** Play prefers UHD candidates, keeps 1080p fallback, skips recognized download-only/10Gbps links, and tries a small ranked pool before continuing provider discovery. Opaque MKV links now receive bounded header detection. English hints and known-working sources receive priority, while actual track/decoder checks still control playback. This remains an experimental prerelease: software checks do not establish audible surround, uninterrupted films or sustained native 4K on every source. See [validation](docs/VALIDATION.md).
 
-**[Download the Roku install ZIP — 0.5.22](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.22/rokumio-4k-personal-0.5.22.zip)**
+**[Download the Roku install ZIP — 0.5.23](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.23/rokumio-4k-personal-0.5.23.zip)**
 
 Upload that ZIP without extracting it. GitHub's green Code button and “Source code” archives are for developers; they are not the Roku install package.
 
-[Release notes and checksum](https://github.com/kaiuribess/rokumio-4k-personal/releases/tag/v0.5.22) · [Installation](docs/INSTALL.md) · [Add-on checks](docs/ADDON_CHECKS.md) · [Playback and 4K](docs/PLAYBACK.md) · [Development](docs/DEVELOPMENT.md) · [Changes](CHANGELOG.md)
+[Release notes and checksum](https://github.com/kaiuribess/rokumio-4k-personal/releases/tag/v0.5.23) · [Installation](docs/INSTALL.md) · [Add-on checks](docs/ADDON_CHECKS.md) · [Playback and 4K](docs/PLAYBACK.md) · [Development](docs/DEVELOPMENT.md) · [Changes](CHANGELOG.md)
 
 ## What you can do
 
@@ -27,6 +27,8 @@ Upload that ZIP without extracting it. GitHub's green Code button and “Source 
 - Choose **Settings → Preferred source** to request that installed provider first when a slot is free. Automatic uses the most recent provider that passed the existing English-track/native A/V progress checks. Queued providers and active requests have distinct status labels.
 
 The built-in Cinemeta catalog supplies title metadata. **Playable movies, shows, provider accounts and configured stream add-ons are not bundled.** Install your own compatible provider manifest and use content you are authorized to access. Searching a title does not establish that a playable 4K source exists.
+
+For optional account-free providers and their tested limits, see the [free sources setup guide](docs/FREE-SOURCES.md).
 
 ## What we added
 
@@ -67,7 +69,7 @@ Preloading and explicit source requests share two worker slots. All eligible pro
 
 Start sooner may begin with fewer recovery alternatives than Compare providers. Both retain native quality/audio checks. Later providers do not switch a movie that is already playing.
 
-For a quality-first 4K setup, choose **Compare providers** and **4K only**. With HD fallback enabled, Start sooner may select an available 1080p candidate before a slower provider returns UHD. Initial 2160p labels remain hints; they do not universally prove native UHD decoding.
+For a quality-first 4K setup, choose **Compare providers** and **4K only**. With HD fallback enabled, Start sooner gives pending providers up to four seconds after HD first becomes ready to return UHD. A slower provider can still arrive after that bound. Initial 2160p labels remain hints; they do not universally prove native UHD decoding.
 
 The source list displays 48 real cards per page, plus two fixed navigation controls when paging is enabled. More/Previous expose later **retained, eligible** choices without growing the current page. Warm prefetch still has its existing 256-candidate/provider cap; Play/Pause refresh uses an ordinary provider response. Ordinary response bytes are not capped by paging. Provider priority reorders waiting jobs only; active transfers are not preempted. Only two opaque hashes are saved for preferred/last working provider identity, excluding configured paths, queries and userinfo.
 

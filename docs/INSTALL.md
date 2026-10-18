@@ -2,7 +2,7 @@
 
 ## Install the release ZIP
 
-**[Download the installable Roku ZIP — 0.5.21](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.21/rokumio-4k-personal-0.5.21.zip)**. Keep it zipped. This direct link avoids GitHub's source-code archives; those archives cannot be uploaded as the channel package.
+**[Download the installable Roku ZIP — 0.5.23](https://github.com/kaiuribess/rokumio-4k-personal/releases/download/v0.5.23/rokumio-4k-personal-0.5.23.zip)**. Keep it zipped. This direct link avoids GitHub's source-code archives; those archives cannot be uploaded as the channel package.
 
 1. On the Roku remote press **Home three times, Up twice, Right, Left, Right, Left, Right**.
 2. Write down the device URL displayed on the developer screen, enable the installer, review Roku's terms, and set an installer password privately. Roku restarts.
@@ -18,7 +18,7 @@ Roku permits one sideloaded app at a time; this replaces an existing development
 1. Continue with a local profile, or use optional Stremio pairing to sync your library/add-ons.
 2. Open **Add-ons** and leave it open.
 3. On your phone/computer, open the exact local setup address displayed by the Roku app. Paste the configured HTTPS manifest URL supplied by your provider and submit it.
-4. Check the TV's import summary. A successful manifest import confirms installation, not movie playback compatibility.
+4. Select **Allow import** on the TV within 60 seconds, then check the final import summary. A successful manifest import confirms installation, not movie playback compatibility.
 
 Configured manifests may contain account secrets. Enter them privately; do not put them in GitHub issues or screenshots. Each public installation needs its own provider configuration. This release does not include the original user's account, API key or stored add-on.
 
