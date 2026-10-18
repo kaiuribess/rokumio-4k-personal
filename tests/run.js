@@ -2082,8 +2082,13 @@ function checkTaskTeardownContract() {
     // per add-on. Four copies of one manifest in a single device log is this.
     const enter = body(streams, 'OnEnter');
     if (enter) {
-        const guardAt = /EpisodeKey\(params\)\s*=\s*m\.loadKey/.exec(enter);
-        const cancelAt = /CancelStreamsLoad\(\)/.exec(enter);
+        // The invalid-params re-entry branch returns before fresh navigation.
+        // It may deliberately cancel an exhausted batch for a recovery reload;
+        // preserve the same-episode guard specifically on non-null navigation.
+        const navigationStart = enter.indexOf('currentContext = SourcePrefetch_Context');
+        const navigation = navigationStart >= 0 ? enter.slice(navigationStart) : enter;
+        const guardAt = /EpisodeKey\(params\)\s*=\s*m\.loadKey/.exec(navigation);
+        const cancelAt = /CancelStreamsLoad\(\)/.exec(navigation);
         if (guardAt && cancelAt && guardAt.index > cancelAt.index) {
             err('StreamsScreen.brs OnEnter() compares EpisodeKey only AFTER CancelStreamsLoad() — by then m.loadKey and m.pendingCount have been cleared by the cancel, so the guard can never match and every entry re-fans out the whole batch again');
         }

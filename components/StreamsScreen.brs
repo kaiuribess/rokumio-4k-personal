@@ -107,7 +107,11 @@ function OnEnter(params as object) as void
         if m.accountGeneration <> invalid and AccountEpoch_Read(m.top) <> m.accountGeneration then return
         m.sourcesSuspended = false
         if m.reloadNeeded = true
-            m.reloadNeeded = false
+            ' Completed batches retain one invalid task slot per provider.
+            ' Disown that batch before LoadStreams, whose duplicate-load guard
+            ' otherwise treats its nonempty slot array as existing work. Keep
+            ' the recovery round, exclusions and accepted position intact.
+            CancelStreamsLoad()
             LoadStreams(m.params,false)
             ResetProviderNavigation()
         end if

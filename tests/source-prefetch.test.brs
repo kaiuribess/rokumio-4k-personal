@@ -892,4 +892,67 @@ Harness_Ok(FormatJson(info).InStr("https://")<0,"diagnostic contains no configur
 CancelStreamsLoad()
 onSourceProgress()
 Harness_Equal(m.sourceProgress.control,"stop","Back disarms progress updates")
+Harness_Suite("Completed playback recovery really refreshes the provider batch")
+PrefetchTest_Setup(2)
+LoadStreams(m.params)
+oldFirst = m.launched[0]:oldSecond = m.launched[1]
+oldFirst.result = PrefetchTest_Result("expired-first")
+oldSecond.result = PrefetchTest_Result("expired-second")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(oldFirst))
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(oldSecond))
+onSourcePrefetchChanged()
+Harness_Equal(m.pendingCount,0,"production callbacks complete both old providers")
+Harness_Equal(m.loadTasks.Count(),2,"completed screen retains its two invalid task slots")
+Harness_Equal(m.loadTasks[0],invalid,"a retained slot is not an active source request")
+oldToken = m.loadToken
+SuspendSourceLoading():m.top.screenActive = false
+request = {videoId:m.params.videoId,position:1136.63,excludedUrls:[oldFirst.result.streams[0].url,oldSecond.result.streams[0].url],round:1,manual:false}
+Harness_Ok(PrepareSourceRecovery(request),"real recovery preparation accepts the completed title")
+Harness_Ok(m.reloadNeeded,"completed batch requests a fresh provider pass")
+m.top.screenActive = true:OnEnter(invalid)
+Harness_Equal(m.launched.Count(),4,"real re-entry starts two fresh requests despite completed invalid slots")
+Harness_Equal(m.prefetchState.activeTasks.Count(),2,"fresh recovery retains the shared two-transfer budget")
+Harness_Ok(m.loadToken <> oldToken,"recovery reload mints a new screen batch token")
+Harness_Equal(m.pendingCount,2,"fresh batch exposes both pending providers")
+Harness_Equal(m.providers[0].streams.Count(),0,"expired retained sources are cleared before fresh requests")
+Harness_Equal(m.params.position,1136.63,"recovery reload preserves accepted resume progress")
+Harness_Equal(m.recoveryRound,1,"recovery reload preserves its bounded round")
+Harness_Equal(m.recoveryExcluded.Count(),2,"automatic recovery retains both failed delivery exclusions")
+Harness_Equal(m.recoveryExcluded[0],oldFirst.result.streams[0].url,"exact failed URL remains private and excluded")
+Harness_Ok(m.autoPlayEnabled and not m.autoPlaySent,"fresh results retain automatic handoff intent")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(oldFirst))
+onSourcePrefetchChanged()
+Harness_Equal(m.pendingCount,2,"duplicate old completion cannot complete a current provider")
+Harness_Equal(m.providers[0].streams.Count(),0,"old completed sources cannot repopulate the fresh batch")
+if m.launched.Count() >= 4
+    fresh = m.launched[2]
+    fresh.result = PrefetchTest_Result("fresh-working")
+    PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(fresh))
+    onSourcePrefetchChanged()
+    Harness_Equal(m.providers[0].streams[0].url,fresh.result.streams[0].url,"fresh provider result crosses the actual coordinator-to-screen boundary")
+end if
+OnEnter(invalid)
+Harness_Equal(m.launched.Count(),4,"duplicate re-entry never starts another replacement batch")
+
+Harness_Suite("Pending recovery resumes existing work without cancelling or refetching it")
+PrefetchTest_Setup(3)
+LoadStreams(m.params)
+first = m.launched[0]
+first.result = PrefetchTest_Result("already-failed")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(first))
+onSourcePrefetchChanged()
+Harness_Equal(m.pendingCount,2,"two providers remain after the first source is offered")
+oldToken = m.loadToken:oldSequence = m.prefetchState.sequence
+SuspendSourceLoading():m.top.screenActive = false
+request = {videoId:m.params.videoId,position:456,excludedUrls:[first.result.streams[0].url],round:1,manual:false}
+PrepareSourceRecovery(request)
+Harness_Ok(not m.reloadNeeded,"automatic early-pool exhaustion preserves pending source work")
+m.top.screenActive = true:OnEnter(invalid)
+Harness_Equal(m.launched.Count(),3,"pending recovery launches no duplicate source requests")
+Harness_Equal(m.loadToken,oldToken,"pending recovery keeps the same screen ownership token")
+Harness_Equal(m.prefetchState.sequence,oldSequence,"pending recovery does not cancel coordinator ownership")
+Harness_Equal(m.prefetchState.activeTasks.Count(),2,"pending recovery remains inside the two-transfer budget")
+Harness_Equal(m.providers[0].streams[0].url,first.result.streams[0].url,"retained results remain available for filtered ranking")
+Harness_Equal(m.recoveryExcluded.Count(),1,"failed early candidate stays excluded while queued providers resume")
+Harness_Equal(m.params.position,456,"pending recovery also preserves the accepted checkpoint")
 Harness_Finish()
