@@ -92,6 +92,13 @@ sub Main()
     Harness_Equal(m.video.observations[0].callback,"onDeliveryStreamInfoChanged","production callback is registered")
     Harness_Equal(m.video.observations[0].context[0],"crimsonDeliveryGeneration","attempt context is requested at native event creation")
     BeginDeliveryInfo(first)
+    m.sourceAccepted = true:m.hasPlayed = true
+    Harness_Equal(PlaybackStatus().sourceAccepted,true,"status distinguishes actual acceptance from current English metadata")
+    Harness_Equal(PlaybackStatus().hasPlayed,true,"status exposes only the boolean played guard")
+    m.sourceAccepted = "fixture-secret":m.hasPlayed = "fixture-secret"
+    Harness_Equal(PlaybackStatus().sourceAccepted,false,"non-boolean acceptance state cannot escape as arbitrary text")
+    Harness_Equal(PlaybackStatus().hasPlayed,false,"non-boolean played state cannot escape as arbitrary text")
+    m.sourceAccepted = false:m.hasPlayed = false
     snapshot = PlaybackStatus().delivery
     Harness_Ok(not snapshot.available,"retained native field is ignored before a fresh notification")
     Harness_Equal(snapshot.measuredAtSelectionBitsPerSecond,invalid,"cached previous stream speed is never polled")

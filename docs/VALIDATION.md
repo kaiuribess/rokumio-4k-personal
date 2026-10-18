@@ -1,3 +1,28 @@
+# Release validation — 0.5.28
+
+Prepared on October 17, 2026 from latest default-branch commit `98c2d3c04f7775d7ba4f3f8a46dafffcefa95844`. Experimental prerelease; no sustained native UHD or audible-surround certification.
+
+| Command/check | Result |
+|---|---|
+| `npm ci --ignore-scripts` | Exit 0; pinned development dependencies unchanged. |
+| `npm test` | Exit 0; 6,304 BrightScript assertions across 36 runs plus 142 cinema-policy assertions = **6,446**. Separate 56 Node test cases, 29 MP4 checks and 50 playlist assertions passed. |
+| `npm run build` | Exit 0; no assertion was weakened. |
+| `python scripts/verify-package.py` | Exit 0; 207 members, 52 XML components, 273 root/3 relative script references, 164 interface implementations. |
+| Focused automatic-selection regression | 9 assertions failed before the size-policy repair. Final production worker/store/budget tests passed 247 assertions, including 74 new checks. |
+| Focused checkpoint/native regressions | 151 reliability-flow, 157 delivery-info and 423 native-playback assertions passed. |
+| Independent source review | No blocker in automatic size-class/memory/host ordering or passive checkpoint diagnostics. Save guards, cadence and durable acknowledgement remain unchanged. |
+| `git diff --check` | Passed. |
+
+The new size rule applies only to automatic selection. Ordinary/unknown UHD precedes files above 35 GiB, then HD follows, within the existing bounded pool/recovery policy. Tests cross actual source budgeting, the SourceSelectionTask callback and source-memory ordering; they include remembered giants, multiple hosts, native boxed/64-bit size values, threshold boundaries, malformed/conflicting labels, exact-URL exclusions, English eligibility, audio ranking and unchanged manual ordering. File size is a heuristic, not elementary video bitrate or throughput proof.
+
+One normal 0.5.27 movie source reported a 3840x2160 encoded header, English HEVC/E-AC-3 metadata and 87,937,111,321 declared bytes over 8,700 seconds (about 80.9 Mbps average container rate). Its selection-time network estimate was about 36 Mbps, whose persistence was not established. A subsequent 59-sample/129.375-second window showed steady reported playback and advancing position, with no buffering-state sample; the user's intermittent-pause report remains relevant. Roku did not report decoded segment resolution for that source. This evidence supports investigating delivery fit, not declaring either universal failure or complete UHD success.
+
+The old checkpoint timing count remained zero in that window. That alone does not prove registry failure: it was incremented only after several save guards. New passive fields separate callback-fire count, guard outcome, acceptance and requested timer control from persistence acknowledgement. They do not change saving behavior or claim a native timer is running. Regression tests preserve Write/Flush refusal handling and previous acknowledged progress.
+
+The further free-source hunt found smaller explicitly UHD-labelled candidates but no independently verified sustained-UHD improvement. One No Way Home file exposed 3840x1608 HEVC metadata and AC3/TrueHD/DTS tracks; English language and native playback were unverified. Other bounded resolver checks returned HTTP 403/404 or HD metadata. Broader aggregation repeated the 4KHDHub family. No additional source, account, trial or payment was installed/activated during these checks. See [free sources and other clients](FREE-SOURCES.md).
+
+---
+
 # Release validation — 0.5.27
 
 Prepared from latest default-branch commit `78739ac9cda30935e370053daae5adf871163a26`. This remains an experimental prerelease.
