@@ -7,6 +7,10 @@ sub InitSourceMemory()
     if m.sourceMemoryPump <> invalid then m.sourceMemoryPump.ObserveField("fire","onSourceMemoryPump")
     m.sourceMemoryPending = []
     m.sourceMemoryTask = invalid
+    m.sourceMemoryInFlight = []
+    m.sourceMemoryRetryCount = 0
+    m.sourceMemoryRetryBlocked = false
+    m.sourceMemoryRetryGuard = invalid
     m.sourceAttemptKey = ""
     m.memorySaved = false
     ResetSourceProof()
@@ -34,10 +38,38 @@ end sub
 
 sub QueueSourceOutcome(outcome as string)
     if m.sourceAttemptKey = invalid or m.sourceAttemptKey = "" then return
-    if Type(m.sourceMemoryPending) <> "roArray" then m.sourceMemoryPending = []
-    if m.sourceMemoryPending.Count() >= 64 then m.sourceMemoryPending.Shift()
-    m.sourceMemoryPending.Push({key:m.sourceAttemptKey,outcome:outcome})
-    if m.sourceMemoryPump <> invalid then m.sourceMemoryPump.control = "start"
+    m.sourceMemoryPending = MergeSourceOutcomes(m.sourceMemoryPending,[{key:m.sourceAttemptKey,outcome:outcome}])
+    m.memorySaved = false
+    ' A real new outcome may restart a bounded retry cycle; a queued timer or
+    ' duplicate worker result cannot restart it on its own.
+    m.sourceMemoryRetryCount = 0
+    m.sourceMemoryRetryBlocked = false
+    ArmSourceMemoryPump(100)
+end sub
+
+' Newer outcomes replace older ones only for the same opaque file key. Keep
+' at most 64 latest distinct keys, including when a failed batch is restored.
+function MergeSourceOutcomes(older as dynamic, newer as dynamic) as object
+    result = []
+    for each batch in [older,newer]
+        if Type(batch) <> "roArray" then continue for
+        for each entry in batch
+            if Type(entry) <> "roAssociativeArray" then continue for
+            if GetInterface(entry.key,"ifString") = invalid or entry.key = "" then continue for
+            if entry.outcome <> "working" and entry.outcome <> "network" and entry.outcome <> "incompatible" then continue for
+            for index = result.Count() - 1 to 0 step -1
+                if result[index].key = entry.key then result.Delete(index)
+            end for
+            if result.Count() >= 64 then result.Shift()
+            result.Push({key:entry.key,outcome:entry.outcome})
+        end for
+    end for
+    return result
+end function
+
+sub ArmSourceMemoryPump(delayMs as integer)
+    if m.sourceMemoryPump = invalid or m.sourceMemoryRetryBlocked = true then return
+    m.sourceMemoryRetryGuard = TimerGuard_Start(m.sourceMemoryPump,delayMs)
 end sub
 
 sub RememberSourceFailure()
@@ -111,10 +143,18 @@ end sub
 
 sub onSourceMemoryPump()
     if m.sourceMemoryTask <> invalid then return
+    if m.sourceMemoryRetryBlocked = true then return
     if Type(m.sourceMemoryPending) <> "roArray" or m.sourceMemoryPending.Count() = 0 then return
-    batch = m.sourceMemoryPending
+    if not TimerGuard_Ready(m.sourceMemoryPump,m.sourceMemoryRetryGuard) then return
+    m.sourceMemoryRetryGuard = invalid
+    m.sourceMemoryInFlight = m.sourceMemoryPending
     m.sourceMemoryPending = []
-    m.sourceMemoryTask = AsyncTask_Launch(m.top,"SourceMemoryWriteTask","onSourceMemorySaved",{events:batch},NextPlayerWorkerId("sourceMemory"))
+    try
+        m.sourceMemoryTask = AsyncTask_Launch(m.top,"SourceMemoryWriteTask","onSourceMemorySaved",{events:m.sourceMemoryInFlight},NextPlayerWorkerId("sourceMemory"))
+    catch e
+        m.sourceMemoryTask = invalid
+    end try
+    if m.sourceMemoryTask = invalid then FinishSourceMemoryWrite(false)
 end sub
 
 sub onSourceMemorySaved(event as object)
@@ -125,6 +165,30 @@ sub onSourceMemorySaved(event as object)
     if Type(result) <> "roAssociativeArray" then return
     m.sourceMemoryTask = invalid
     AsyncTask_Reap(task,m.top,false)
-    if result.saved = true then m.memorySaved = true
-    if m.sourceMemoryPump <> invalid and Type(m.sourceMemoryPending) = "roArray" and m.sourceMemoryPending.Count() > 0 then m.sourceMemoryPump.control = "start"
+    FinishSourceMemoryWrite(result.saved = true)
+end sub
+
+sub FinishSourceMemoryWrite(saved as boolean)
+    if Type(m.sourceMemoryPending) <> "roArray" then m.sourceMemoryPending = []
+    delayMs = 100
+    if saved
+        m.sourceMemoryRetryCount = 0
+        m.sourceMemoryRetryBlocked = false
+    else
+        m.sourceMemoryPending = MergeSourceOutcomes(m.sourceMemoryInFlight,m.sourceMemoryPending)
+        if m.sourceMemoryRetryCount = invalid then m.sourceMemoryRetryCount = 0
+        m.sourceMemoryRetryCount = m.sourceMemoryRetryCount + 1
+        m.sourceMemoryRetryBlocked = m.sourceMemoryRetryCount > 3
+        ' Initial attempt plus at most three timed retries (1,2,4 seconds).
+        delayMs = 1000
+        if m.sourceMemoryRetryCount = 2 then delayMs = 2000
+        if m.sourceMemoryRetryCount >= 3 then delayMs = 4000
+    end if
+    m.sourceMemoryInFlight = []
+    m.memorySaved = saved and m.sourceMemoryPending.Count() = 0
+    if m.sourceMemoryRetryBlocked = true
+        if m.sourceMemoryPump <> invalid then m.sourceMemoryPump.control = "stop"
+    else if m.sourceMemoryPending.Count() > 0
+        ArmSourceMemoryPump(delayMs)
+    end if
 end sub
