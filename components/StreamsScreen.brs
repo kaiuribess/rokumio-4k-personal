@@ -77,6 +77,7 @@ sub init()
     m.selectionTask = invalid
     m.recoveryExcluded = []
     m.recoveryRound = 0
+    m.recoveryManual = false
     m.autoPlayEnabled = false
     m.autoPlaySent = false
     m.prefetchNode = invalid
@@ -156,6 +157,7 @@ function OnEnter(params as object) as void
     m.params = params
     m.recoveryExcluded = []
     m.recoveryRound = 0
+    m.recoveryManual = false
     m.fourKOnly = PlaybackPreferences(m.stores,params).fourKOnly
     m.autoPlayEnabled = params.autoPlay = true
     m.autoPlaySent = false
@@ -354,6 +356,12 @@ sub ApplyProviderSources(index as integer, result as dynamic)
     if Type(result) <> "roAssociativeArray" then return
     provider = m.providers[index]
     provider.readyStreams = result.readyStreams
+    provider.uhdCount = 0
+    if Type(result.uhdCount) = "Integer" or Type(result.uhdCount) = "roInteger"
+        if Type(result.readyStreams) = "roArray"
+            if result.uhdCount >= 0 and result.uhdCount <= result.readyStreams.Count() then provider.uhdCount = result.uhdCount
+        end if
+    end if
     provider.sourceDiagnostics = result.sourceDiagnostics
     if Type(result.streams) = "roArray" then provider.streams = result.streams
     if result.error <> invalid and result.error <> ""
@@ -424,22 +432,38 @@ sub MaybeStartAutomaticPlayback()
     if m.selectionRevision = m.sourceRevision then return
     groups = []
     readyCount = 0
+    uhdCount = 0
     if m.providers <> invalid
         for each provider in m.providers
             if Type(provider.streams) = "roArray"
                 groups.Push(provider.streams)
             end if
-            if Type(provider.readyStreams) = "roArray" then readyCount = readyCount + CinemaFilterReadyStreams(provider.readyStreams,m.fourKOnly).Count()
+            if Type(provider.readyStreams) = "roArray"
+                ' Workers count UHD once; never regex-scan the full pool again
+                ' on each render-thread timer or provider notification.
+                count = 0
+                if provider.uhdCount <> invalid then count = provider.uhdCount
+                uhdCount = uhdCount + count
+                if m.fourKOnly then readyCount = readyCount + count else readyCount = readyCount + provider.readyStreams.Count()
+            end if
         end for
     end if
     prefs = PlaybackPreferences(m.stores,m.params)
     if m.pendingCount > 0
         if prefs.waitForProviders = true or readyCount = 0 then return
-        if m.autoGraceDeadline = invalid
-            if m.autoClock <> invalid then m.autoGraceDeadline = m.autoClock.TotalMilliseconds() + 750
+        ' Give pending providers a bounded chance to return UHD before taking
+        ' an early HD fallback. A UHD arrival shortens, never extends, the wait.
+        graceMs = 4000
+        if uhdCount > 0 then graceMs = 750
+        rearm = m.autoGraceDeadline = invalid
+        if m.autoClock <> invalid and m.autoGraceDeadline <> invalid
+            if m.autoGraceDeadline > m.autoClock.TotalMilliseconds() + graceMs then rearm = true
+        end if
+        if rearm
+            if m.autoClock <> invalid then m.autoGraceDeadline = m.autoClock.TotalMilliseconds() + graceMs
             m.autoGraceToken = m.loadToken
             if m.autoGraceTimer <> invalid and m.autoClock <> invalid
-                m.autoGraceTimer.duration = 0.75
+                m.autoGraceTimer.duration = graceMs / 1000.0
                 m.autoGraceTimer.control = "start"
                 return
             end if
@@ -450,7 +474,7 @@ sub MaybeStartAutomaticPlayback()
     m.selectionRevision = m.sourceRevision
     if m.selectionSequence = invalid then m.selectionSequence = 0
     m.selectionSequence = m.selectionSequence + 1
-    m.selectionTask = AsyncTask_Launch(m.top, "SourceSelectionTask", "onAutomaticSourcesReady", {providerGroups:groups,excludedUrls:m.recoveryExcluded,videoId:ParamString(m.params.videoId),audioMode:CurrentAudioMode(),fourKOnly:m.fourKOnly,loadToken:m.loadToken}, "automaticSources" + m.loadToken + "_" + ParamString(m.selectionSequence))
+    m.selectionTask = AsyncTask_Launch(m.top, "SourceSelectionTask", "onAutomaticSourcesReady", {providerGroups:groups,excludedUrls:m.recoveryExcluded,videoId:ParamString(m.params.videoId),audioMode:CurrentAudioMode(),fourKOnly:m.fourKOnly,loadToken:m.loadToken,sourceRevision:m.sourceRevision,skipRecentFailures:m.recoveryManual <> true}, "automaticSources" + m.loadToken + "_" + ParamString(m.selectionSequence))
 end sub
 
 sub onAutomaticSourcesReady(event as object)
@@ -463,6 +487,13 @@ sub onAutomaticSourcesReady(event as object)
     AsyncTask_Reap(task, m.top, false)
     if not m.top.screenActive or m.sourcesSuspended = true or m.autoPlayEnabled <> true or m.autoPlaySent = true then return
     if task.fourKOnly <> m.fourKOnly or task.audioMode <> CurrentAudioMode()
+        m.selectionRevision = -1
+        MaybeStartAutomaticPlayback()
+        return
+    end if
+    ' Results arriving during ranking belong in the initial decision. Once
+    ' playback has been handed off, late providers never replace it.
+    if task.sourceRevision <> invalid and task.sourceRevision <> m.sourceRevision
         m.selectionRevision = -1
         MaybeStartAutomaticPlayback()
         return
@@ -575,6 +606,11 @@ end sub
 ' its monotonic token rejects late results from the canceled request.
 sub RefreshStreams()
     if m.params = invalid or m.stores = invalid then return
+    m.recoveryManual = true
+    m.recoveryExcluded = []
+    m.recoveryRound = 0
+    m.autoPlayEnabled = true
+    m.autoPlaySent = false
     selectedAddress = ""
     if m.providers <> invalid and m.activeIndex >= 0 and m.activeIndex < m.providers.Count() then selectedAddress = ParamString(m.providers[m.activeIndex].address)
     CancelStreamsLoad()
@@ -850,6 +886,8 @@ sub RenderActiveProvider()
                 label = "This provider returned no direct HTTPS streams. A torrent alone cannot play on Roku."
             end if
             if skipped.uncached > 0 then label = "Only uncached downloads are available. Choose a cached source or another title."
+            if skipped.downloadOnly <> invalid and skipped.downloadOnly > 0 then label = "Download-only / 10Gbps links were skipped because they cannot provide reliable playback and seeking."
+            if skipped.nonEnglish <> invalid and skipped.nonEnglish > 0 then label = "Sources explicitly marked non-English were skipped. English and multilingual sources remain eligible."
             if skipped.status > 0 then label = "Provider reported an account or service error. Check your provider configuration."
         end if
         if label = ""
@@ -971,6 +1009,7 @@ sub DisableAutomaticForManualBrowse()
     CancelAutomaticGrace()
     m.recoveryExcluded = []
     m.recoveryRound = 0
+    m.recoveryManual = false
     m.autoPlayEnabled = false
     m.autoPlaySent = true
     if m.selectionTask <> invalid
@@ -1345,6 +1384,7 @@ function PrepareSourceRecovery(request as dynamic) as boolean
     if request.videoId <> m.params.videoId then return false
     if request.round < 1 or request.round > 2 then return false
     m.recoveryRound = request.round
+    m.recoveryManual = request.manual = true
     m.recoveryExcluded = request.excludedUrls
     if request.manual = true then m.recoveryExcluded = []
     m.params.position = request.position

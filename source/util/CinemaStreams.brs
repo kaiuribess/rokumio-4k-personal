@@ -31,9 +31,40 @@ function CinemaIsHttpsStream(stream as dynamic, patterns = invalid as dynamic) a
     return not whitespace.IsMatch(url)
 end function
 
-function CinemaIs4KLabel(stream as dynamic) as boolean
-    pattern = CreateObject("roRegex", "(^|[^a-z0-9])(2160p?|4k|uhd)([^a-z0-9]|$)", "i")
-    return pattern.IsMatch(CinemaStreamText(stream))
+function CinemaResolutionHint(stream as dynamic, patterns = invalid as dynamic) as integer
+    if Type(stream) <> "roAssociativeArray" then return 0
+    if patterns = invalid then patterns = CinemaResolutionPatterns()
+    ' A release filename/descriptive resolution is more specific than a
+    ' provider's badge. In particular, "4K remastered 1080p" is an HD file.
+    filename = ""
+    if Type(stream.behaviorHints) = "roAssociativeArray" then filename = CinemaOptionalText(stream.behaviorHints.filename)
+    for each text in [filename, CinemaOptionalText(stream.title) + " " + CinemaOptionalText(stream.description), CinemaOptionalText(stream.quality), CinemaOptionalText(stream.name)]
+        for each hint in patterns.resolutions
+            if hint.pattern.IsMatch(text) then return hint.height
+        end for
+        ' Aliases keep the same field precedence as numeric resolution.
+        ' Within one field, an explicit 1080p still beats "4K remastered".
+        if patterns.fourK.IsMatch(text) then return 2160
+    end for
+    return 0
+end function
+
+function CinemaIs4KLabel(stream as dynamic, patterns = invalid as dynamic) as boolean
+    return CinemaResolutionHint(stream, patterns) = 2160
+end function
+
+' An explicit language label is only a sorting/filter hint. Actual native
+' track metadata still authorizes audio. Mixed or unspecified audio survives.
+function CinemaEnglishHint(stream as dynamic, patterns = invalid as dynamic) as integer
+    if patterns = invalid then patterns = CinemaSourcePatterns()
+    text = CinemaStreamText(stream)
+    if patterns.english.IsMatch(text) then return 1
+    if patterns.multilingual.IsMatch(text) then return 0
+    if patterns.foreignOnly.IsMatch(text) then return -1
+    if Type(stream) = "roAssociativeArray"
+        if patterns.foreignName.IsMatch(CinemaOptionalText(stream.name)) then return -1
+    end if
+    return 0
 end function
 
 ' Torrentio emits HTTPS status clips and download-to-debrid placeholders as
@@ -41,12 +72,28 @@ end function
 ' Match the inspected protocol shapes, not arbitrary movie words such as Error.
 function CinemaSourceBlockReason(stream as dynamic, patterns = invalid as dynamic) as string
     if Type(stream) <> "roAssociativeArray" then return ""
+    if patterns = invalid then patterns = CinemaSourcePatterns()
     name = LCase(CinemaOptionalText(stream.name))
-    providers = "(tb|rd|ad|dl|pm|oc|ed|hw|putio)"
-    if patterns = invalid then download = CreateObject("roRegex", "\[" + providers + "[ ]+download\]", "i") else download = patterns.download
-    if download.IsMatch(name) then return "uncached"
-    if patterns = invalid then error = CreateObject("roRegex", "(^|[^a-z0-9])" + providers + "[ ]+error([^a-z0-9]|$)", "i") else error = patterns.providerError
-    if name.InStr("torrentio") >= 0 and error.IsMatch(name) then return "provider-status"
+    hints = stream.behaviorHints
+    if Type(hints) = "roAssociativeArray"
+        if hints.downloadOnly = true then return "download-only"
+    end if
+    ' Recognize delivery annotations, not movie words or ordinary filenames.
+    ' notWebReady is deliberately unrelated: native MKV sources use it too.
+    text = CinemaStreamText(stream)
+    if patterns.downloadOnly.IsMatch(text) then return "download-only"
+    if patterns.downloadName.IsMatch(name) then return "download-only"
+    ' The provider's 10Gbps delivery variant is excluded even when its
+    ' download-only warning is omitted. Do not scan arbitrary URL/filename text.
+    if patterns.tenGbpsName.IsMatch(name) then return "download-only"
+    for each field in ["title", "description"]
+        for each line in CinemaOptionalText(stream[field]).Split(Chr(10))
+            if patterns.downloadName.IsMatch(line.Trim()) then return "download-only"
+        end for
+    end for
+    if CinemaEnglishHint(stream, patterns) < 0 then return "non-english"
+    if patterns.download.IsMatch(name) then return "uncached"
+    if name.InStr("torrentio") >= 0 and patterns.providerError.IsMatch(name) then return "provider-status"
     url = LCase(CinemaOptionalText(stream.url))
     if Left(url, 8) <> "https://" then return ""
     rest = Mid(url, 9)
@@ -62,28 +109,48 @@ function CinemaSourceBlockReason(stream as dynamic, patterns = invalid as dynami
 end function
 
 function CinemaSkippedSources(streams as dynamic) as object
-    counts = { uncached: 0, status: 0 }
+    counts = { uncached: 0, status: 0, downloadOnly: 0, nonEnglish: 0 }
     if Type(streams) <> "roArray" then return counts
     patterns = CinemaSourcePatterns()
     for each stream in streams
         reason = CinemaSourceBlockReason(stream, patterns)
         if reason = "uncached" then counts.uncached = counts.uncached + 1
         if reason = "provider-status" then counts.status = counts.status + 1
+        if reason = "download-only" then counts.downloadOnly = counts.downloadOnly + 1
+        if reason = "non-english" then counts.nonEnglish = counts.nonEnglish + 1
     end for
     return counts
 end function
 
 function CinemaQualityLabel(stream as dynamic) as string
-    if CinemaIs4KLabel(stream) then return "2160p / 4K source label"
-    hd = CreateObject("roRegex", "(^|[^a-z0-9])1080p?([^a-z0-9]|$)", "i")
-    if hd.IsMatch(CinemaStreamText(stream)) then return "1080p source label"
+    height = CinemaResolutionHint(stream)
+    if height = 2160 then return "2160p / 4K source label"
+    if height > 0 then return height.ToStr() + "p source label"
     return "Resolution not supplied"
 end function
 
+function CinemaResolutionPatterns() as object
+    resolutions = []
+    for each height in [2160,1440,1080,720,576,480,360,240,144]
+        resolutions.Push({height:height,pattern:CreateObject("roRegex", "(^|[^a-z0-9])" + height.ToStr() + "p?([^a-z0-9]|$)", "i")})
+    end for
+    return {resolutions:resolutions,fourK:CreateObject("roRegex", "(^|[^a-z0-9])(4k|uhd)([^a-z0-9]|$)", "i")}
+end function
+
 function CinemaSourcePatterns() as object
+    quality = CinemaResolutionPatterns()
+    languages = "(hindi|tamil|telugu|spanish|french|german|italian|portuguese|russian|japanese|korean|chinese|arabic)"
     return {
+        resolutions: quality.resolutions
         whitespace: CreateObject("roRegex", "\s", "")
-        fourK: CreateObject("roRegex", "(^|[^a-z0-9])(2160p?|4k|uhd)([^a-z0-9]|$)", "i")
+        fourK: quality.fourK
+        english: CreateObject("roRegex", "(^|[^a-z])(english|eng)([^a-z]|$)", "i")
+        multilingual: CreateObject("roRegex", "(^|[^a-z])(dual[ ._-]*audio|multi[ ._-]*(audio|language|lingual))([^a-z]|$)", "i")
+        foreignOnly: CreateObject("roRegex", "\[(" + languages + "([ ]+audio)?[ -]+only|only[ -]+" + languages + ")\]|(^|[^a-z])audio[ ]*:[ ]*" + languages + "[ ]+only([^a-z]|$)", "i")
+        foreignName: CreateObject("roRegex", "^(" + languages + "([ ]+audio)?[ -]+only|only[ -]+" + languages + ")$", "i")
+        downloadOnly: CreateObject("roRegex", "\[(10[ ]*gbps([ ]+download[ -]+only)?|download[ -]+only)\]", "i")
+        downloadName: CreateObject("roRegex", "^(10[ ]*gbps[ ]+)?download[ -]+only$", "i")
+        tenGbpsName: CreateObject("roRegex", "(^|[^a-z0-9])10[ ]*gbps([^a-z0-9]|$)", "i")
         hevc: CreateObject("roRegex", "(^|[^a-z0-9])(hevc|h[ ._-]?265|x265)([^a-z0-9]|$)", "i")
         ddplus: CreateObject("roRegex", "(ddp|dd\+|e[ ._-]?ac[ ._-]?3|dolby digital plus)", "i")
         aac: CreateObject("roRegex", "(^|[^a-z0-9])aac([ ._-]?[1-8][ ._-][01])?([^a-z0-9]|$)", "i")
@@ -101,8 +168,8 @@ end function
 function CinemaStreamRank(stream as dynamic, patterns = invalid as dynamic, audioMode = "surround" as string) as integer
     if patterns = invalid then patterns = CinemaSourcePatterns()
     text = CinemaStreamText(stream)
-    score = 0
-    if patterns.fourK.IsMatch(text) then score = score + 1000
+    score = CinemaQualityRank(CinemaResolutionHint(stream, patterns))
+    if CinemaEnglishHint(stream, patterns) > 0 then score = score + 400
     hevc = patterns.hevc
     if hevc.IsMatch(text) then score = score + 20
     ddplus = patterns.ddplus
@@ -137,7 +204,7 @@ function CinemaChooseStreams(streams as dynamic, fourKOnly as boolean, audioMode
                 text = CinemaStreamText(stream)
                 if (patterns.incompatibleProjector.IsMatch(text) or patterns.ddplus.IsMatch(text)) and not patterns.aac.IsMatch(text) then include = false
             end if
-            if fourKOnly and include then include = patterns.fourK.IsMatch(CinemaStreamText(stream))
+            if fourKOnly and include then include = CinemaResolutionHint(stream, patterns) = 2160
             if include
                 ' Score each source once. Re-ranking every comparison exhausted
                 ' the Roku render thread when providers returned hundreds of files.
@@ -157,14 +224,29 @@ end function
 ' Status counts never need a ranking or sort.
 function CinemaPreferUhdFirst(streams as dynamic) as object
     if Type(streams) <> "roArray" then return []
-    uhd = []
-    hd = []
-    pattern = CreateObject("roRegex", "(^|[^a-z0-9])(2160p?|4k|uhd)([^a-z0-9]|$)", "i")
+    ordered = []
+    patterns = CinemaSourcePatterns()
     for each stream in streams
-        if pattern.IsMatch(CinemaStreamText(stream)) then uhd.Push(stream) else hd.Push(stream)
+        ordered.Push({rank:CinemaQualityRank(CinemaResolutionHint(stream,patterns)),stream:stream})
     end for
-    uhd.Append(hd)
-    return uhd
+    ' A stable sort restores quality tiers after source memory without
+    ' discarding its proven-working priority inside each tier.
+    ordered.SortBy("rank", "r")
+    result = []
+    for each entry in ordered
+        result.Push(entry.stream)
+    end for
+    return result
+end function
+
+function CinemaQualityRank(height as integer) as integer
+    ' The user's preferred fallbacks are UHD then Full HD. Other known
+    ' qualities follow; no audio/name hint may cross a resolution tier.
+    heights = [2160,1080,1440,720,576,480,360,240,144]
+    for index = 0 to heights.Count() - 1
+        if height = heights[index] then return (heights.Count() - index) * 1000
+    end for
+    return 0
 end function
 
 function CinemaCountReadyStreams(streams as dynamic) as integer
@@ -182,9 +264,9 @@ function CinemaFilterReadyStreams(streams as dynamic, fourKOnly as boolean) as o
     if Type(streams) <> "roArray" then return []
     if not fourKOnly then return streams
     result = []
-    pattern = CreateObject("roRegex", "(^|[^a-z0-9])(2160p?|4k|uhd)([^a-z0-9]|$)", "i")
+    patterns = CinemaSourcePatterns()
     for each stream in streams
-        if pattern.IsMatch(CinemaStreamText(stream)) then result.Push(stream)
+        if CinemaResolutionHint(stream,patterns) = 2160 then result.Push(stream)
     end for
     return result
 end function
@@ -274,6 +356,7 @@ function CinemaBudgetStreams(raw as dynamic, countLimit = invalid as dynamic, by
         hints = item.behaviorHints
         if Type(hints) = "roAssociativeArray"
             safeHints = {}
+            if hints.downloadOnly = true then safeHints.downloadOnly = true
             if GetInterface(hints.filename,"ifString") <> invalid and Len(hints.filename) <= 512 then safeHints.filename = hints.filename
             if Type(hints.videoSize) = "Integer" or Type(hints.videoSize) = "Double" or Type(hints.videoSize) = "Float" or Type(hints.videoSize) = "roInt" or Type(hints.videoSize) = "roDouble" or Type(hints.videoSize) = "roFloat" then safeHints.videoSize = hints.videoSize
             if Type(hints.proxyHeaders) = "roAssociativeArray"

@@ -119,6 +119,8 @@ function AddonDiagnostics_ProviderLabel(provider as object, pending as dynamic, 
     if visibleCount = 0 and Type(skipped) = "roAssociativeArray"
         if skipped.status > 0 then return "Provider reports an account / service problem · Check your private configuration"
         if skipped.uncached > 0 then return "Provider returned downloads still pending · Choose a cached source"
+        if skipped.downloadOnly <> invalid and skipped.downloadOnly > 0 then return "Download-only / 10Gbps links skipped · Playback and seeking are not supported"
+        if skipped.nonEnglish <> invalid and skipped.nonEnglish > 0 then return "Explicit non-English sources skipped · No eligible English candidates returned"
     end if
     if visibleCount = 0 then return rawCount.ToStr() + " sources listed · None match the current source filter"
     return visibleCount.ToStr() + " source choices · Availability and playback are checked when selected"

@@ -1,7 +1,8 @@
 ' A small on-device memory of verified file outcomes, not a saved stream URL.
 ' Caller records "incompatible" only for complete file/header facts. Native
 ' transport, decoder-start and language-unknown errors are temporary "network"
-' outcomes. Manual source selection may bypass this automatic ordering.
+' outcomes. Automatic selection can skip these during their short cooldown;
+' manual browsing retains them for an explicit retry.
 '
 ' Persisted schema is deliberately only opaque SHA-256 key, outcome and UTC
 ' timestamps. Source URLs, headers, filenames and provider configuration never
@@ -21,7 +22,7 @@ end function
 function SourceMemory_Ttl(outcome as string) as integer
     if outcome = "working" then return 1209600 ' 14 days, still reverified at play.
     if outcome = "incompatible" then return 604800 ' 7 days, file facts only.
-    if outcome = "network" then return 600 ' 10 minutes, never excluded.
+    if outcome = "network" then return 600 ' 10-minute automatic retry cooldown.
     return 0
 end function
 
@@ -260,7 +261,7 @@ end function
 
 ' Apply before the automatic 64-source cap. Stable buckets preserve the source
 ' rank among unknown candidates; a temporary failure goes last, not away.
-function SourceMemory_Order(streams as dynamic, data as dynamic, videoId as string, audioMode as string, now as dynamic, hashFn = invalid as dynamic) as object
+function SourceMemory_Order(streams as dynamic, data as dynamic, videoId as string, audioMode as string, now as dynamic, hashFn = invalid as dynamic, skipRecentFailures = false as boolean) as object
     if Type(streams) <> "roArray" then return []
     data = SourceMemory_Normalize(data,now)
     working = []
@@ -272,7 +273,7 @@ function SourceMemory_Order(streams as dynamic, data as dynamic, videoId as stri
         if outcome = "working"
             working.Push(stream)
         else if outcome = "network"
-            transient.Push(stream)
+            if not skipRecentFailures then transient.Push(stream)
         else if outcome <> "incompatible"
             unknown.Push(stream)
         end if

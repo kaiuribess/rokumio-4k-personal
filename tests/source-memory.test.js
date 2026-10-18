@@ -41,11 +41,21 @@ const keyDeliveredHls = add(...base.slice(0, 4), 'hls', 'file:A.2160p.mkv');
 const keyDeliveredDash = add(...base.slice(0, 4), 'dash', 'file:A.2160p.mkv');
 const keyIpv6 = add(...base.slice(0, 3), '[2001:db8::1]', 'mkv', 'file:A.2160p.mkv');
 const boundKeys = Array.from({ length: 40 }, (_, i) => hash('source-memory-bound-slot-' + i));
+const selection = fs.readFileSync(path.join(root,'components/SourceSelectionTask.brs'),'utf8')
+    .match(/^sub choose\(\)[\s\S]*?^end sub/m)[0]
+    .replace('sub choose()', 'sub TestAutomaticChoose()')
+    .replace('SourceMemory_Now()', 'TestSelectionNow()')
+    .replace('CreateObject("roRegistrySection", "playbackMemory")', 'm.selectionRegistry')
+    .replace('now,invalid,', 'now,TestSourceDigest,')
+    .replace('streams[0],m.top.videoId,m.top.audioMode)', 'streams[0],m.top.videoId,m.top.audioMode,"",TestSourceDigest)');
 
 let code = [
     fs.readFileSync(path.join(root, 'tests/harness.brs'), 'utf8'),
     fs.readFileSync(path.join(root, 'tests/mocks.brs'), 'utf8'),
     fs.readFileSync(path.join(root, 'source/util/SourceMemory.brs'), 'utf8'),
+    fs.readFileSync(path.join(root, 'source/util/CinemaStreams.brs'), 'utf8'),
+    fs.readFileSync(path.join(root, 'source/util/AutoPlayback.brs'), 'utf8'),
+    selection,
     `m.sourceMemoryDigests = [${[...digests].map(([text, key]) => `{text:${quote(text)},key:${quote(key)}}`).join(',')}]`,
     `function TestSourceDigest(value as string) as string
         for each fixture in m.sourceMemoryDigests
@@ -55,6 +65,9 @@ let code = [
     end function
     function TestBadDigest(value as string) as string
         return value
+    end function
+    function TestSelectionNow() as double
+        return m.selectionNow
     end function
     function TestSource(filename as string, name as string) as object
         return {url:"https://cdn.example/config-fixture-secret/file?token=fixture-secret-DO-NOT-SAVE",name:name,behaviorHints:{filename:filename},sourceMemoryProvider:"addon.public|addon.example"}
@@ -188,6 +201,11 @@ let code = [
     Harness_Equal(ordered[2].name,"E","second unknown retains relative rank")
     Harness_Equal(ordered[3].name,"looks like filename.mkv","source with no fingerprint remains usable")
     Harness_Equal(ordered[4].name,"A","recent network failure stays eligible at end")
+    automatic = SourceMemory_Order([a,b,c,d,e],memory,"tt100001","projector",now,TestSourceDigest,true)
+    Harness_Equal(automatic.Count(),3,"automatic cooldown skips temporary and permanent failures")
+    Harness_Equal(automatic[0].name,"D","working UHD remains preferred after cooldown filtering")
+    cooled = SourceMemory_Order([a,b,c,d,e],memory,"tt100001","projector",now+600,TestSourceDigest,true)
+    Harness_Equal(cooled.Count(),4,"temporary exclusion expires after ten minutes")
     Harness_Equal(SourceMemory_Order([a,b,c,d,e],memory,"tt100001","surround",now,TestSourceDigest).Count(),5,"projector rejections never affect surround selection")
     Harness_Equal(SourceMemory_Order([a,b,c,d,e],memory,"tt100001:1:1","projector",now,TestSourceDigest).Count(),5,"movie outcomes never affect episode")
     old = SourceMemory_Order([a,b,c,d,e],memory,"tt100001","projector",now+600,TestSourceDigest)
@@ -289,6 +307,41 @@ let code = [
     beforeBadClock = registry.Read(SourceMemory_RegistryKey())
     Harness_Ok(not SourceMemory_Save(registry,SourceMemory_Empty(),0),"invalid clock cannot overwrite existing playback memory")
     Harness_Equal(registry.Read(SourceMemory_RegistryKey()),beforeBadClock,"unavailable clock preserves stored bytes")
+    Harness_Suite("Real source-selection worker consumes persistent outcomes and failure exclusions")
+    m.selectionRegistry = MockRegistry()
+    m.selectionNow = now
+    memory = SourceMemory_Empty()
+    memory = SourceMemory_Record(memory,keyA,"network",now)
+    memory = SourceMemory_Record(memory,keyB,"incompatible",now)
+    memory = SourceMemory_Record(memory,keyD,"working",now)
+    SourceMemory_Save(m.selectionRegistry,memory,now)
+    a.url = "https://cdn.example/a?signature=private-fixture"
+    b.url = "https://cdn.example/b"
+    c.url = "https://cdn.example/c"
+    d.url = "https://cdn.example/d"
+    e.url = "https://cdn.example/e"
+    m.top = {providerGroups:[[a,b,c],[d,e]],excludedUrls:[],videoId:"tt100001",audioMode:"projector",fourKOnly:false}
+    TestAutomaticChoose()
+    Harness_Equal(m.top.result.streams.Count(),3,"worker retains only working and untried candidates")
+    Harness_Equal(m.top.result.streams[0].url,d.url,"worker starts with remembered UHD over HD")
+    Harness_Equal(m.top.result.streams[1].url,c.url,"worker retains first 1080p fallback")
+    Harness_Equal(m.top.result.streams[2].url,e.url,"worker retains second 1080p fallback")
+    m.top.excludedUrls = [d.url]
+    TestAutomaticChoose()
+    Harness_Equal(m.top.result.streams.Count(),2,"rediscovery excludes the failed early UHD source")
+    Harness_Equal(m.top.result.streams[0].url,c.url,"automatic recovery reaches HD without selecting cooled-down UHD")
+    m.top.skipRecentFailures = false
+    TestAutomaticChoose()
+    Harness_Equal(m.top.result.streams[0].url,a.url,"explicit fresh-link retry can reconsider transient failure without manual source picking")
+    Harness_Equal(m.top.result.streams.Count(),3,"explicit retry still excludes proven incompatible file and attempted URL")
+    m.top.skipRecentFailures = true
+    m.selectionNow = now + 600
+    TestAutomaticChoose()
+    Harness_Equal(m.top.result.streams[0].url,a.url,"fresh requests can reconsider source after failure cooldown expires")
+    m.top.fourKOnly = true
+    m.selectionNow = now
+    TestAutomaticChoose()
+    Harness_Equal(m.top.result.streams.Count(),0,"explicit 4K-only never silently bypasses policy with HD")
     Harness_Finish()`
 ].join('\n');
 

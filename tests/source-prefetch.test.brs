@@ -134,7 +134,7 @@ end sub
 
 function PrefetchTest_Result(id as string) as object
     source = {name:"AAC 2.0 1080p",url:"https://media.example.test/"+id+".mkv"}
-    return {ok:true,streams:[source],readyStreams:[source],error:""}
+    return {ok:true,streams:[source],readyStreams:[source],uhdCount:0,error:""}
 end function
 
 function PrefetchTest_RememberedHash(identity as string) as string
@@ -422,6 +422,8 @@ onSourcePrefetchChanged()
 Harness_Equal(m.launched.Count(),5,"empty ordinary answer advances the next queued provider")
 Harness_Equal(m.pendingCount,2,"empty provider is completed once")
 RefreshStreams()
+Harness_Ok(m.recoveryManual and m.autoPlayEnabled,"explicit refresh enables fresh automatic retry without source picking")
+Harness_Equal(m.recoveryExcluded.Count(),0,"explicit refresh clears the previous attempt exclusions")
 Harness_Equal(m.launched.Count(),5,"refresh queues new requests behind unfinished old transfers")
 Harness_Equal(m.pendingCount,5,"refresh preserves all matching providers")
 Harness_Equal(m.providers[0].streams.Count(),0,"refresh removes formerly cached links")
@@ -484,7 +486,7 @@ Harness_Equal(m.launched[2].audioMode,"surround","return reload uses current aud
 Harness_Equal(m.launched[2].kind,"StreamsLoaderTask","deferred cold reload uses full ordinary source worker")
 Harness_Equal(m.pendingCount,3,"fresh configuration retains all providers")
 
-Harness_Suite("Short automatic comparison grace escapes a slow provider safely")
+Harness_Suite("Bounded HD comparison waits for UHD without waiting forever")
 PrefetchTest_Setup(2)
 m.params.autoPlay = true
 m.autoPlayEnabled = true
@@ -501,7 +503,13 @@ onAutomaticGrace()
 Harness_Equal(m.selectionTask,invalid,"queued stale timer cannot bypass comparison grace")
 m.autoClock.now = 750
 onAutomaticGrace()
-Harness_Ok(m.selectionTask <> invalid,"automatic selection starts after short grace despite slow provider")
+Harness_Equal(m.selectionTask,invalid,"early HD waits for potential UHD instead of starting at 750ms")
+m.autoClock.now = 3999
+onAutomaticGrace()
+Harness_Equal(m.selectionTask,invalid,"HD fallback waits to the bounded comparison deadline")
+m.autoClock.now = 4000
+onAutomaticGrace()
+Harness_Ok(m.selectionTask <> invalid,"HD fallback starts after four seconds despite slow provider")
 selection = m.selectionTask
 Harness_Equal(selection.providerGroups[0].Count(),1,"early candidate pool contains only completed sources")
 selection.result = {streams:fast.result.streams}
@@ -528,7 +536,7 @@ MaybeStartAutomaticPlayback()
 Harness_Equal(m.autoGraceDeadline,invalid,"HD-only fast source cannot open a strict 4K grace")
 m.fourKOnly = false
 MaybeStartAutomaticPlayback()
-m.autoClock.now = 10750
+m.autoClock.now = 14000
 onAutomaticGrace()
 selection = m.selectionTask
 Harness_Ok(selection <> invalid,"explicit all-quality policy permits the available HD source")
@@ -539,7 +547,7 @@ onAutomaticSourcesReady(PrefetchTest_Event(selection))
 Harness_Equal(m.pushCalls,0,"ranking from old quality policy cannot bypass new 4K-only setting")
 Harness_Equal(m.selectionTask,invalid,"old ranking worker is reaped and disowned")
 slow = m.launched[1]
-slow.result = {streams:[{name:"2160p AAC 2.0",url:"https://media.example.test/4k.mkv"}],readyStreams:[{name:"2160p AAC 2.0",url:"https://media.example.test/4k.mkv"}],error:""}
+slow.result = {streams:[{name:"2160p AAC 2.0",url:"https://media.example.test/4k.mkv"}],readyStreams:[{name:"2160p AAC 2.0",url:"https://media.example.test/4k.mkv"}],uhdCount:1,error:""}
 PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(slow))
 onSourcePrefetchChanged()
 Harness_Ok(m.selectionTask <> invalid,"final provider results rerank the new strict quality pool")
@@ -552,7 +560,7 @@ fast = m.launched[0]
 fast.result = PrefetchTest_Result("fast")
 PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(fast))
 onSourcePrefetchChanged()
-m.autoClock.now = 750
+m.autoClock.now = 4000
 onAutomaticGrace()
 selection = m.selectionTask
 slow = m.launched[1]
@@ -563,6 +571,56 @@ selection.result = {streams:[]}
 onAutomaticSourcesReady(PrefetchTest_Event(selection))
 Harness_Ok(m.selectionTask <> invalid,"new results during empty early ranking are reranked rather than stranded")
 Harness_Equal(m.selectionTask.providerGroups[0].Count()+m.selectionTask.providerGroups[1].Count(),2,"rerank includes the later provider")
+
+Harness_Suite("Late UHD beats early HD before automatic handoff")
+PrefetchTest_Setup(3)
+m.autoPlayEnabled = true
+LoadStreams(m.params)
+fast = m.launched[0]
+fast.result = PrefetchTest_Result("early-HD")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(fast))
+onSourcePrefetchChanged()
+m.autoClock.now = 1000
+slow = m.launched[1]
+uhd = {name:"2160p English AAC",url:"https://media.example.test/late-4k.mkv"}
+slow.result = {streams:[uhd],readyStreams:[uhd],uhdCount:1,error:""}
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(slow))
+onSourcePrefetchChanged()
+Harness_Equal(m.autoGraceDeadline,1750,"UHD arrival shortens existing HD wait to 750ms")
+m.autoClock.now = 1749
+onAutomaticGrace()
+Harness_Equal(m.selectionTask,invalid,"stale grace event cannot prematurely select UHD")
+m.autoClock.now = 1750
+onAutomaticGrace()
+Harness_Ok(m.selectionTask <> invalid,"UHD starts brief comparison without waiting for remaining provider")
+Harness_Equal(m.selectionTask.providerGroups[1][0].url,uhd.url,"selection receives late UHD provider")
+
+Harness_Suite("Nonempty stale ranking cannot beat newer provider results")
+PrefetchTest_Setup(2)
+m.autoPlayEnabled = true
+LoadStreams(m.params)
+fast = m.launched[0]
+fast.result = PrefetchTest_Result("early-HD")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(fast))
+onSourcePrefetchChanged()
+m.autoClock.now = 4000
+onAutomaticGrace()
+selection = m.selectionTask
+slow = m.launched[1]
+uhd = {name:"2160p English AAC",url:"https://media.example.test/new-4k.mkv"}
+slow.result = {streams:[uhd],readyStreams:[uhd],uhdCount:1,error:""}
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(slow))
+onSourcePrefetchChanged()
+selection.result = {streams:fast.result.streams}
+onAutomaticSourcesReady(PrefetchTest_Event(selection))
+Harness_Equal(m.pushCalls,0,"old HD decision cannot hand off after UHD already arrived")
+Harness_Ok(m.selectionTask <> invalid and m.selectionTask.id <> selection.id,"fresh revision reranks once before playback")
+current = m.selectionTask
+current.result = {streams:[uhd]}
+onAutomaticSourcesReady(PrefetchTest_Event(current))
+Harness_Equal(m.pushCalls,1,"fresh UHD decision hands off exactly once")
+onAutomaticSourcesReady(PrefetchTest_Event(selection))
+Harness_Equal(m.pushCalls,1,"stale nonempty completion cannot replace accepted playback")
 
 Harness_Suite("Unavailable optional comparison clock never strands automatic selection")
 PrefetchTest_Setup(2)
@@ -592,14 +650,14 @@ m.autoClock.now = 750
 onAutomaticGrace()
 Harness_Equal(m.selectionTask,invalid,"canceled old grace cannot select old HD policy")
 Harness_Ok(onKeyEvent("options",true),"quality button can restore all-quality policy")
-m.autoClock.now = 1500
+m.autoClock.now = 4750
 onAutomaticGrace()
 oldSelection = m.selectionTask
 Harness_Ok(oldSelection <> invalid,"restored quality schedules its own automatic ranking")
 onKeyEvent("options",true)
 Harness_Ok(oldSelection.stopped,"quality button cancels in-flight old ranking")
 onKeyEvent("options",true)
-m.autoClock.now = 2250
+m.autoClock.now = 8750
 onAutomaticGrace()
 newSelection = m.selectionTask
 Harness_Ok(newSelection <> invalid and newSelection.id <> oldSelection.id,"repeated policy changes always mint a unique ranking worker ID")

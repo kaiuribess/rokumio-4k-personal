@@ -32,9 +32,11 @@ sub load()
             error = answer.error
         end if
 
+        ready = CinemaChooseStreams(streams, false, m.top.audioMode, false)
         m.top.result = {
             streams: streams
-            readyStreams: CinemaChooseStreams(streams, false, m.top.audioMode, false)
+            readyStreams: ready
+            uhdCount: CinemaFilterReadyStreams(ready,true).Count()
             error: error
             providerIndex: m.top.providerIndex
             providerName: m.top.providerName
@@ -43,6 +45,7 @@ sub load()
         m.top.result = {
             streams: []
             readyStreams: []
+            uhdCount: 0
             error: "Source response could not be processed"
             providerIndex: m.top.providerIndex
             providerName: m.top.providerName
