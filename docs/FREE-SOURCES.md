@@ -1,5 +1,7 @@
 # Optional free sources
 
+New to add-ons? Start with the **[step-by-step tutorial](ADDONS.md)**, including profile choice, browser import/TV approval and a public TMDB browsing preset. Comet/TorBox is a separate optional account-backed setup; free catalogs do not include that subscription.
+
 Crimson Cinema can use free add-ons, but each add-on has a different role. The two playback providers below are **optional imports**, not bundled accounts or default streaming services. No account or paid key was required for the configurations checked on **October 17, 2026**. Availability, host limits and provider terms can change; free access today is not a lifetime guarantee.
 
 Install your own compatible provider manifest and use content you are authorized to access. Listing an add-on here does not establish permission to watch every title it returns, an affiliation with its operator, or a guarantee of playback.
