@@ -1,22 +1,43 @@
 # Sports in Crimson Cinema — 0.6.0 feature preview
 
-**This adds a working schedule browser and extensible native-playback integration, not a subscription-free replacement for every sports broadcaster. No live sports streams are bundled.** An authorized compatible provider is still needed for video. A listed game, reachable playlist or source label does not prove that a Roku can play it.
+**Provider-native live browsing now reaches the existing native player.** During October 29 testing, the free StremVerse Live Events service returned HLS media that decoded on the PC at **1920×1080 H.264/AAC** for one event and **512×288 H.264/AAC** for another. This is real media evidence, not a mock stream. Other sources failed, and a later request for the HD event returned 403. **Sustained Roku playback, audible English, broadcast authorization and broad league coverage remain unverified.** No provider is installed or bundled automatically.
 
-## On the Roku
+## Quick setup and use
 
-1. Open **Sports** in Home's left menu.
-2. Pick a league, date and **All events / Live / Upcoming / Completed**. Dates run from yesterday through the next seven days. Start timestamps are shown in UTC; ESPN determines which schedule date an event belongs to.
-3. Select an event to check installed compatible providers. Upcoming events show an explanation. Events with no matching provider show **Schedule only**, not a fabricated Play result.
-4. When a provider returns direct streams, the existing source picker and player handle automatic selection, manual alternatives, English audio checks, projector/surround preferences and bounded source recovery.
-5. **TV / sports add-ons** opens installed TV/channel catalogs or Add-ons management. These can cover boxing, other competitions or linear channels outside the built-in schedule. They are not all sports catalogs and are labelled by provider.
+1. Install the developer ZIP from the successful **PR #9 CI artifact**, not GitHub's source archive. This preview is not merged or hardware-certified.
+2. In **Add-ons**, import an HTTPS manifest for a provider you are authorized to use. The free service tested here is `https://stremverse1.alwaysdata.net/manifest.json`. Its [provider FAQ](https://stremverse1.alwaysdata.net/) distinguishes free **Live Events / Replays / Highlights** from paid **Xtra / IPTV**. The free path needs no membership, Stremio app/account, media proxy or permanently running PC. This is a technical compatibility result, not an endorsement or a grant of broadcast rights.
+3. Return to **Sports → provider · Live Events**. Sports lists your installed TV/channel catalogs. Choose an event, then a source. Its original ID/type goes to the original provider; no ESPN matching or per-game JSON editing is required.
+4. **Live mode** starts about 12 seconds behind the available live edge where supported. It disables resume, next episode and online movie subtitle lookups. Source quality depends on the provider; an “HD SERVER” label is not a measurement.
+5. **English + unlabelled** prefers English but permits missing language metadata after native codec and advancing audio/video checks. Playback details still say English is unverified. Choose **Audio: verified English** in Sports, or press **\*** in the live source picker to require it. Known foreign-language tracks remain blocked. Movie/series audio rules are unchanged.
+6. For a replay/highlight, choose **Playback: Recorded** before opening its catalog. This restores the existing Details/playback path and strict movie-style audio checks; legacy TV/channel no-resume behavior is unchanged. “Live” is the selected playback mode, not independent proof of an event's time/status.
 
-**Down** from the filters enters the event list. ***** returns to filters; **Play/Pause** refreshes. Back dismisses an open filter, then returns immediately without waiting for network work. There is no background polling during a movie.
+**Down** enters the list; **\*** returns to Sports filters. **Play/Pause** refreshes. **Back** exits without waiting for provider requests. Existing source pagination and bounded alternatives remain available. No source replacement occurs merely because a late result arrives.
 
-The schedule supports NFL, NBA, MLB, NHL, UFC, college football, men's/women's college basketball, WNBA, Premier League, MLS, La Liga and Champions League. The inspected boxing endpoint failed; it is not offered as a working schedule adapter. Completed means the event ended, not that a replay is available.
+The first Sports filter also opens the separate ESPN schedule browser (13 leagues, yesterday through seven days ahead, times UTC). Schedule IDs are not shared with sports add-ons. **Schedule only** does not mean a stream exists. Use **TV / sports add-ons → Return to provider catalogs** to leave schedules. Events in a provider catalog may be upcoming, completed, mislabeled or unavailable; empty/browser-only/error responses are reported honestly.
 
-Sports event requests permit HD even if movies are set to 4K-only. Movie settings are not changed. Live sources do not enter Continue Watching or trigger next-episode autoplay. HLS can adapt quality during playback; no 4K or surround guarantee is made.
+## Fresh provider and video investigation
 
-## Providers investigated
+Read-only checks on **2026-10-29, approximately 21:32–21:50 UTC**, from this PC/network. [Sanitized response/decode evidence](research/live-providers-2026-10-29.json) contains no media URLs, request header values, tokens or video files.
+
+| Provider | Real response evidence | Integration decision |
+| --- | --- | --- |
+| [Nuvio Live Sports](https://nuviosports.xyz/configure), [source](https://github.com/rajhodedara/live-sport-plugin) | Public manifest/configuration returned HTTP 403 (Cloudflare 1010). Source advertises catalog/meta/stream, TV/channel types, `nuvio_sport_` IDs and multiple upstream adapters. [Issue 63](https://github.com/rajhodedara/live-sport-plugin/issues/63) separately reports catalogs loading while replay streams fail. | Native add-on protocol is a potential fit, but service playback is **not verified here**. No browser challenge bypass or copied resolver. The upstream README discourages common free/shared hosting; no self-hosting expense introduced. |
+| [Highfly free instances](https://www.reddit.com/r/nuvioaddons/comments/1wig7l4/addon_sports_streams_update_domain_change_nba_soc/) | All three supplied free manifest URLs returned HTTP 403. The developer's announcement identifies these free instances; this is not Roku playback evidence. [lista-m3u](https://github.com/SPxMM3R1/lista-m3u/blob/main/highfly_live.py) uses current provider leaf IDs and its own resolver paths, so an old empty snapshot alone cannot settle service health. | **Blocked from this network**, not declared universally broken. No premium instance, copied relay or browser-fingerprint workaround. |
+| [StremVerse free Live Events](https://stremverse1.alwaysdata.net/) | Manifest 3.0.0, `tv` catalog `stremverse_live_events`; Crimson's exact `skip=0.json` route returned 107 entries. Four early sampled stream responses ranged from empty to browser-only to multiple direct media links. A Copa del Rey item supplied HLS and decoded 300 video/517 audio frames at 512×288; HB Koge vs Barcelona supplied HLS and decoded 225 video/387 audio frames at 1920×1080. Both were AVC/AAC without language tags. A later HD request returned 403. | Strongest **tested direct-media path**, using the existing add-on system, original IDs, queries and per-source Referer/User-Agent headers. No new adapter/host required. Not a universal reliability, rights, English or Roku claim. Only the free live catalog was requested. |
+| [StreamFree API](https://strmfree.st/api) | Documentation and `/api/v1/streams` responded; event objects contained `live_sources` pointing to embed pages. | Event/source discovery exists, but embeds are not native Video URLs. No new resolver justified while the hosted direct-media path works. No embed scripts or protected token machinery executed. |
+
+Community [StremVerse developer announcement and replies](https://www.reddit.com/r/StremioAddons/comments/1s7uy9m/stremverse_just_another_sports_addon_for_stremio/) identify the free offering and also report empty catalogs/failed playback. These guided testing; they do not establish coverage or Roku compatibility. Other upstream names in Nuvio's source are implementation leads, not independently tested/bundled providers. No upstream code was copied, so no upstream resolver license is assumed from marketing text.
+
+### Reproduce the bounded checks
+
+```text
+python scripts/probe-live-providers.py --event-index 3 --event-index 9 --output verification/live-providers.json
+```
+
+Indices select the **current** catalog snapshot and can refer to different events later. The report stores the event name and SHA-256 of the opaque ID for attribution. Optional `--decode` requires PyAV in a separate research environment (tested with 19.0.2); it is neither an app dependency nor part of the Roku ZIP. The probe reads at most three 8 MiB segments per source, refuses non-public/non-HTTPS destinations, stops at encryption tags, checks redirects and records only status/origin/codec evidence. It never installs an add-on or solves an access challenge. Run `python tests/probe-live-providers.test.py` for the offline tool tests.
+
+## Earlier alternatives and schedule checks
+
 
 Read-only research on **October 29, 2026**:
 
@@ -39,7 +60,13 @@ The Roku directly fetches one schedule at a time through the existing bounded HT
 
 Schedule IDs are `espn_<sport>_<league>_<eventId>`, for example `espn_football_nfl_123`. They are metadata identifiers, not media URLs. A compatible add-on advertises `stream` for `tv` with the `espn_` prefix. Custom event/channel catalogs can use `sports_<operator-id>`. An arbitrary existing movie add-on is not expected to recognize these IDs.
 
-The app consults the actual installed AddonsStore capabilities on selection; account removal/switching is not bypassed by a copied provider list. Existing source-worker limits, 48-card pagination, fallback/discovery limits, native Video, voice controls, captions, audio policy and source memory remain in place. Fallback is bounded, not endless. English-tagged source labels alone cannot bypass the native audio check; an otherwise playable broadcast with untagged audio may be rejected.
+Provider-native playback is pinned to the selected catalog owner and its exact original ID/type. A second provider advertising broad `tv` support is not automatically trusted to identify the same game. Alternatives are limited to the original provider/event response; upstream mislabeling remains possible. Account switching/removal uses the existing registry, not a copied provider database.
+
+The existing two-worker coordinator refreshes live lists after 30 seconds on explicit adoption/return/selection, compared with five minutes for movies. This is a bounded freshness policy, not a promise that every signed link lasts 30 seconds. Failed pools use the existing maximum two discovery rounds and attempted-URL exclusion. Successful playback is not changed by background results. No live media URL is saved to source memory; movie source memory is unchanged.
+
+Queries and validated per-item headers survive the source budget and reach a fresh video HTTP agent. Explicit safe stream-format hints and small, signature-checked HLS/DASH responses support extensionless endpoints. Browser-only responses produce an explanation. No HTML player, authentication challenge or DRM is resolved by Crimson. Existing HTTPS source policy remains; the static publisher's stricter query-free URL rules are **not** general native-player limitations.
+
+The selected Live mode uses Roku's documented [Live/PlayStart/HttpHeaders metadata](https://developer.roku.com/dev/docs/content-metadata) and existing native controls. It does not transcode or create English audio. Unlabelled-live acceptance and English verification are separate facts; compatible decoder metadata plus advancing native audio/video samples are still required. Explicit receiver/codec rejection is retained. 48-card pagination, movies, TorBox, voice, captions, projector/surround preferences and manual next episode are preserved.
 
 ## Standalone add-on for an authorized broadcaster
 
@@ -100,7 +127,7 @@ See [exact commands, counts and remaining acceptance checks](SPORTS-VALIDATION.m
 
 Software tests execute production schedule worker/result/finished handlers, source capabilities through AddonsStore, generated manifest registration, CatalogStore requests, Sports/Scene navigation, source budgeting/ranking, PlaybackStore resolution and expiry. Separate local HTTP tests request the actual generated files. Mock media is never presented as a real sports broadcast.
 
-API-tested: dated league responses plus one public HLS master/variant/segment prefix. **Not physically Roku-tested:** Sports layout/navigation, live decoder startup, audible English/surround, adaptive playback, real source failover and the new paused-Down shortcut.
+API/media-tested: dated league responses, provider-native catalogs and stream responses, and short StremVerse HLS samples decoded on the PC at 288p and 1080p. A later HD request failed with 403; neither sample proved English language or sustained delivery. **Not physically Roku-tested:** Sports layout/navigation, live decoder startup, audible English/surround, adaptive playback, real source failover and the new paused-Down shortcut.
 
 Before recommending a sports provider, establish its distribution permission and stable direct endpoint; then test live startup, sustained playback, expiring/unavailable alternatives, Back during loading and audible output on the actual Roku/HDMI route. None of the probes establishes universal NFL/NBA/UFC coverage or no-buffering playback.
 

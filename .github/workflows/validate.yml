@@ -18,6 +18,7 @@ jobs:
           python-version: '3.12'
       - run: npm ci --ignore-scripts
       - run: npm test
+      - run: python tests/probe-live-providers.test.py
       - run: npm run build
       - run: python scripts/verify-package.py
       - run: python scripts/release-provenance.py
