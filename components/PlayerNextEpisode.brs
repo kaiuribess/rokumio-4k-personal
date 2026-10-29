@@ -15,7 +15,7 @@ sub PrepareNextEpisode(params as object)
     CancelNextEpisode()
     m.naturalEnd = false
     m.nextEpisodeMeta = params.seriesMeta
-    if params.metaType <> "series" or params.diagnostic = true or params.autoNextEpisode = false then return
+    if params.metaType <> "series" or params.diagnostic = true then return
     if Type(m.nextEpisodeMeta) = "roAssociativeArray" and Type(m.nextEpisodeMeta.videos) = "roArray" and m.nextEpisodeMeta.videos.Count() > 0 then return
     if NextEpisode_Text(params.addonAddress) = "" or NextEpisode_Text(params.metaId) = "" then return
     m.nextSetupPending = true
@@ -27,7 +27,7 @@ sub onNextEpisodeSetup()
     if m.playbackActive <> true or m.top.screenActive <> true then return
     if not TimerGuard_Ready(m.nextEpisodeSetup,m.nextSetupGuard) then return
     m.nextSetupPending = false
-    if Type(m.playParams) <> "roAssociativeArray" or m.playParams.metaType <> "series" or m.playParams.diagnostic = true or m.playParams.autoNextEpisode = false then return
+    if Type(m.playParams) <> "roAssociativeArray" or m.playParams.metaType <> "series" or m.playParams.diagnostic = true then return
     if m.nextEpisodeTask <> invalid then return
     m.nextEpisodeTask = AsyncTask_Launch(m.top, "MetaLoaderTask", "onNextEpisodeMetaLoaded", {addonAddress:NextEpisode_Text(m.playParams.addonAddress),metaType:"series",metaId:NextEpisode_Text(m.playParams.metaId)}, NextPlayerWorkerId("nextEpisodeMeta"))
 end sub
@@ -42,6 +42,7 @@ sub onNextEpisodeMetaLoaded(event as object)
     AsyncTask_Reap(task, m.top, false)
     if m.playbackActive <> true or m.top.screenActive <> true then return
     if result.ok = true and Type(result.meta) = "roAssociativeArray" then m.nextEpisodeMeta = result.meta
+    if m.video <> invalid and m.video.state = "paused" then ShowPlaybackInfo()
 end sub
 
 function NextEpisodeClock() as string
@@ -80,6 +81,22 @@ sub onNextEpisodeTick()
         CancelNextEpisode()
         return
     end if
+    if m.manualNextPending = true
+        if m.video.state <> "paused" or m.sourceAccepted <> true or m.hasPlayed <> true
+            CancelNextEpisode()
+            return
+        end if
+        if not TimerGuard_Ready(m.nextEpisodeTimer,m.nextEpisodeGuard) then return
+        params = NextEpisode_Params(m.playParams,m.nextEpisodeMeta,NextEpisodeClock(),true)
+        m.manualNextPending = false:m.nextEpisodePending = false
+        m.nextEpisodeTimer.control = "stop"
+        if params = invalid then return
+        ' Save accepted progress, not a fabricated episode completion.
+        SavePosition()
+        m.manualNextAuthorized = NextEpisode_Text(m.playParams.videoId)
+        m.top.nextEpisodeRequest = {videoId:m.manualNextAuthorized,params:params}
+        return
+    end if
     if m.video.state <> "finished" or m.naturalEnd <> true or m.sourceAccepted <> true
         CancelNextEpisode()
         return
@@ -101,6 +118,8 @@ sub onNextEpisodeTick()
 end sub
 
 sub CancelNextEpisode()
+    m.manualNextPending = false
+    m.manualNextAuthorized = ""
     m.nextEpisodePending = false
     m.nextSetupPending = false
     m.nextEpisodeGuard = invalid
@@ -117,7 +136,27 @@ end sub
 
 function CanAdvanceEpisode(videoId as string) as boolean
     if m.sourceAccepted <> true or m.hasPlayed <> true then return false
+    if m.playbackActive = true and m.top.screenActive = true and m.video <> invalid and Type(m.playParams) = "roAssociativeArray"
+        if m.manualNextAuthorized = videoId and videoId <> "" and m.video.state = "paused" and m.playParams.metaType = "series" and m.playParams.diagnostic <> true and NextEpisode_Text(m.playParams.videoId) = videoId
+            m.manualNextAuthorized = ""
+            return true
+        end if
+    end if
     if m.playbackActive <> true or m.top.screenActive <> true or m.naturalEnd <> true or m.video = invalid then return false
     if Type(m.playParams) <> "roAssociativeArray" or m.video.state <> "finished" then return false
     return NextEpisode_Text(m.playParams.videoId) = videoId and m.playParams.metaType = "series" and m.playParams.diagnostic <> true
+end function
+
+' User-key callback only. The timer saves and navigates outside Video observers.
+' Native seeking, Play/Pause, Options/captions and Back keep their existing path.
+function RequestNextEpisodeNow() as boolean
+    if m.video = invalid or m.video.state <> "paused" then return false
+    if m.playbackActive <> true or m.top.screenActive <> true or m.sourceAccepted <> true or m.hasPlayed <> true then return false
+    params = NextEpisode_Params(m.playParams,m.nextEpisodeMeta,NextEpisodeClock(),true)
+    if params = invalid or m.nextEpisodeTimer = invalid then return false
+    if m.manualNextPending = true then return true
+    m.manualNextPending = true:m.nextEpisodePending = true
+    m.status.text = "Opening next episode…"
+    m.nextEpisodeGuard = TimerGuard_Start(m.nextEpisodeTimer,100)
+    return true
 end function

@@ -1,8 +1,9 @@
 ' Build a fresh episode request from provider metadata, never from the previous
 ' media URL. Missing metadata/current episode is a safe stop, not a guessed id.
-function NextEpisode_Params(params as dynamic, meta as dynamic, nowIso = "" as string) as dynamic
+function NextEpisode_Params(params as dynamic, meta as dynamic, nowIso = "" as string, manual = false as boolean) as dynamic
     if Type(params) <> "roAssociativeArray" or Type(meta) <> "roAssociativeArray" then return invalid
-    if params.metaType <> "series" or params.diagnostic = true or params.autoNextEpisode = false then return invalid
+    if params.metaType <> "series" or params.diagnostic = true then return invalid
+    if params.autoNextEpisode = false and not manual then return invalid
     if Type(meta.videos) <> "roArray" then return invalid
     seriesId = NextEpisode_Text(params.metaId)
     if NextEpisode_Text(params.videoId) = "" then return invalid

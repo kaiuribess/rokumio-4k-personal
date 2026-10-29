@@ -1715,6 +1715,9 @@ sub ShowPlaybackInfo()
     if m.resolvedPlayback <> invalid then media = m.resolvedPlayback.media
     m.playbackInfoText.text = NativeMedia_Resolution(media) + nl + "Delivery: " + delivery + nl + "Source: " + PlaybackInfo_SourceLabel(stream) + nl + PlaybackInfo_Segment(m.playingSegment) + nl + "Video: " + PlaybackInfo_Codec(videoCodec) + nl + "Audio: " + PlaybackInfo_Codec(audioCodec, true) + nl + PlaybackInfo_DeviceFacts(m.devicePlaybackInfo) + nl + "Audio codec alone does not verify 5.1 or Atmos." + nl + "HDMI output resolution does not verify source resolution."
     m.playbackInfoGroup.visible = true
+    if m.sourceAccepted = true and m.hasPlayed = true
+        if NextEpisode_Params(m.playParams,m.nextEpisodeMeta,NextEpisodeClock(),true) <> invalid then m.playbackInfoText.text = "Down: next episode now" + nl + m.playbackInfoText.text
+    end if
 end sub
 
 ' Read-only local checks. Unsupported methods must not prevent a source from
@@ -1760,6 +1763,7 @@ end sub
 ' stack → stop + save + pop).
 function OnKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
+    if key = "down" and RequestNextEpisodeNow() then return true
     if key = "play" and m.playbackActive and m.sourceQueue <> invalid and m.sourceIndex + 1 >= m.sourceQueue.Count() and m.audioGuardBlocked
         QueueSourceDiscovery(true)
         return true

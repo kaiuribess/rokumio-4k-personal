@@ -34,6 +34,8 @@ sub EpisodeSetup()
     m.nextEpisodeSetup = {control:"stop"}
     m.nextEpisodeTask = invalid
     m.nextEpisodePending = false
+    m.manualNextPending = false
+    m.manualNextAuthorized = ""
     m.nextEpisodeParams = invalid
     m.playbackActive = true
     m.sourceAccepted = true
@@ -286,12 +288,51 @@ sub TestEpisodeTimedEvents()
     Harness_Equal(m.launched,1,"duplicate metadata setup does not launch again")
     EpisodeSetup():m.playParams.autoNextEpisode=false
     PrepareNextEpisode(m.playParams):onNextEpisodeSetup()
-    Harness_Equal(m.launched,0,"cancelled setup cannot fetch after autoplay is disabled")
+    Harness_Equal(m.launched,0,"metadata setup still waits for its timer when autoplay is disabled")
+    m.nextSetupGuard.clock.elapsed=100:onNextEpisodeSetup()
+    Harness_Equal(m.launched,1,"manual next episode can obtain metadata with autoplay disabled")
     m.testTimed=false
+end sub
+
+sub TestManualNextEpisode()
+    Harness_Suite("Manual next episode saves real progress and uses fresh sources")
+    EpisodeSetup():m.video.state="paused":m.video.position=510:m.playParams.autoNextEpisode=false
+    Harness_Ok(OnKeyEvent("down",true),"paused accepted series key can advance before credits")
+    Harness_Equal(m.top.nextEpisodeRequest,invalid,"key callback does not navigate synchronously")
+    Harness_Ok(RequestNextEpisodeNow(),"repeated key stays one pending transition")
+    onNextEpisodeTick()
+    Harness_Equal(m.top.nextEpisodeRequest.params.videoId,"two","fresh next episode ID")
+    Harness_Equal(m.top.nextEpisodeRequest.params.autoNextEpisode,false,"manual action does not change autoplay preference")
+    Harness_Equal(m.top.nextEpisodeRequest.params.position,0,"next starts from zero")
+    Harness_Equal(m.top.nextEpisodeRequest.params.stream,invalid,"old media URL not forwarded")
+    Harness_Equal(m.top.watchStateUpdate.position,510,"skipping does not fabricate completion")
+    Harness_Ok(not CanAdvanceEpisode("stale"),"old episode request rejected")
+    Harness_Ok(CanAdvanceEpisode("one"),"scene accepts exactly one manual transition")
+    Harness_Ok(not CanAdvanceEpisode("one"),"duplicate manual transition rejected")
+    EpisodeSetup():m.video.state="playing"
+    Harness_Ok(not OnKeyEvent("down",true),"Down during playback does not skip")
+    EpisodeSetup():m.video.state="paused"
+    Harness_Ok(not OnKeyEvent("down",false),"key release does not advance")
+    Harness_Ok(not OnKeyEvent("options",true),"native caption Options path stays available")
+    EpisodeSetup():m.video.state="paused":m.sourceAccepted=false
+    Harness_Ok(not RequestNextEpisodeNow(),"unaccepted source cannot skip")
+    EpisodeSetup():m.video.state="paused":m.playParams.metaType="tv"
+    Harness_Ok(not RequestNextEpisodeNow(),"live channel cannot advance")
+    EpisodeSetup():m.video.state="paused":m.playParams.diagnostic=true
+    Harness_Ok(not RequestNextEpisodeNow(),"diagnostic cannot advance")
+    EpisodeSetup():m.video.state="paused":m.nextEpisodeMeta.videos[2].released="2099-01-01"
+    Harness_Ok(not RequestNextEpisodeNow(),"unaired episode cannot advance")
+    EpisodeSetup():m.video.state="paused"
+    RequestNextEpisodeNow():m.video.state="playing":onNextEpisodeTick()
+    Harness_Equal(m.top.nextEpisodeRequest,invalid,"resuming cancels delayed manual action")
+    EpisodeSetup():m.video.state="paused"
+    RequestNextEpisodeNow():CancelNextEpisode():onNextEpisodeTick()
+    Harness_Equal(m.top.nextEpisodeRequest,invalid,"Back cancels delayed manual action")
 end sub
 
 TestEpisodePolicy()
 TestEpisodeFinishAndCancel()
 TestEpisodeMetadataAndRoute()
 TestEpisodeTimedEvents()
+TestManualNextEpisode()
 Harness_Finish()
