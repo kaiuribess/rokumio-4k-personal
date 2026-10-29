@@ -1,0 +1,191 @@
+{
+  "checked_utc": "2026-10-29T20:19:18.919733+00:00",
+  "scoreboards": [
+    {
+      "league": "football/nfl",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=20261029&limit=100",
+      "status": 200,
+      "mime": "application/json",
+      "bytes": 22898,
+      "valid_events": true,
+      "events": 1,
+      "states": [
+        "pre"
+      ],
+      "seconds": 0.203
+    },
+    {
+      "league": "basketball/nba",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261029&limit=100",
+      "status": 200,
+      "mime": "application/json",
+      "bytes": 62969,
+      "valid_events": true,
+      "events": 3,
+      "states": [
+        "pre"
+      ],
+      "seconds": 0.187
+    },
+    {
+      "league": "baseball/mlb",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates=20261029&limit=100",
+      "status": 200,
+      "mime": "application/json",
+      "bytes": 1393,
+      "valid_events": true,
+      "events": 0,
+      "states": [],
+      "seconds": 0.203
+    },
+    {
+      "league": "hockey/nhl",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?dates=20261029&limit=100",
+      "status": 200,
+      "mime": "application/json",
+      "bytes": 228012,
+      "valid_events": true,
+      "events": 11,
+      "states": [
+        "pre"
+      ],
+      "seconds": 0.172
+    },
+    {
+      "league": "mma/ufc",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard?dates=20261029&limit=100",
+      "status": 200,
+      "mime": "application/json",
+      "bytes": 12535,
+      "valid_events": true,
+      "events": 0,
+      "states": [],
+      "seconds": 0.109
+    },
+    {
+      "league": "football/college-football",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=20261029&limit=100",
+      "status": 200,
+      "mime": "application/json",
+      "bytes": 41782,
+      "valid_events": true,
+      "events": 2,
+      "states": [
+        "pre"
+      ],
+      "seconds": 0.125
+    },
+    {
+      "league": "basketball/mens-college-basketball",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates=20261029&limit=100",
+      "status": 200,
+      "mime": "application/json",
+      "bytes": 3508,
+      "valid_events": true,
+      "events": 0,
+      "states": [],
+      "seconds": 0.078
+    },
+    {
+      "league": "basketball/womens-college-basketball",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/womens-college-basketball/scoreboard?dates=20261029&limit=100",
+      "status": 200,
+      "mime": "application/json",
+      "bytes": 3476,
+      "valid_events": true,
+      "events": 0,
+      "states": [],
+      "seconds": 0.078
+    },
+    {
+      "league": "basketball/wnba",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/scoreboard?dates=20261029&limit=100",
+      "status": 200,
+      "mime": "application/json",
+      "bytes": 23213,
+      "valid_events": true,
+      "events": 1,
+      "states": [
+        "post"
+      ],
+      "seconds": 0.094
+    },
+    {
+      "league": "soccer/eng.1",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard?dates=20261029&limit=100",
+      "status": 200,
+      "mime": "application/json",
+      "bytes": 2503,
+      "valid_events": true,
+      "events": 0,
+      "states": [],
+      "seconds": 0.11
+    },
+    {
+      "league": "soccer/usa.1",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/soccer/usa.1/scoreboard?dates=20261029&limit=100",
+      "status": 200,
+      "mime": "application/json",
+      "bytes": 2253,
+      "valid_events": true,
+      "events": 0,
+      "states": [],
+      "seconds": 0.125
+    },
+    {
+      "league": "soccer/esp.1",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard?dates=20261029&limit=100",
+      "status": 200,
+      "mime": "application/json",
+      "bytes": 2507,
+      "valid_events": true,
+      "events": 0,
+      "states": [],
+      "seconds": 0.078
+    },
+    {
+      "league": "soccer/uefa.champions",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard?dates=20261029&limit=100",
+      "status": 200,
+      "mime": "application/json",
+      "bytes": 1786,
+      "valid_events": true,
+      "events": 0,
+      "states": [],
+      "seconds": 0.093
+    },
+    {
+      "league": "boxing/boxing",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/boxing/boxing/scoreboard?dates=20261029&limit=100",
+      "status": 400,
+      "seconds": 0.125
+    }
+  ],
+  "media": {
+    "master": "https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8",
+    "kind": "research-only; rights and hardware unverified",
+    "status": 200,
+    "mime": "application/x-mpegurl",
+    "hls": true,
+    "resolutions": [
+      "320x180",
+      "426x240",
+      "640x360",
+      "960x540",
+      "1280x720",
+      "1920x1080"
+    ],
+    "codecs": [
+      "avc1.4d4015,mp4a.40.2",
+      "avc1.4d401f,mp4a.40.2",
+      "avc1.4d4028,mp4a.40.2",
+      "avc1.66.30,mp4a.40.2",
+      "avc1.77.30,mp4a.40.2"
+    ],
+    "variant_is_live": true,
+    "encrypted": false,
+    "segment_status": 200,
+    "segment_bytes_read": 65536,
+    "mpeg_ts_sync": true
+  }
+}

@@ -1,5 +1,7 @@
 # Crimson Cinema
 
+**Feature branch: 0.6.0 Sports preview.** [Sports setup, provider research and limitations](docs/SPORTS.md). Adds schedules, authorized-provider integration and manual next episode; no sports streams are bundled. This preview is not yet hardware-verified. The 0.5.29 download below remains the published release.
+
 A native Roku client with a dark red interface for browsing Stremio-compatible catalogs, searching movies and shows, and playing compatible direct streams with the Roku remote. This community derivative adds English audio selection, projector/surround preferences, clearer source cards, automatic source recovery, next-episode playback, and add-on checks. The repository and ZIP filename remain `rokumio-4k-personal` so existing links and build instructions continue to work.
 
 **Version 0.5.29 shares Home previews across catalog providers and repairs paging for providers returning 20 items per page.** Later providers can now contribute Home rows without increasing the existing request/poster budgets. Discover preserves raw offsets and handles repeated pages safely. The 0.5.28 automatic preference for lighter UHD, English checks, source recovery and private checkpoint diagnostics remain. Catalogs supply browsing information; each user supplies compatible stream providers. Uninterrupted UHD and audible surround remain unverified for every title. This remains an experimental prerelease. See [validation](docs/VALIDATION.md).

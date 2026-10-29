@@ -1,5 +1,14 @@
 # Changes
 
+## 0.6.0 — feature preview, not released
+
+- Add Sports navigation, 13 league schedules, date/status filters and installed TV/sports catalog shortcuts. Distinguish schedule-only, upcoming and provider-backed entries; never infer video from a listing.
+- Fetch schedules directly on Roku with one retained worker, a 10-second request budget, 1 MiB response ceiling, bounded rows/fields and stale/duplicate callback protection.
+- Add a dependency-free standalone sports add-on publisher for operator-authorized public HLS/DASH feeds. Reuse existing native source ranking, audio preferences and bounded recovery; no accounts, media proxy, default streams or paid hosting required.
+- Reject expired feed sources during discovery and resolution. Preserve expiry through candidate budgeting.
+- Add paused-Down manual next episode with accepted-progress saving, fresh sources, one-use navigation authorization and cancellation guards. Preserve automatic-next preference and existing remote controls.
+- Add production-boundary regression tests, actual local HTTP protocol tests and reproducible public provider probes. Document unresolved broadcast rights/delivery and physical Roku validation rather than claim universal sports coverage.
+
 ## 0.5.29 — 2026-10-17
 
 Fair catalog previews and correct smaller-page browsing. Experimental prerelease; catalog availability is separate from stream delivery.
