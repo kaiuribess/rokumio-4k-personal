@@ -422,6 +422,11 @@ function CinemaBudgetStreams(raw as dynamic, countLimit = invalid as dynamic, by
         hints = item.behaviorHints
         if Type(hints) = "roAssociativeArray"
             safeHints = {}
+            if hints.crimsonExpiresAt <> invalid
+                if GetInterface(hints.crimsonExpiresAt,"ifString") = invalid then continue for
+                if Len(hints.crimsonExpiresAt) > 32 then continue for
+                safeHints.crimsonExpiresAt = hints.crimsonExpiresAt
+            end if
             if hints.downloadOnly = true then safeHints.downloadOnly = true
             if GetInterface(hints.filename,"ifString") <> invalid and Len(hints.filename) <= 512 then safeHints.filename = hints.filename
             size = CinemaSizeNumber(hints.videoSize)

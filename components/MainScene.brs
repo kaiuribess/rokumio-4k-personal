@@ -68,6 +68,8 @@ sub init()
     m.searchScreen.ObserveField("pushRequest", "onSearchAction")
     m.discoverScreen = m.top.FindNode("discoverScreen")
     m.discoverScreen.ObserveField("pushRequest", "onDiscoverAction")
+    m.sportsScreen = m.top.FindNode("sportsScreen")
+    m.sportsScreen.ObserveField("pushRequest", "onSportsAction")
     m.libraryScreen = m.top.FindNode("libraryScreen")
     m.libraryScreen.ObserveField("pushRequest", "onLibraryAction")
     m.uiRoot = m.top.FindNode("uiRoot")
@@ -206,6 +208,7 @@ sub init()
     m.aboutScreen.callFunc("SetStores", m.storeHost, m.top)
     m.searchScreen.callFunc("SetStores", m.storeHost, m.top)
     m.discoverScreen.callFunc("SetStores", m.storeHost, m.top)
+    m.sportsScreen.callFunc("SetStores", m.storeHost, m.top)
     m.libraryScreen.callFunc("SetStores", m.storeHost, m.top)
     m.playerScreen.callFunc("SetStores", m.storeHost, m.top)
 end sub
@@ -368,6 +371,14 @@ sub onNextEpisodeRequest()
     else
         m.stack.push("streamsScreen", request.params)
     end if
+end sub
+
+sub onSportsAction()
+    if m.sportsScreen.screenActive <> true then return
+    request = m.sportsScreen.pushRequest
+    if Type(request) <> "roAssociativeArray" then return
+    if request.screen <> "streamsScreen" and request.screen <> "discoverScreen" and request.screen <> "addonsScreen" then return
+    m.stack.push(request.screen,request.params)
 end sub
 
 ' The player published a position update (pause or leave) through

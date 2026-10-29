@@ -209,6 +209,9 @@ sub ApplyParamsChrome(params as object)
         end if
         episodeOverview = params.episodeOverview
         if episodeOverview <> invalid and episodeOverview <> "" then synopsis = episodeOverview
+    else if params.metaType = "tv" or params.metaType = "channel"
+        action = "Live event / channel"
+        if params.description <> invalid then synopsis = params.description
     else if params.metaType <> invalid and params.metaType <> ""
         action = "Movie"
         description = params.description

@@ -85,6 +85,7 @@
             <AboutScreen id="aboutScreen" visible="false" />
             <SearchScreen id="searchScreen" visible="false" />
             <DiscoverScreen id="discoverScreen" visible="false" />
+            <SportsScreen id="sportsScreen" visible="false" />
             <LibraryScreen id="libraryScreen" visible="false" />
             <PlayerScreen id="playerScreen" visible="false" />
         </Group>

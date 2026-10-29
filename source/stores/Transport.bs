@@ -455,6 +455,7 @@ end class
 ' cancellation is best effort; a temporary file can overshoot between polls.
 function TransportResponseLimit(url as string) as integer
     path = LCase(url.Split("?")[0])
+    if path.InStr("https://site.api.espn.com/apis/site/v2/sports/") = 0 then return 1048576
     if path.InStr("/manifest.json") >= 0 then return 262144
     if path.InStr("/subtitles/") >= 0 then return 131072
     if path.InStr("/stream/") >= 0 or path.InStr("/catalog/") >= 0 or path.InStr("/meta/") >= 0 then return 1048576

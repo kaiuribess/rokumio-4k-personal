@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="SportsScreen" extends="Screen">
+    <interface>
+        <field id="pushRequest" type="assocarray" alwaysNotify="true" />
+        <function name="OnEnter" />
+        <function name="OnExit" />
+        <function name="OnBackPressed" />
+        <function name="BlurFocus" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
+    <script type="text/brightscript" uri="pkg:/source/core/AsyncTask.bs" />
+    <script type="text/brightscript" uri="pkg:/source/util/Sports.brs" />
+    <script type="text/brightscript" uri="pkg:/components/SportsScreen.brs" />
+    <children>
+        <Label id="sportsTitle" text="Sports" translation="[80, 54]" width="1760" height="70" font="font:LargeBoldSystemFont" />
+        <Label id="sportsSubtitle" text="Scores and schedules · Video availability depends on your installed providers" translation="[80, 138]" width="1760" height="50" font="font:SmallSystemFont" />
+        <ChevronList id="sportsList" translation="[80, 340]" numRows="5" itemWidth="1000" rowHeight="108" />
+        <Group translation="[1140, 330]">
+            <Rectangle id="sportsPlate" width="700" height="570" />
+            <Label id="sportsName" translation="[32, 28]" width="636" height="100" wrap="true" font="font:MediumBoldSystemFont" />
+            <Label id="sportsDetail" translation="[32, 148]" width="636" height="390" wrap="true" font="font:SmallSystemFont" />
+        </Group>
+        <Label id="sportsStatus" translation="[80, 930]" width="1760" height="54" font="font:SmallSystemFont" />
+        <Label id="sportsHelp" text="OK  Check sources     *  Filters     Play/Pause  Refresh     Back  Return" translation="[80, 1000]" width="1760" height="42" font="font:SmallSystemFont" />
+        <FilterBar id="sportsFilters" translation="[80, 232]" />
+    </children>
+</component>
