@@ -1230,4 +1230,23 @@ PrefetchTest_Setup(1)
 LoadStreams(m.params)
 ApplyProviderSources(0,{streams:[uhd],readyStreams:invalid,uhdCount:boxedCount,error:""})
 Harness_Equal(m.providers[0].uhdCount,0,"no ready array means no counted UHD candidates")
+Harness_Suite("Live sources are pinned to the original provider with a short refresh budget")
+PrefetchTest_Setup(3)
+m.params={metaType:"tv",metaId:"native-event",videoId:"native-event",addonAddress:m.stores.addons.installed[1].address,livePlayback:true,allowUnknownLiveAudio:true}
+ctx=SourcePrefetch_Context(m.stores,m.params,PrefetchTest_PriorityHash)
+Harness_Equal(ctx.providers.Count(),1,"broad matching other providers cannot claim the same event")
+Harness_Equal(ctx.providers[0].address,m.params.addonAddress,"catalog owner receives its own identifier")
+LoadStreams(m.params)
+Harness_Equal(m.providers.Count(),1,"source screen and coordinator agree on event owner")
+Harness_Equal(m.launched[0].videoId,"native-event","worker gets unmodified provider-native ID")
+task=m.launched[0]:task.result=PrefetchTest_Result("fresh-live")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(task))
+m.prefetchState.clock.now=29999
+Harness_Ok(not PrefetchTest_Resume(ctx.key).refreshed,"fresh live results may be reused briefly")
+m.prefetchState.clock.now=30000
+Harness_Ok(PrefetchTest_Resume(ctx.key).refreshed,"explicit return refreshes live links after 30 seconds")
+Harness_Equal(m.launched.Count(),2,"refresh requests provider again instead of saving a temporary URL")
+PrefetchTest_Suspend(ctx.key):m.prefetchState.clock.now=90000
+Harness_Ok(not PrefetchTest_Snapshot(ctx.key,true).refreshed,"late observations never interrupt active playback")
+
 Harness_Finish()

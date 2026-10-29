@@ -67,6 +67,8 @@ function OnEnter(params as object) as void
     if m.stores <> invalid and CatalogSignature() <> m.sourcesSignature then ResetDiscover()
 
     if Type(params) = "roAssociativeArray"
+        m.liveEntry = invalid
+        if params.livePlayback = true then m.liveEntry = params
         if params.metaType <> invalid or params.catalogId <> invalid or params.focusGenres = true
             m.entryRequest = params
             if m.sources.Count() > 0 then ReadySources():return
@@ -107,7 +109,9 @@ end sub
 sub RefreshDiscoverIfStale()
     if m.top.screenActive <> true or m.loaded <> true or m.loadTask <> invalid then return
     if m.catalogRefreshClock <> invalid
-        if m.catalogRefreshClock.TotalMilliseconds() < 1800000 then return
+        freshnessMs = 1800000
+        if Type(m.liveEntry) = "roAssociativeArray" then freshnessMs = 30000
+        if m.catalogRefreshClock.TotalMilliseconds() < freshnessMs then return
     end if
     FetchDiscover(true)
 end sub
@@ -932,12 +936,21 @@ end sub
 ' A result opens DetailsScreen through the same one-action channel Home and
 ' Search use for a catalog tile: full meta + the source add-on's address.
 sub onResultSelected()
+    if m.top.screenActive = false then return
     if m.selectedCatalog = invalid then return
     data = m.grid.rowItemSelected
     if data = invalid or data.Count() < 2 then return
     if data[0] < 0 or data[1] < 0 or data[1] >= m.chunk then return
     flat = data[0] * m.chunk + data[1]
     if flat < 0 or flat >= m.metas.Count() then return
+    if Type(m.liveEntry) = "roAssociativeArray"
+        live = m.liveEntry
+        if live.addonAddress = m.selectedCatalog.address and live.catalogId = m.selectedCatalog.catalogId and live.metaType = m.selectedCatalog.rawType
+            meta = m.metas[flat]
+            m.top.pushRequest = {screen:"streamsScreen",params:{addonAddress:m.selectedCatalog.address,metaType:meta.type,metaId:meta.id,videoId:meta.id,name:meta.name,poster:meta.poster,background:meta.background,position:0,autoPlay:false,fourKOnly:false,autoNextEpisode:false,onlineSubtitles:false,livePlayback:true,allowUnknownLiveAudio:live.allowUnknownLiveAudio = true}}
+            return
+        end if
+    end if
     m.top.pushRequest = {
         screen: "detailsScreen"
         params: {

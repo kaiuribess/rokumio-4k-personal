@@ -1083,6 +1083,7 @@ sub StartPlayback(url as string, streamFormat = "" as string)
     m.audioGuardBlocked = false
     m.audioLogSignature = ""
     m.lastEnglishTrack = ""
+    m.acceptedEnglishVerified = false
     BeginAudioRecovery()
     m.video.mute = true
     if m.audioGuardTimer <> invalid then m.audioGuardTimer.control = "stop"
@@ -1104,7 +1105,7 @@ sub StartPlayback(url as string, streamFormat = "" as string)
     content.httpCertificatesFile = "common:/certs/ca-bundle.crt"
     content.httpSendClientCertificates = false
     content.httpHeaders = []
-    if m.playParams <> invalid and m.playParams.diagnosticControl <> true
+    if m.playParams <> invalid and m.playParams.diagnosticControl <> true and not (m.playParams.livePlayback = true and m.playParams.allowUnknownLiveAudio = true)
         content.audioWhitelist = "en,eng"
         ' Do not narrow the published renditions to one codec. An inspected
         ' AAC track can still fail natively, and the same file's English MP3
@@ -1116,7 +1117,12 @@ sub StartPlayback(url as string, streamFormat = "" as string)
     params = m.playParams
     content.title = PlaybackInfo_Text(params.name)
     startOffset = PlaybackInfo_ResumeOffset(params.position)
-    if startOffset > 0 then content.playStart = startOffset
+    if params.livePlayback = true
+        content.live = true
+        content.playStart = -12
+    else if startOffset > 0
+        content.playStart = startOffset
+    end if
     if streamFormat <> "" then content.streamFormat = streamFormat
 
     ' Guarded for the same reason trickPlayBar is, and because the warning this
@@ -1227,7 +1233,7 @@ sub onVideoStateChanged()
         if m.playParams <> invalid and m.playParams.diagnostic <> true then PublishWatchState()
         ShowPlaybackInfo()
     else if state = "finished"
-        if m.sourceAccepted
+        if m.sourceAccepted and m.playParams.livePlayback <> true
             observed = PlaybackPosition_Snapshot()
             duration = observed.duration
             position = observed.position
@@ -1360,7 +1366,7 @@ function CurrentEnglishAudioFacts() as object
     end if
     emptyTracks = Type(tracks) <> "roArray"
     if Type(tracks) = "roArray" then emptyTracks = tracks.Count() = 0
-    if not result.verified and m.sourceAccepted = true and m.audioExplicitRejection <> true and emptyTracks
+    if not result.verified and m.sourceAccepted = true and (m.playParams.livePlayback <> true or m.acceptedEnglishVerified = true) and m.audioExplicitRejection <> true and emptyTracks
         selectedId = PlaybackInfo_Text(selected)
         sameOrMissingTrack = selected = m.lastEnglishTrack
         if selectedId = "" and m.lastEnglishCodec <> invalid and m.lastEnglishCodec <> "" then sameOrMissingTrack = AudioRecovery_Codec() = m.lastEnglishCodec
@@ -1369,7 +1375,7 @@ function CurrentEnglishAudioFacts() as object
             result.reason = "English-track-continuity"
         end if
     end if
-    if not result.verified and m.sourceAccepted = true and m.audioExplicitRejection <> true and (state = "buffering" or state = "paused")
+    if not result.verified and m.sourceAccepted = true and (m.playParams.livePlayback <> true or m.acceptedEnglishVerified = true) and m.audioExplicitRejection <> true and (state = "buffering" or state = "paused")
         temporary = result.reason = "unknown-language" or result.reason = "loading" or result.reason = "no-playable-audio"
         sameTrack = selected = m.lastEnglishTrack or PlaybackInfo_Text(selected) = ""
         emptyCodec = PlaybackInfo_Text(codec) = "" or LCase(PlaybackInfo_Text(codec)) = "none" or LCase(PlaybackInfo_Text(codec)) = "unknown"
@@ -1386,13 +1392,13 @@ function CurrentEnglishAudioFacts() as object
         result.verified = false
         result.reason = "receiver-audio-unsupported"
     end if
-    return result
+    return EnglishAudio_LivePolicy(result,m.playParams,tracks,selected,codec,mode)
 end function
 
 function CurrentEnglishAudioCheck(facts = invalid as dynamic) as object
     result = facts
     if Type(result) <> "roAssociativeArray" then result = CurrentEnglishAudioFacts()
-    if result.verified <> true or m.sourceAccepted = true then return result
+    if not EnglishAudio_Playable(result) or m.sourceAccepted = true then return result
     if m.audioProgressPassed = true and m.audioProvenTrack = AudioRecovery_TrackKey() and m.audioProvenCodec = AudioRecovery_Codec() then return result
     ' Keep provisional native facts intact: they authorize sound while the
     ' independent advancing-sample check still gates acceptance and history.
@@ -1415,18 +1421,19 @@ sub onEnglishAudioFactsChanged()
     ' sound. Actual advancing samples are required before accepting the source,
     ' saving resume/history or remembering it. This avoids depending on mute
     ' semantics to produce positionInfo.audio on untested firmware.
-    if m.sourceAccepted <> true then m.video.mute = facts.verified <> true
+    if m.sourceAccepted <> true then m.video.mute = not EnglishAudio_Playable(facts)
     if m.sourceAccepted = true
         mode = "projector"
         if Type(m.playParams) = "roAssociativeArray" and m.playParams.audioMode = "surround" then mode = "surround"
-        if facts.verified = true
+        if EnglishAudio_Playable(facts)
+            m.acceptedEnglishVerified = facts.verified = true
             m.video.mute = false
             m.audioExplicitRejection = false
             if AudioRecovery_TrackId() <> "" then m.lastEnglishTrack = AudioRecovery_TrackId()
             if AudioRecovery_CodecAllowed(AudioRecovery_Codec(),mode) then m.lastEnglishCodec = AudioRecovery_Codec()
         end if
         explicitFailure = facts.reason = "non-english" or facts.reason = "non-dialogue-audio" or facts.reason = "projector-codec" or facts.reason = "unsupported-audio" or facts.reason = "receiver-audio-unsupported"
-        explicitTrackChange = facts.verified <> true and AudioRecovery_TrackId() <> "" and AudioRecovery_TrackId() <> m.lastEnglishTrack
+        explicitTrackChange = not EnglishAudio_Playable(facts) and AudioRecovery_TrackId() <> "" and AudioRecovery_TrackId() <> m.lastEnglishTrack
         if explicitTrackChange then explicitFailure = true
         if explicitFailure or explicitTrackChange then m.audioExplicitRejection = true
         if m.video.state = "playing" and facts.reason = "no-playable-audio" then explicitFailure = true
@@ -1445,14 +1452,15 @@ sub onEnglishAudioFactsChanged()
         if m.audioGuardTimer <> invalid then m.audioGuardTimer.control = "stop"
         m.audioGuardArmed = false
         StopAudioRecoveryTimers()
-        if facts.verified = true and m.video.state = "playing"
+        if EnglishAudio_Playable(facts) and m.video.state = "playing"
             StopSourceStartupLimit()
             ArmSourceProof()
             m.status.text = ""
         end if
         return
     end if
-    if result.verified
+    if EnglishAudio_Playable(result)
+        m.acceptedEnglishVerified = result.verified = true
         if m.video.state = "playing" then StopSourceStartupLimit()
         m.sourceAccepted = true
         ProgressRecovery_Update()
@@ -1466,6 +1474,7 @@ sub onEnglishAudioFactsChanged()
         if m.video.state = "playing" then m.status.text = ""
     else if m.video.state = "playing"
         m.status.text = "Checking English audio…" + Chr(10) + "Back cancels"
+        if m.playParams.livePlayback = true and m.playParams.allowUnknownLiveAudio = true then m.status.text = "Checking live audio playback… Language may be unlabelled." + Chr(10) + "Back cancels"
         ArmAudioProgress()
         if not m.audioGuardArmed
             m.audioGuardArmed = true
@@ -1483,7 +1492,7 @@ sub onEnglishAudioTimeout()
         return
     end if
     result = CurrentEnglishAudioCheck()
-    if result.verified
+    if EnglishAudio_Playable(result)
         onEnglishAudioFactsChanged()
         return
     end if
@@ -1573,7 +1582,8 @@ sub ScheduleNextSource(reason as string)
     if m.audioGuardTimer <> invalid then m.audioGuardTimer.control = "stop"
     StopSourceStartupLimit()
     if m.video <> invalid
-        if m.sourceAccepted then m.playParams.position = PlaybackPosition_Snapshot().position
+        if m.sourceAccepted and m.playParams.livePlayback <> true then m.playParams.position = PlaybackPosition_Snapshot().position
+        if m.playParams.livePlayback = true then m.playParams.position = 0
         m.video.mute = true
     end if
     print "[auto] failed attempt "; m.sourceIndex + 1; " reason "; reason
@@ -1587,11 +1597,13 @@ sub ScheduleNextSource(reason as string)
         if Type(m.playParams) = "roAssociativeArray" and m.playParams.fourKOnly = true
             m.status.text = "No compatible English 4K source found in " + m.sourceQueue.Count().ToStr() + " attempts. Play/Pause retries; Back cancels."
         end if
+        if m.playParams.livePlayback = true then m.status.text = "No playable live source in this batch. Checking fresh links when allowed; Play/Pause retries, Back exits."
         m.top.SetFocus(true)
         if m.playParams.autoSourceRetry <> false then QueueSourceDiscovery(false)
         return
     end if
     m.status.text = "Trying another English source automatically…" + Chr(10) + "Back cancels"
+    if m.playParams.livePlayback = true then m.status.text = "Trying another source for this live event…" + Chr(10) + "Back cancels"
     if reason = "prefer-UHD" then m.status.text = "Checking another 4K source; keeping this source as fallback…" + Chr(10) + "Back cancels"
     if Type(m.playParams) = "roAssociativeArray" and m.playParams.fourKOnly = true
         m.status.text = "Trying another English 4K source automatically…" + Chr(10) + "Back cancels"
@@ -1626,6 +1638,7 @@ sub onAutoSourceRetry()
     m.playbackActive = true
     m.sourceAccepted = false
     m.status.text = AutoPlayback_Status(m.sourceIndex, m.sourceQueue.Count(), m.playParams.stream) + Chr(10) + "Back cancels"
+    if m.playParams.livePlayback = true then m.status.text = "Opening live source " + (m.sourceIndex+1).ToStr() + " of " + m.sourceQueue.Count().ToStr() + Chr(10) + "Back cancels"
     StartResolve(m.playParams.stream, m.playParams.serverAddress, ResolveOrdinal(m.playParams.season), ResolveOrdinal(m.playParams.episode))
     ArmSourceStartupLimit(true)
 end sub
@@ -1697,7 +1710,7 @@ function PlaybackStatus() as object
     segment = PlaybackInfo_Segment(m.playingSegment)
     remembered = false
     if Type(m.playParams) = "roAssociativeArray" then remembered = m.playParams.rememberedSource = true
-    return {rememberedSource:remembered,memorySaved:m.memorySaved = true,device:m.devicePlaybackInfo,segment:segment,position:position,videoCodec:videoCodec,muted:muted,samples:samples,diagnostic:diagnostic,inspection:NativeMedia_Reason(media),format:format,state:state,audioCodec:codec,englishVerified:audio.verified,audioReason:audio.reason,englishTrackCount:audio.englishTracks.Count(),attempt:m.sourceIndex + 1,retrying:m.retryPending,resolution:NativeMedia_Resolution(media),active:m.playbackActive,sourceAccepted:m.sourceAccepted = true,hasPlayed:m.hasPlayed = true,buffering:BufferingRecovery_Status(),delivery:DeliveryInfo_Status(),checkpoint:CheckpointTiming_Status(),progress:ProgressRecovery_Status(),file:PlaybackInfo_FileFacts(media,DeliveryInfo_Duration())}
+    return {rememberedSource:remembered,memorySaved:m.memorySaved = true,device:m.devicePlaybackInfo,segment:segment,position:position,videoCodec:videoCodec,muted:muted,samples:samples,diagnostic:diagnostic,inspection:NativeMedia_Reason(media),format:format,state:state,audioCodec:codec,englishVerified:audio.verified,audioPlayable:EnglishAudio_Playable(audio),audioReason:audio.reason,englishTrackCount:audio.englishTracks.Count(),attempt:m.sourceIndex + 1,retrying:m.retryPending,resolution:NativeMedia_Resolution(media),active:m.playbackActive,sourceAccepted:m.sourceAccepted = true,hasPlayed:m.hasPlayed = true,buffering:BufferingRecovery_Status(),delivery:DeliveryInfo_Status(),checkpoint:CheckpointTiming_Status(),progress:ProgressRecovery_Status(),file:PlaybackInfo_FileFacts(media,DeliveryInfo_Duration())}
 end function
 
 sub ShowPlaybackInfo()
@@ -1713,7 +1726,9 @@ sub ShowPlaybackInfo()
     nl = Chr(10)
     media = invalid
     if m.resolvedPlayback <> invalid then media = m.resolvedPlayback.media
-    m.playbackInfoText.text = NativeMedia_Resolution(media) + nl + "Delivery: " + delivery + nl + "Source: " + PlaybackInfo_SourceLabel(stream) + nl + PlaybackInfo_Segment(m.playingSegment) + nl + "Video: " + PlaybackInfo_Codec(videoCodec) + nl + "Audio: " + PlaybackInfo_Codec(audioCodec, true) + nl + PlaybackInfo_DeviceFacts(m.devicePlaybackInfo) + nl + "Audio codec alone does not verify 5.1 or Atmos." + nl + "HDMI output resolution does not verify source resolution."
+    language = "English language not verified"
+    if CurrentEnglishAudioFacts().verified = true then language = "English track metadata verified"
+    m.playbackInfoText.text = language + nl + NativeMedia_Resolution(media) + nl + "Delivery: " + delivery + nl + "Source: " + PlaybackInfo_SourceLabel(stream) + nl + PlaybackInfo_Segment(m.playingSegment) + nl + "Video: " + PlaybackInfo_Codec(videoCodec) + nl + "Audio: " + PlaybackInfo_Codec(audioCodec, true) + nl + PlaybackInfo_DeviceFacts(m.devicePlaybackInfo) + nl + "Audio codec alone does not verify 5.1 or Atmos." + nl + "HDMI output resolution does not verify source resolution."
     m.playbackInfoGroup.visible = true
     if m.sourceAccepted = true and m.hasPlayed = true
         if NextEpisode_Params(m.playParams,m.nextEpisodeMeta,NextEpisodeClock(),true) <> invalid then m.playbackInfoText.text = "Down: next episode now" + nl + m.playbackInfoText.text
@@ -1933,7 +1948,7 @@ sub SavePosition()
     if m.accountGeneration <> invalid
         if AccountEpoch_Read(m.top) <> m.accountGeneration then return
     end if
-    if m.playParams <> invalid and m.playParams.diagnostic = true then return
+    if m.playParams <> invalid and (m.playParams.diagnostic = true or m.playParams.livePlayback = true) then return
     if m.sourceAccepted = false then return
     if m.saved then return
     if m.playParams = invalid or m.playParams.videoId = invalid then return
@@ -2003,6 +2018,7 @@ sub onLocalCheckpoint()
     m.checkpointLastGuard = "diagnostic"
     if m.playParams.diagnostic = true then return
     m.checkpointLastGuard = "live"
+    if m.playParams.livePlayback = true then return
     if m.stores.library.callFunc("LibraryIsChannelType",PlaybackInfo_Text(m.playParams.metaType)) then return
     snapshot = PlaybackPosition_Snapshot()
     m.checkpointLastGuard = "unchanged"
@@ -2088,7 +2104,7 @@ sub PublishWatchState()
         if AccountEpoch_Read(m.top) <> m.accountGeneration then return
     end if
     if m.sourceAccepted <> true then return
-    if m.playParams <> invalid and m.playParams.diagnostic = true then return
+    if m.playParams <> invalid and (m.playParams.diagnostic = true or m.playParams.livePlayback = true) then return
     if m.playParams = invalid or m.playParams.videoId = invalid then return
     if m.stores = invalid then return
     if m.video = invalid then return

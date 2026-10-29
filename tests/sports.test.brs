@@ -179,4 +179,42 @@ Harness_Equal(m.rows.Count(),0,"Live filter excludes upcoming events")
 m.filters.open=true
 Harness_Ok(OnBackPressed(),"Back dismisses filter menu first")
 Harness_Ok(not OnBackPressed(),"second Back returns without waiting for network")
+Harness_Suite("Hosted-provider response shape crosses registry, Sports, Discover, stream and resolver boundaries")
+SportsReset():m.browseProviders=true:m.livePlayback=true:m.allowUnknownLiveAudio=true
+manifest={id:"com.example.sports",name:"Fixture live provider",version:"3.0.0",resources:["catalog","meta","stream"],types:["tv"],idPrefixes:["stremevent_"],catalogs:[{type:"tv",id:"provider_live_events",name:"Live Events",extra:[{name:"search"},{name:"skip"}]}]}
+installed=m.addons.InstallFromDescriptor("https://sports.example/config/fixture/manifest.json?token=fixture",manifest)
+Harness_Ok(installed.ok,"configured hosted-style manifest installs through real store")
+SportsCatalogs():RenderSportsCatalogs()
+Harness_Equal(m.rows.Count(),2,"installed provider shown without generating a schedule feed")
+Harness_Equal(m.launches,0,"provider browsing does not issue ESPN lookups")
+OpenSportsCatalog(1):entry=m.top.pushRequest.params
+Harness_Ok(entry.livePlayback and entry.allowUnknownLiveAudio,"Sports transfers explicit live/audio policy")
+Harness_Ok(entry.addonAddress.InStr("config/fixture")>=0,"configuration path preserved privately")
+id="stremevent_merged_"+String(340,"A")
+transport=ScriptedTransport([{ok:true,status:200,json:{metas:[{id:id,type:"tv",name:"Copa fixture"}]}}])
+catalog=CatalogStore(transport).Catalog(entry.addonAddress,entry.metaType,entry.catalogId)
+Harness_Ok(catalog.ok,"actual catalog client accepts provider-native items")
+m.selectedCatalog={address:entry.addonAddress,rawType:entry.metaType,catalogId:entry.catalogId}:m.liveEntry=entry
+m.metas=catalog.metas:m.grid={rowItemSelected:[0,0]}:m.chunk=5
+SportsDiscoverSelected():request=m.top.pushRequest.params
+Harness_Equal(m.top.pushRequest.screen,"streamsScreen","actual Discover callback opens source picker")
+Harness_Equal(request.videoId,id,"opaque ID remains original, not an ESPN identifier")
+streams=[{name:"SV",title:"HD SERVER",url:"https://media.example/live.m3u8?token=temporary-fixture",behaviorHints:{proxyHeaders:{request:{Referer:"https://provider.example/","User-Agent":"Fixture client"}}}},{name:"Open browser",externalUrl:"https://provider.example/watch"}]
+transport=ScriptedTransport([{ok:true,status:200,json:{streams:streams}}])
+playback=PlaybackStore(transport):answer=playback.Streams(request.addonAddress,request.metaType,request.videoId)
+Harness_Ok(transport.log[0].url.InStr("/stream/tv/"+id+".json")>=0,"stream endpoint receives original event ID")
+Harness_Ok(Right(transport.log[0].url,14)="?token=fixture","configured query retained on stream endpoint")
+budgeted=CinemaBudgetStreams(answer.streams,256,262144)
+Harness_Equal(CinemaSkippedSources(budgeted).browserOnly,1,"external browser option is diagnosed, never sent to Video")
+ranked=CinemaChooseStreams(budgeted,false,"projector",false)
+Harness_Equal(ranked.Count(),1,"only direct HTTPS stream reaches playback")
+resolved=playback.ResolvePlayback("",ranked[0])
+Harness_Equal(resolved.url,streams[0].url,"temporary media query survives exact resolution")
+Harness_Equal(resolved.headers.Count(),2,"provider-required headers survive response budgeting")
+Harness_Equal(resolved.streamFormat,"hls","live source uses native HLS")
+Harness_Equal(CinemaResolutionHint(ranked[0]),0,"HD SERVER name is not proof of HD dimensions")
+Harness_Ok(not request.autoNextEpisode,"live route never advances a movie or series")
+OpenSportsCatalog(0)
+Harness_Equal(m.top.pushRequest.screen,"addonsScreen","provider installation remains explicit")
+
 Harness_Finish()

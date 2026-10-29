@@ -313,6 +313,7 @@ end sub
 
 ' DiscoverScreen's action channel; same one-action routing.
 sub onDiscoverAction()
+    if m.discoverScreen.screenActive <> true then return
     request = m.discoverScreen.pushRequest
     if request = invalid or request.screen = invalid then return
     m.stack.push(request.screen, request.params)

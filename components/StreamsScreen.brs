@@ -261,6 +261,7 @@ sub LoadStreams(params as object, allowPrefetch = true as boolean)
 
     providers = []
     for each addon in m.stores.addons.callFunc("AddonsGetAll")
+        if params.livePlayback = true and addon.address <> params.addonAddress then continue for
         if m.stores.addons.callFunc("AddonsSupportsResource", addon.resources, addon.types, addon.idPrefixes, "stream", ParamString(params.metaType), ParamString(params.videoId))
             if addon.address <> invalid and addon.address <> ""
                 name = AddonDiagnostics_Name(addon)
@@ -568,7 +569,7 @@ sub PushAutomaticPlayer(first as object, candidates as object, remembered = fals
     serverAddress = ""
     prefs = PlaybackPreferences(m.stores,m.params)
     if m.stores <> invalid then serverAddress = m.stores.settings.callFunc("SettingsGetServerAddress")
-    m.top.pushRequest = {screen:"playerScreen",params:{stream:first,candidates:candidates,excludedUrls:m.recoveryExcluded,recoveryRound:m.recoveryRound,rememberedSource:remembered,preferUhd:m.autoPlayEnabled = true,fourKOnly:m.fourKOnly = true,serverAddress:serverAddress,audioMode:CurrentAudioMode(),diagnostic:m.params.diagnostic = true,metaType:m.params.metaType,metaId:m.params.metaId,videoId:m.params.videoId,season:m.params.season,episode:m.params.episode,position:m.params.position,name:m.headTitle.text,poster:m.params.poster,posterShape:m.params.posterShape,logo:m.params.logo,background:m.params.background,addonAddress:m.params.addonAddress,seriesMeta:m.params.seriesMeta,autoNextEpisode:prefs.autoNextEpisode,autoSourceRetry:prefs.autoSourceRetry,waitForProviders:prefs.waitForProviders}}
+    m.top.pushRequest = {screen:"playerScreen",params:{livePlayback:m.params.livePlayback = true,allowUnknownLiveAudio:m.params.allowUnknownLiveAudio = true,stream:first,candidates:candidates,excludedUrls:m.recoveryExcluded,recoveryRound:m.recoveryRound,rememberedSource:remembered,preferUhd:m.autoPlayEnabled = true,fourKOnly:m.fourKOnly = true,serverAddress:serverAddress,audioMode:CurrentAudioMode(),diagnostic:m.params.diagnostic = true,metaType:m.params.metaType,metaId:m.params.metaId,videoId:m.params.videoId,season:m.params.season,episode:m.params.episode,position:m.params.position,name:m.headTitle.text,poster:m.params.poster,posterShape:m.params.posterShape,logo:m.params.logo,background:m.params.background,addonAddress:m.params.addonAddress,seriesMeta:m.params.seriesMeta,autoNextEpisode:prefs.autoNextEpisode,autoSourceRetry:prefs.autoSourceRetry,waitForProviders:prefs.waitForProviders}}
 end sub
 
 ' A single provider's stream list landed (or failed). The task reports which
@@ -941,6 +942,7 @@ sub RenderActiveProvider()
             else
                 label = "This provider returned no direct HTTPS streams. A torrent alone cannot play on Roku."
             end if
+            if skipped.browserOnly <> invalid and skipped.browserOnly > 0 then label = "Provider returned browser-only links. Roku needs a direct HTTPS video source; refresh or choose another event."
             if skipped.uncached > 0 then label = "Only uncached downloads are available. Choose a cached source or another title."
             if skipped.downloadOnly <> invalid and skipped.downloadOnly > 0 then label = "Download-only / 10Gbps links were skipped because they cannot provide reliable playback and seeking."
             if skipped.nonEnglish <> invalid and skipped.nonEnglish > 0 then label = "Sources explicitly marked non-English were skipped. English and multilingual sources remain eligible."
@@ -987,6 +989,7 @@ sub RenderActiveProvider()
         item.title = "Play source " + (i + 1).ToStr()
         item.AddFields({ qualityBadge: CinemaQualityLabel(stream) })
         lines = CinemaCleanSourceLines(stream, CurrentAudioMode())
+        if m.params.livePlayback = true and m.params.allowUnknownLiveAudio = true and lines.Count() > 1 then lines[1] = "Live audio: English preferred; unlabelled language may play"
         if lines.Count() > 0
             description = ""
             for each line in lines
@@ -1081,6 +1084,10 @@ sub UpdateQualityHint()
         mode = "4K source labels only  |  * show all qualities"
     else
         mode = "4K source labels first + 1080p  |  * 4K only"
+    end if
+    if Type(m.params) = "roAssociativeArray" and m.params.livePlayback = true
+        mode = "All live qualities | English required | * allow unlabelled audio"
+        if m.params.allowUnknownLiveAudio = true then mode = "All live qualities | Language may be unknown | * require English"
     end if
     m.qualityHint.text = mode + Chr(10) + "OK plays + retries automatically  |  Play refresh  |  Back cancels"
 end sub
@@ -1342,7 +1349,7 @@ function EpisodeKey(params as object) as string
             episode = 0
         end try
     end if
-    return ParamString(params.metaType) + "|" + ParamString(params.metaId) + "|" + ParamString(params.videoId) + "|" + season.toStr() + "|" + episode.toStr() + "|" + ParamString(params.addonAddress)
+    return ParamString(params.metaType) + "|" + ParamString(params.metaId) + "|" + ParamString(params.videoId) + "|" + season.toStr() + "|" + episode.toStr() + "|" + ParamString(params.addonAddress) + "|" + ParamString(params.livePlayback) + "|" + ParamString(params.allowUnknownLiveAudio)
 end function
 
 sub RestoreFocus()
@@ -1366,6 +1373,11 @@ function onKeyEvent(key as string, press as boolean) as boolean
     end if
     if m.providers = invalid or m.activeIndex < 0 then return false
     if key = "options"
+        if m.params.livePlayback = true
+            m.params.allowUnknownLiveAudio = m.params.allowUnknownLiveAudio <> true
+            RenderActiveProvider()
+            return true
+        end if
         m.fourKOnly = not m.fourKOnly
         m.params.fourKOnly = m.fourKOnly
         CancelAutomaticGrace()

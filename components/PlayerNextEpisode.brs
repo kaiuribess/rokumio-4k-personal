@@ -15,7 +15,7 @@ sub PrepareNextEpisode(params as object)
     CancelNextEpisode()
     m.naturalEnd = false
     m.nextEpisodeMeta = params.seriesMeta
-    if params.metaType <> "series" or params.diagnostic = true then return
+    if params.metaType <> "series" or params.diagnostic = true or params.livePlayback = true then return
     if Type(m.nextEpisodeMeta) = "roAssociativeArray" and Type(m.nextEpisodeMeta.videos) = "roArray" and m.nextEpisodeMeta.videos.Count() > 0 then return
     if NextEpisode_Text(params.addonAddress) = "" or NextEpisode_Text(params.metaId) = "" then return
     m.nextSetupPending = true

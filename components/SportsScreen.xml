@@ -13,7 +13,7 @@
     <script type="text/brightscript" uri="pkg:/components/SportsScreen.brs" />
     <children>
         <Label id="sportsTitle" text="Sports" translation="[80, 54]" width="1760" height="70" font="font:LargeBoldSystemFont" />
-        <Label id="sportsSubtitle" text="Scores and schedules · Video availability depends on your installed providers" translation="[80, 138]" width="1760" height="50" font="font:SmallSystemFont" />
+        <Label id="sportsSubtitle" text="Browse provider events and channels · Schedules are separate from video availability" translation="[80, 138]" width="1760" height="50" font="font:SmallSystemFont" />
         <ChevronList id="sportsList" translation="[80, 340]" numRows="5" itemWidth="1000" rowHeight="108" />
         <Group translation="[1140, 330]">
             <Rectangle id="sportsPlate" width="700" height="570" />

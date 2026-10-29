@@ -19,7 +19,7 @@ end sub
 sub PrepareSourceMemoryAttempt(stream as object)
     ResetSourceProof()
     m.sourceAttemptKey = ""
-    if Type(m.playParams) <> "roAssociativeArray" or m.playParams.diagnosticControl = true then return
+    if Type(m.playParams) <> "roAssociativeArray" or m.playParams.diagnosticControl = true or m.playParams.livePlayback = true then return
     try
         m.sourceAttemptKey = SourceMemory_Fingerprint(stream,PlaybackInfo_Text(m.playParams.videoId),PlaybackInfo_Text(m.playParams.audioMode))
     catch e

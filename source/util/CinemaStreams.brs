@@ -126,11 +126,14 @@ function CinemaSourceBlockReason(stream as dynamic, patterns = invalid as dynami
 end function
 
 function CinemaSkippedSources(streams as dynamic) as object
-    counts = { uncached: 0, status: 0, downloadOnly: 0, nonEnglish: 0 }
+    counts = { uncached: 0, status: 0, downloadOnly: 0, nonEnglish: 0, browserOnly: 0 }
     if Type(streams) <> "roArray" then return counts
     patterns = CinemaSourcePatterns()
     for each stream in streams
         reason = CinemaSourceBlockReason(stream, patterns)
+        if Type(stream) = "roAssociativeArray" and CinemaOptionalText(stream.url) = ""
+            if CinemaOptionalText(stream.externalUrl) <> "" or stream.browserOnly = true then counts.browserOnly++
+        end if
         if reason = "uncached" then counts.uncached = counts.uncached + 1
         if reason = "provider-status" then counts.status = counts.status + 1
         if reason = "download-only" then counts.downloadOnly = counts.downloadOnly + 1
@@ -407,6 +410,7 @@ function CinemaBudgetStreams(raw as dynamic, countLimit = invalid as dynamic, by
     for each item in raw
         if Type(item) <> "roAssociativeArray" then continue for
         stream = {}
+        if CinemaOptionalText(item.url) = "" and (CinemaOptionalText(item.externalUrl) <> "" or item.browserOnly = true) then stream.browserOnly = true
         unsafe = false
         for each field in ["url","infoHash","sourceMemoryProvider","streamFormat"]
             value = item[field]

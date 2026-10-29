@@ -141,11 +141,13 @@ function PrefetchExpireCompleted() as boolean
     if m.context = invalid or m.fullLoad <> true or m.suspended = true then return false
     changed = false
     now = m.clock.TotalMilliseconds()
+    freshnessMs = 300000
+    if m.context.livePlayback = true then freshnessMs = 30000
     for i = 0 to m.entries.Count() - 1
         entry = m.entries[i]
         if entry.status <> "ready" and entry.status <> "failed" then continue for
         expired = entry.receivedAt = invalid
-        if not expired then expired = now < entry.receivedAt or now - entry.receivedAt >= 300000
+        if not expired then expired = now < entry.receivedAt or now - entry.receivedAt >= freshnessMs
         if not expired then continue for
         m.entries[i] = {status:"queued",result:invalid,warm:false}
         changed = true

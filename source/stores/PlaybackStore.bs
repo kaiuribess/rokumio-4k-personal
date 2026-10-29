@@ -457,6 +457,8 @@ class PlaybackStore
         urlFormat = m.FormatFromUrl(url)
         if urlFormat <> "" then return urlFormat
         if stream <> invalid
+            explicit = LCase(m.AsText(stream.streamFormat))
+            if explicit = "hls" or explicit = "dash" or explicit = "mkv" or explicit = "mp4" then return explicit
             hint = m.FormatFromText(m.AddonFilename(stream))
             if hint <> "" then return hint
             hint = m.FormatFromText(m.AddonTitle(stream))

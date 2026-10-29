@@ -31,7 +31,7 @@ async function main() {
     generatedRead('source/stores/AddonsStore.brs'), generatedRead('source/stores/CatalogStore.brs'),
     generatedRead('source/stores/PlaybackStore.brs'), generatedRead('source/stores/EpisodesStore.brs'),
     read('source/util/CinemaStreams.brs'), read('source/util/Sports.brs'), controller, worker,
-    extract('components/MainScene.brs', 'onSportsAction'), fixtureCode, read('tests/sports.test.brs')].join('\n');
+    extract('components/MainScene.brs', 'onSportsAction'), extract('components/DiscoverScreen.brs', 'onResultSelected').replace('sub onResultSelected()', 'sub SportsDiscoverSelected()'), fixtureCode, read('tests/sports.test.brs')].join('\n');
   const file = path.join(dir, 'tests.brs'); fs.writeFileSync(file, code);
   const run = spawnSync(process.execPath, [path.join(root, 'node_modules/@rokucommunity/brs/bin/cli.js'), '--root', dir, file], {cwd: root, encoding: 'utf8'});
   process.stdout.write(run.stdout || ''); process.stderr.write(run.stderr || '');

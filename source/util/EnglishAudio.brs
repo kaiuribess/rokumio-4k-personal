@@ -5,6 +5,40 @@ function EnglishAudio_IsEnglish(value as dynamic) as boolean
     return CreateObject("roRegex", "^(eng|en|en-[a-z0-9]{1,8}(-[a-z0-9]{1,8})*)$", "").IsMatch(language)
 end function
 
+' Only the explicit Sports live-mode UI can permit missing language metadata.
+' This does not certify English, override a known foreign track or waive the
+' native codec / receiver / advancing-audio proof requirements.
+function EnglishAudio_LivePolicy(facts as object, params as dynamic, tracks as dynamic, selected as dynamic, codec as dynamic, mode as string) as object
+    if Type(params) <> "roAssociativeArray" then return facts
+    if params.livePlayback <> true or params.allowUnknownLiveAudio <> true or facts.verified = true then return facts
+    if facts.reason <> "unknown-language" and facts.reason <> "non-english" then return facts
+    if GetInterface(codec,"ifString") = invalid then return facts
+    compatible = EnglishAudio_ProjectorCodec(codec)
+    if mode = "surround" and (LCase(codec) = "ac3" or LCase(codec) = "eac3") then compatible = true
+    if not compatible then return facts
+    if Type(tracks) = "roArray" and tracks.Count() > 0
+        current = invalid
+        for each track in tracks
+            if Type(track) = "roAssociativeArray" and GetInterface(selected,"ifString") <> invalid and selected <> ""
+                if track.Track = selected then current = track
+            end if
+        end for
+        if current = invalid or not EnglishAudio_IsDialogue(current) then return facts
+        language = ""
+        if GetInterface(current.Language,"ifString") <> invalid then language = LCase(current.Language.Trim())
+        if language <> "" and language <> "und" and language <> "mul" and language <> "zxx" then return facts
+    end if
+    facts.playable = true
+    facts.verified = false
+    facts.reason = "live-language-unverified"
+    return facts
+end function
+
+function EnglishAudio_Playable(facts as dynamic) as boolean
+    if Type(facts) <> "roAssociativeArray" then return false
+    return facts.verified = true or (facts.playable = true and facts.reason = "live-language-unverified")
+end function
+
 function EnglishAudio_ProjectorCodec(value as dynamic) as boolean
     if Type(value) <> "String" and Type(value) <> "roString" then return false
     codec = LCase(value.Trim())
