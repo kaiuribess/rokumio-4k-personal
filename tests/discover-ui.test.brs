@@ -42,7 +42,10 @@ sub DiscoverTest_Reset()
     m.rowGap = 18
     m.status = { text: "" }
     m.header = { text: "" }
-    m.top = { screenActive: true }
+    m.top = { screenActive: true,subtitle:{text:""},FindNode:function(id as string) as dynamic
+        if id = "discoverSub" then return m.subtitle
+        return invalid
+    end function }
     m.grid = {
         rowItemFocused: [0, 0]
         itemFocused: 0
@@ -280,6 +283,15 @@ m.selectedCatalog.catalogId="original-live":m.selectedCatalog.address="https://o
 Harness_Equal(m.top.pushRequest.screen,"detailsScreen","same catalog ID at another provider is isolated")
 m.top.screenActive=false:m.top.pushRequest=invalid:onResultSelected()
 Harness_Equal(m.top.pushRequest,invalid,"hidden stale selection cannot interrupt playback")
+
+Harness_Suite("Manual backup comparison label resets on normal catalog entry")
+DiscoverTest_Reset():m.sourcesSignature=CatalogSignature():m.metas=[{id:"one",type:"sports",name:"One"}]
+OnEnter({livePlayback:true,previousEventName:"Home vs Away"})
+Harness_Ok(m.top.subtitle.text.InStr("Home vs Away")>=0,"production entry displays previous event for human comparison")
+Harness_Ok(m.top.subtitle.text.InStr("Live/Recorded")>=0,"live versus replay identity remains explicit")
+OnEnter({})
+Harness_Ok(m.top.subtitle.text.InStr("Home vs Away")<0,"ordinary entry clears prior event label")
+Harness_Equal(m.liveEntry,invalid,"ordinary catalog cannot inherit live audio policy")
 
 Harness_Finish()
 if m.failed > 0

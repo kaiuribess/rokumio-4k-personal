@@ -69,6 +69,12 @@ function OnEnter(params as object) as void
     if Type(params) = "roAssociativeArray"
         m.liveEntry = invalid
         if params.livePlayback = true then m.liveEntry = params
+        hint = m.top.FindNode("discoverSub")
+        if hint <> invalid
+            hint.text = "OK on a chip to open its menu · Up/Down to reach results · Back to exit · * Focus filters"
+            reference = DiscoverText(params.previousEventName)
+            if params.livePlayback = true and reference <> "" then hint.text = "Match: " + Left(reference,60) + " · Check teams, competition and Live/Recorded"
+        end if
         if params.metaType <> invalid or params.catalogId <> invalid or params.focusGenres = true
             m.entryRequest = params
             if m.sources.Count() > 0 then ReadySources():return

@@ -19,6 +19,16 @@ sub init()
 end sub
 
 function OnEnter(params as object) as void
+    if Type(params) = "roAssociativeArray"
+        m.previousEventName = ""
+        m.previousProviderAddress = ""
+        if params.backupMode = true
+            m.browseProviders = true:m.livePlayback = true
+            m.allowUnknownLiveAudio = params.allowUnknownLiveAudio = true
+            m.previousEventName = Sports_Text(params.previousEventName,120)
+            m.previousProviderAddress = params.previousProviderAddress
+        end if
+    end if
     SportsDays()
     SportsCatalogs()
     SportsChips()
@@ -55,17 +65,31 @@ sub SportsCatalogs()
     if m.stores = invalid then return
     addons = m.stores.addons.callFunc("AddonsGetAll")
     if Type(addons) <> "roArray" then return
+    ' Prioritize other providers before the 40-row budget, not after it. A
+    ' large current provider must not crowd every backup out of this view.
+    if m.previousProviderAddress <> invalid and m.previousProviderAddress <> ""
+        ordered = []:current = []
+        for each addon in addons
+            if Type(addon) <> "roAssociativeArray" then continue for
+            if addon.address = m.previousProviderAddress then current.Push(addon) else ordered.Push(addon)
+        end for
+        ordered.Append(current):addons = ordered
+    end if
     for each addon in addons
+        if Type(addon) <> "roAssociativeArray" then continue for
         if Type(addon.catalogs) <> "roArray" then continue for
         for each catalog in addon.catalogs
             if Type(catalog) <> "roAssociativeArray" then continue for
-            if catalog.type <> "tv" and catalog.type <> "channel" then continue for
+            if catalog.type <> "tv" and catalog.type <> "channel" and catalog.type <> "sports" then continue for
             cap = m.stores.addons.callFunc("AddonsCatalogCapabilities",catalog)
             if cap = invalid or cap.feed <> true then continue for
             if m.catalogs.Count() >= 40 then exit for
-            m.catalogs.Push({raw:catalog.id,label:Sports_Text(addon.name,28) + " · " + Sports_Text(catalog.name,28),params:{metaType:catalog.type,catalogId:catalog.id,addonAddress:addon.address}})
+            label = Sports_Text(addon.name,28) + " · " + Sports_Text(catalog.name,28)
+            if addon.address = m.previousProviderAddress then label = "Current · " + label
+            m.catalogs.Push({raw:catalog.id,label:label,params:{metaType:catalog.type,catalogId:catalog.id,addonAddress:addon.address}})
         end for
     end for
+
 end sub
 
 sub SportsChips()
@@ -318,6 +342,7 @@ sub RenderSportsCatalogs()
     end for
     m.list.content = content
     m.status.text = "Provider listings are not playback guarantees · Play/Pause refreshes installed catalogs"
+    if m.previousEventName <> invalid and m.previousEventName <> "" then m.status.text = "Find the same event: " + m.previousEventName
     ShowSportsCatalogDetail(0)
 end sub
 
@@ -333,6 +358,9 @@ sub ShowSportsCatalogDetail(index as integer)
         m.detail.text = m.detail.text + Chr(10) + Chr(10) + "Live mode: start near the live edge; no resume or next episode. For replays, choose Playback: Recorded."
         if m.allowUnknownLiveAudio = true then m.detail.text = m.detail.text + Chr(10) + "English preferred. Unlabelled audio is allowed, with language unverified."
     end if
+    if m.previousEventName <> invalid and m.previousEventName <> ""
+        m.detail.text = "Match the teams, competition and Live/Recorded status before playing." + Chr(10) + Chr(10) + "Providers may share feeds. A second listing does not guarantee a working backup." + Chr(10) + Chr(10) + "OK opens this provider's own events. No automatic event matching."
+    end if
 end sub
 
 sub OpenSportsCatalog(index as integer)
@@ -344,5 +372,6 @@ sub OpenSportsCatalog(index as integer)
     end for
     params.livePlayback = m.livePlayback = true
     params.allowUnknownLiveAudio = m.allowUnknownLiveAudio = true
+    params.previousEventName = m.previousEventName
     m.top.pushRequest = {screen:"discoverScreen",params:params}
 end sub

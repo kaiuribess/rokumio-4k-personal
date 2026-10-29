@@ -351,8 +351,22 @@ end sub
 
 ' StreamsScreen's action channel; same one-action routing as every other screen.
 sub onStreamsAction()
+    if m.streamsScreen.screenActive <> true then return
     request = m.streamsScreen.pushRequest
     if request = invalid or request.screen = invalid then return
+    if request.screen = "sportsScreen"
+        if Type(request.params) <> "roAssociativeArray" or request.params.backupMode <> true then return
+        shown = m.stack.top()
+        if shown = invalid or shown.id <> "streamsScreen" then return
+        ' Reuse the original Sports screen instead of duplicating static nodes
+        ' each time a viewer tries a different provider.
+        if m.stack.has("sportsScreen")
+            if m.stack.popTo("sportsScreen") then m.sportsScreen.callFunc("OnEnter",request.params)
+        else
+            m.stack.push("sportsScreen",request.params)
+        end if
+        return
+    end if
     m.stack.push(request.screen, request.params)
 end sub
 

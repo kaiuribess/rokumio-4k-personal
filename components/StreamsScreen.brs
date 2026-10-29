@@ -1090,6 +1090,7 @@ sub UpdateQualityHint()
         if m.params.allowUnknownLiveAudio = true then mode = "All live qualities | Language may be unknown | * require English"
     end if
     m.qualityHint.text = mode + Chr(10) + "OK plays + retries automatically  |  Play refresh  |  Back cancels"
+    if Type(m.params) = "roAssociativeArray" and m.params.livePlayback = true then m.qualityHint.text = mode + Chr(10) + "OK plays | Play refresh | Replay: other sports providers | Back exits"
 end sub
 
 function CurrentAudioMode() as string
@@ -1366,6 +1367,16 @@ end sub
 ' device-dependent — verify on-device.
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
+    if key = "replay" and Type(m.params) = "roAssociativeArray" and m.params.livePlayback = true
+        if m.top.screenActive <> true then return false
+        ' Human-selected backup browsing. Never transfer this provider's opaque
+        ' event ID, source URL, recovery pool or attempted IDs to another one.
+        SuspendSourceLoading()
+        m.autoPlayEnabled = false
+        m.autoPlaySent = true
+        m.top.pushRequest = {screen:"sportsScreen",params:{backupMode:true,previousEventName:Left(ParamString(m.params.name),120),previousProviderAddress:m.params.addonAddress,allowUnknownLiveAudio:m.params.allowUnknownLiveAudio = true}}
+        return true
+    end if
     if key = "play"
         m.autoPlaySent = false
         RefreshStreams()

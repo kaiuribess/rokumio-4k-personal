@@ -217,4 +217,88 @@ Harness_Ok(not request.autoNextEpisode,"live route never advances a movie or ser
 OpenSportsCatalog(0)
 Harness_Equal(m.top.pushRequest.screen,"addonsScreen","provider installation remains explicit")
 
+Harness_Suite("Manual provider switch keeps native IDs separate")
+backup={id:"com.example.backup",name:"Backup fixture",version:"1.0.0",resources:["catalog","stream"],types:["tv"],idPrefixes:["other_"],catalogs:[{id:"other-live",type:"tv",name:"Other live"}]}
+Harness_Ok(m.addons.InstallFromDescriptor("https://backup.example/config/fixture/manifest.json",backup).ok,"backup registers independently")
+OnEnter({backupMode:true,previousEventName:"Home vs Away",previousProviderAddress:entry.addonAddress,allowUnknownLiveAudio:false})
+Harness_Equal(m.catalogs[1].params.catalogId,"other-live","other provider catalogs are offered before current provider")
+Harness_Ok(m.catalogs[2].label.InStr("Current")=0,"previous provider labeled honestly")
+Harness_Ok(m.status.text.InStr("Home vs Away")>=0,"original event name remains visible for comparison")
+Harness_Ok(not m.allowUnknownLiveAudio,"strict live audio choice survives manual switch")
+OpenSportsCatalog(1):other=m.top.pushRequest.params
+Harness_Equal(other.previousEventName,"Home vs Away","human comparison label reaches new catalog")
+Harness_Equal(other.videoId,invalid,"no foreign provider event ID sent to catalog")
+m.selectedCatalog={address:other.addonAddress,rawType:"tv",catalogId:"other-live"}:m.liveEntry=other
+m.metas=[{id:"other_original_987",type:"tv",name:"Home vs Away"}]:m.grid={rowItemSelected:[0,0]}:m.chunk=5
+SportsDiscoverSelected()
+Harness_Equal(m.top.pushRequest.params.videoId,"other_original_987","backup selection uses its own event ID")
+Harness_Equal(m.top.pushRequest.params.addonAddress,other.addonAddress,"backup playback remains scoped to backup owner")
+OnEnter({})
+Harness_Equal(m.previousEventName,"","ordinary Sports entry clears stale comparison context")
+
+Harness_Suite("Provider sports type survives catalog and player boundaries")
+sportManifest={id:"com.example.sports-type",name:"Sports type fixture",version:"1.0.0",resources:["catalog","stream"],types:["sports"],catalogs:[{id:"sports-native-live",type:"sports",name:"Live"}]}
+Harness_Ok(m.addons.InstallFromDescriptor("https://sports-type.example/config/fixture/manifest.json",sportManifest).ok,"custom sports provider registers through production store")
+SportsCatalogs()
+sportIndex=-1
+for i=1 to m.catalogs.Count()-1
+    if m.catalogs[i].params.catalogId="sports-native-live" then sportIndex=i
+end for
+Harness_Ok(sportIndex>0,"sports resource is visible beside tv catalogs")
+OpenSportsCatalog(sportIndex):sportEntry=m.top.pushRequest.params
+Harness_Equal(sportEntry.metaType,"sports","catalog request keeps declared sports type")
+m.selectedCatalog={address:sportEntry.addonAddress,rawType:"sports",catalogId:"sports-native-live"}:m.liveEntry=sportEntry
+m.metas=[{id:"provider:sports:original",type:"sports",name:"Home vs Away"}]:m.grid={rowItemSelected:[0,0]}:m.chunk=5
+SportsDiscoverSelected()
+Harness_Equal(m.top.pushRequest.screen,"streamsScreen","sports type takes explicit live source path")
+Harness_Equal(m.top.pushRequest.params.metaType,"sports","native stream request preserves provider sports type")
+Harness_Equal(m.top.pushRequest.params.videoId,"provider:sports:original","sports native ID never becomes ESPN ID")
+sportRequest=m.top.pushRequest.params
+sportTransport=ScriptedTransport([{ok:true,status:200,json:{streams:[{url:"https://media.example/live.m3u8?token=fixture"}]}}])
+sportPlayback=PlaybackStore(sportTransport)
+sportAnswer=sportPlayback.Streams(sportRequest.addonAddress,sportRequest.metaType,sportRequest.videoId)
+Harness_Ok(sportAnswer.ok,"production source store admits the custom sports type")
+Harness_Ok(sportTransport.log[0].url.InStr("/stream/sports/provider%3Asports%3Aoriginal.json")>=0,"source request retains type and escaped native ID")
+Harness_Ok(sportPlayback.ResolvePlayback("",sportAnswer.streams[0]).ok,"custom sports source reaches existing direct resolver")
+
+Harness_Suite("Scene backup action reuses real stack without duplicate static screens")
+scene={nodes:{},FindNode:function(id as string) as object
+    return m.nodes[id]
+end function}
+for each name in ["homeScreen","sportsScreen","discoverScreen","streamsScreen"]
+    scene.nodes[name]={id:name,screenActive:false,calls:[],SetFocus:sub(value as boolean)
+        m.focus=value
+    end sub,callFunc:function(name as string,params=invalid as dynamic) as dynamic
+        m.calls.Push({name:name,params:params})
+        return invalid
+    end function}
+end for
+m.stack=ScreenStack(scene)
+for each name in ["homeScreen","sportsScreen","discoverScreen","streamsScreen"]
+    m.stack.push(name,{})
+end for
+m.streamsScreen=scene.nodes.streamsScreen:m.sportsScreen=scene.nodes.sportsScreen
+m.streamsScreen.pushRequest={screen:"sportsScreen",params:{backupMode:true,previousEventName:"Home vs Away"}}
+onStreamsAction()
+Harness_Equal(m.stack.count(),2,"backup navigation unwinds sources and catalog instead of duplicating Sports")
+Harness_Equal(m.stack.top().id,"sportsScreen","Sports is interactive after manual action")
+calls=m.sportsScreen.calls
+Harness_Equal(calls[calls.Count()-1].params.previousEventName,"Home vs Away","actual Scene hands comparison context to Sports OnEnter")
+Harness_Ok(not m.streamsScreen.screenActive,"old source screen deactivated")
+onStreamsAction()
+Harness_Equal(m.stack.count(),2,"duplicate hidden source action is ignored")
+
+Harness_Suite("Backup priority applies before catalog row budget")
+SportsReset():m.previousProviderAddress="https://large.example"
+large={id:"com.example.large",name:"Large",version:"1.0.0",resources:["catalog","stream"],types:["tv"],catalogs:[]}
+for i=1 to 45
+    large.catalogs.Push({id:"catalog"+i.ToStr(),type:"tv",name:"Catalog"})
+end for
+Harness_Ok(m.addons.InstallFromDescriptor("https://large.example/manifest.json",large).ok,"large current provider is valid")
+Harness_Ok(m.addons.InstallFromDescriptor("https://backup.example/manifest.json",backup).ok,"later backup provider registers normally")
+SportsCatalogs()
+Harness_Equal(m.catalogs.Count(),40,"existing catalog row budget remains bounded")
+Harness_Equal(m.catalogs[1].params.addonAddress,"https://backup.example","large current provider cannot hide the backup before sorting")
+Harness_Ok(m.catalogs[2].label.InStr("Current")=0,"current provider remains distinguishable after priority")
+
 Harness_Finish()
