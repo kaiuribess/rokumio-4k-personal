@@ -2,6 +2,9 @@
 
 ## 0.6.0 — feature preview, not released
 
+- Add Replay on live Sources to browse another installed sports provider, retaining the event name for manual comparison. Keep native IDs, source pools and recovery isolated; reuse the existing navigation stack and preserve movie controls.
+- Include provider-declared `sports` catalogs alongside TV/channel catalogs. Exercise custom type registration, catalog selection, native stream lookup and direct resolution in production-boundary tests.
+- Add a bounded, private-profile reliability probe with fresh same-event resolution, request-stage failures and optional PC decode measurements. Record repeated StremVerse playlist 403, shared upstreams, a decodable holding card and failed Nebula media plus separate sustained 720p NHL checks through StremVerse and CNCVerse. Disclose the shared gateway rather than claim independent delivery. Correct Highfly status to require legitimate configured-manifest testing.
 - Make installed provider catalogs the Sports entry point. Preserve original event IDs, media types and private configuration; pin live fallback to the selected provider/event instead of assuming ESPN IDs are understood.
 - Add explicit live playback with near-edge start, no movie resume/next episode and a visible English/unlabelled-audio choice. Keep unknown language distinct from English verification and preserve decoder/progress/receiver checks.
 - Refresh live source lists after 30 seconds at interactive handoff boundaries; retain bounded recovery and Back cancellation. Explain browser-only results; preserve query URLs and per-item headers; recognize bounded extensionless HLS/DASH responses.

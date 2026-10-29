@@ -22,9 +22,6 @@ from pathlib import Path
 
 MANIFESTS = {
     "nuvio": "https://nuviosports.xyz/manifest.json",
-    "highfly": "https://sports.highfly.to/manifest.json",
-    "highfly-free": "https://sportsfree.highfly.to/manifest.json",
-    "highfly-us2": "https://sportsfree-us2.highfly.to/manifest.json",
     "stremverse": "https://stremverse1.alwaysdata.net/manifest.json",
 }
 
@@ -200,6 +197,8 @@ if __name__ == "__main__":
         manifests = list(pool.map(inventory, MANIFESTS.items()))
     report = {"checked_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
               "verification": "PC network/decode only; no Roku or audible-language test",
+              "highfly": {"state": "Needs normal human-verified configuration; bare manifest URLs are not a service-health test",
+                          "configure": ["https://sportsfree.highfly.dev/configure", "https://sportsfree-us2.highfly.dev/configure"]},
               "manifests": manifests, "stremverse": stremverse(args.event_index or [0, 1, 2, 3], args.decode)}
     rendered = json.dumps(report, indent=2, ensure_ascii=True) + "\n"
     if args.output:

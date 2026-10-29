@@ -1,0 +1,1268 @@
+{
+  "date": "2026-10-29",
+  "scope": "PC HTTP and PyAV checks only; no physical Roku tests",
+  "milestone": "Two providers separately delivered matching live NHL footage on PC; independent upstream delivery and physical Roku validation remain unproven",
+  "observations": {
+    "cnc_picture": "A follow-up decoded frame showed a promotional holding card. Event content is not verified.",
+    "shared_upstream": "StremVerse HB Koge and CNC PlayZTV Vivo alternatives resolved to exactly the same media URL in a private comparison. The CNC jorvak alternative used a different hostname; operator/origin independence is unknown.",
+    "highfly": "Both .dev free configure pages returned HTTP 200 and required human verification before a manifest. No configured manifest issued; no media test possible.",
+    "fresh_links": "A fresh add-on resolution can return an unchanged blocked media URL; retained required headers did not resolve the observed StremVerse entry-playlist 403.",
+    "nhl_visual_review": {
+      "reviewed_utc_approximate": "2026-10-29T23:12Z",
+      "method": "Decoded frame inspection on PC; media files excluded from repository",
+      "cnc": "Blue Jackets and Hurricanes visible, first-period score overlay 0-0 at 18:30; earlier sample included pregame highlights",
+      "stremverse": "Sample showed Blue Jackets versus Carolina players; provider poster independently identified Hurricanes vs Blue Jackets, Oct 29 23:00 GMT",
+      "limits": "Not an audible-English, live-latency, broadcast-rights or physical Roku test"
+    },
+    "nhl_shared_dependency": "Both independently queried own IDs resolve through chatgpt.hereisman.net and rotating variant CDN hosts. Different generated URLs do not establish independent upstreams.",
+    "probe_correction": "Initial CNC NHL probe reloaded master on every poll; routing changed from pl.playlist5.space to unresolvable pl.kamfir5.space. Corrected probe polls its selected variant, with a fresh master only in each new resolution round. Later two rounds per provider completed; this is PC recovery evidence, not native Roku failover proof.",
+    "nebula_dash": "Two returned DASH manifests fetched with HTTP 200 and contained ContentProtection. No key/DRM processing or circumvention performed."
+  },
+  "checks": [
+    {
+      "checked_utc": "2026-10-29T22:35:01.599644+00:00",
+      "scope": "PC requests/decoding; not physical Roku or audible language",
+      "provider_origin": "stremverse1.alwaysdata.net",
+      "rounds": [
+        {
+          "round": 1,
+          "source_count": 1,
+          "sample": {
+            "requested_seconds": 120,
+            "polls": 0,
+            "unique_segments": 0,
+            "segment_bytes": 0,
+            "sequences": [],
+            "frames": {},
+            "decode_failures": 0,
+            "tracks": [],
+            "media_url_sha256": "ce19b4094bd1683b46a6bca28b3d87794de12e6264d7d05b69201b4033e670c5",
+            "header_names": [
+              "Referer",
+              "User-Agent"
+            ],
+            "failure": {
+              "stage": "entry-playlist",
+              "status": 403
+            },
+            "elapsed_seconds": 0.39,
+            "playlist_advanced": false,
+            "event_content_verified": false
+          }
+        },
+        {
+          "round": 2,
+          "source_count": 1,
+          "sample": {
+            "requested_seconds": 120,
+            "polls": 0,
+            "unique_segments": 0,
+            "segment_bytes": 0,
+            "sequences": [],
+            "frames": {},
+            "decode_failures": 0,
+            "tracks": [],
+            "media_url_sha256": "ce19b4094bd1683b46a6bca28b3d87794de12e6264d7d05b69201b4033e670c5",
+            "header_names": [
+              "Referer",
+              "User-Agent"
+            ],
+            "failure": {
+              "stage": "entry-playlist",
+              "status": 403
+            },
+            "elapsed_seconds": 0.27,
+            "playlist_advanced": false,
+            "event_content_verified": false
+          }
+        }
+      ],
+      "event": {
+        "name": "HB Koge vs Barcelona",
+        "id_sha256": "72397e81f5ae3e2fbda4eb18884cf876a305ca5388cdcc2ccf05a094ec288779",
+        "type": "tv",
+        "catalog": "stremverse_live_events"
+      },
+      "request_counts": [
+        {
+          "stage": "manifest",
+          "origin": "stremverse1.alwaysdata.net",
+          "status_or_error": 200,
+          "count": 1
+        },
+        {
+          "stage": "catalog",
+          "origin": "stremverse1.alwaysdata.net",
+          "status_or_error": 200,
+          "count": 1
+        },
+        {
+          "stage": "addon-stream",
+          "origin": "stremverse1.alwaysdata.net",
+          "status_or_error": 200,
+          "count": 2
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "live.vivo155.com",
+          "status_or_error": 403,
+          "count": 2
+        }
+      ],
+      "check": "stremverse-hd-pinned-reliability"
+    },
+    {
+      "checked_utc": "2026-10-29T22:38:30.406002+00:00",
+      "scope": "PC requests/decoding; not physical Roku or audible language",
+      "provider_origin": "stremverse1.alwaysdata.net",
+      "rounds": [
+        {
+          "round": 1,
+          "source_count": 1,
+          "sample": {
+            "requested_seconds": 60,
+            "polls": 0,
+            "unique_segments": 0,
+            "segment_bytes": 0,
+            "sequences": [],
+            "frames": {},
+            "decode_failures": 0,
+            "tracks": [],
+            "media_url_sha256": "ce19b4094bd1683b46a6bca28b3d87794de12e6264d7d05b69201b4033e670c5",
+            "header_names": [
+              "Referer",
+              "User-Agent"
+            ],
+            "failure": {
+              "stage": "entry-playlist",
+              "status": 403
+            },
+            "elapsed_seconds": 0.22,
+            "playlist_advanced": false,
+            "event_content_verified": false
+          }
+        }
+      ],
+      "event": {
+        "name": "HB Koge vs Barcelona",
+        "id_sha256": "72397e81f5ae3e2fbda4eb18884cf876a305ca5388cdcc2ccf05a094ec288779",
+        "type": "tv",
+        "catalog": "stremverse_live_events"
+      },
+      "request_counts": [
+        {
+          "stage": "manifest",
+          "origin": "stremverse1.alwaysdata.net",
+          "status_or_error": 200,
+          "count": 1
+        },
+        {
+          "stage": "catalog",
+          "origin": "stremverse1.alwaysdata.net",
+          "status_or_error": 200,
+          "count": 1
+        },
+        {
+          "stage": "addon-stream",
+          "origin": "stremverse1.alwaysdata.net",
+          "status_or_error": 200,
+          "count": 1
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "live.vivo155.com",
+          "status_or_error": 403,
+          "count": 1
+        }
+      ],
+      "check": "stremverse-hd-later-reliability"
+    },
+    {
+      "checked_utc": "2026-10-29T22:35:31.493852+00:00",
+      "scope": "PC requests/decoding; not physical Roku or audible language",
+      "provider_origin": "stremverse1.alwaysdata.net",
+      "rounds": [
+        {
+          "round": 1,
+          "source_count": 4,
+          "sample": {
+            "requested_seconds": 120,
+            "polls": 0,
+            "unique_segments": 0,
+            "segment_bytes": 0,
+            "sequences": [],
+            "frames": {},
+            "decode_failures": 0,
+            "tracks": [],
+            "media_url_sha256": "dbb2f5abe544acc7ee7aa2f312c80770d51633a2ee50ee89a6f2904a59131efd",
+            "header_names": [
+              "Referer",
+              "User-Agent"
+            ],
+            "failure": {
+              "stage": "entry-playlist",
+              "status": 403
+            },
+            "elapsed_seconds": 0.14,
+            "playlist_advanced": false,
+            "event_content_verified": false
+          }
+        },
+        {
+          "round": 2,
+          "source_count": 4,
+          "sample": {
+            "requested_seconds": 120,
+            "polls": 0,
+            "unique_segments": 0,
+            "segment_bytes": 0,
+            "sequences": [],
+            "frames": {},
+            "decode_failures": 0,
+            "tracks": [],
+            "media_url_sha256": "dbb2f5abe544acc7ee7aa2f312c80770d51633a2ee50ee89a6f2904a59131efd",
+            "header_names": [
+              "Referer",
+              "User-Agent"
+            ],
+            "failure": {
+              "stage": "entry-playlist",
+              "status": 403
+            },
+            "elapsed_seconds": 0.39,
+            "playlist_advanced": false,
+            "event_content_verified": false
+          }
+        }
+      ],
+      "event": {
+        "name": "Copa del Rey",
+        "id_sha256": "f21ccf0482aa0bd8950261b49038e556d07b75af20ee98ec0fd6dbf92ca72a93",
+        "type": "tv",
+        "catalog": "stremverse_live_events"
+      },
+      "request_counts": [
+        {
+          "stage": "manifest",
+          "origin": "stremverse1.alwaysdata.net",
+          "status_or_error": 200,
+          "count": 1
+        },
+        {
+          "stage": "catalog",
+          "origin": "stremverse1.alwaysdata.net",
+          "status_or_error": 200,
+          "count": 1
+        },
+        {
+          "stage": "addon-stream",
+          "origin": "stremverse1.alwaysdata.net",
+          "status_or_error": 200,
+          "count": 2
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "live.vivo155.com",
+          "status_or_error": 403,
+          "count": 2
+        }
+      ],
+      "check": "stremverse-copa-pinned-reliability"
+    },
+    {
+      "checked_utc": "2026-10-29T22:32:56.208504+00:00",
+      "scope": "PC requests/decoding; not physical Roku or audible language",
+      "provider_origin": "cncverse.dpdns.org",
+      "rounds": [
+        {
+          "round": 1,
+          "source_count": 4,
+          "sample": {
+            "requested_seconds": 120,
+            "polls": 29,
+            "unique_segments": 33,
+            "segment_bytes": 23475936,
+            "sequences": [
+              1793304141,
+              1793304143,
+              1793304145,
+              1793304146,
+              1793304147,
+              1793304148,
+              1793304149,
+              1793304150,
+              1793304151,
+              1793304152,
+              1793304153,
+              1793304154,
+              1793304155,
+              1793304156,
+              1793304157,
+              1793304158,
+              1793304159,
+              1793304160,
+              1793304161,
+              1793304162,
+              1793304163,
+              1793304164,
+              1793304165,
+              1793304166,
+              1793304167,
+              1793304168,
+              1793304169,
+              1793304170,
+              1793304171
+            ],
+            "frames": {
+              "video": 3960,
+              "audio": 6188
+            },
+            "decode_failures": 0,
+            "tracks": [
+              {
+                "type": "video",
+                "codec": "h264",
+                "width": 1280,
+                "height": 720,
+                "language": null
+              },
+              {
+                "type": "audio",
+                "codec": "aac",
+                "width": null,
+                "height": null,
+                "language": null
+              }
+            ],
+            "media_url_sha256": "65f71c35ad16c05942b6cae0a1c91a2bc43e487f93afb80f0b0863911448467c",
+            "header_names": [
+              "User-Agent"
+            ],
+            "live_playlist": true,
+            "decoder": "PyAV 19.0.2",
+            "pts": {
+              "video": [
+                12047.821,
+                12179.788
+              ],
+              "audio": [
+                12047.757333333333,
+                12179.746666666666
+              ]
+            },
+            "elapsed_seconds": 122.19,
+            "playlist_advanced": true,
+            "event_content_verified": false
+          }
+        },
+        {
+          "round": 2,
+          "source_count": 4,
+          "sample": {
+            "requested_seconds": 120,
+            "polls": 29,
+            "unique_segments": 33,
+            "segment_bytes": 23464092,
+            "sequences": [
+              1793304173,
+              1793304175,
+              1793304177,
+              1793304178,
+              1793304179,
+              1793304180,
+              1793304181,
+              1793304182,
+              1793304183,
+              1793304184,
+              1793304185,
+              1793304186,
+              1793304187,
+              1793304188,
+              1793304189,
+              1793304190,
+              1793304191,
+              1793304192,
+              1793304193,
+              1793304194,
+              1793304195,
+              1793304196,
+              1793304197,
+              1793304198,
+              1793304199,
+              1793304200,
+              1793304201,
+              1793304202,
+              1793304203
+            ],
+            "frames": {
+              "video": 3960,
+              "audio": 6188
+            },
+            "decode_failures": 0,
+            "tracks": [
+              {
+                "type": "video",
+                "codec": "h264",
+                "width": 1280,
+                "height": 720,
+                "language": null
+              },
+              {
+                "type": "audio",
+                "codec": "aac",
+                "width": null,
+                "height": null,
+                "language": null
+              }
+            ],
+            "media_url_sha256": "65f71c35ad16c05942b6cae0a1c91a2bc43e487f93afb80f0b0863911448467c",
+            "header_names": [
+              "User-Agent"
+            ],
+            "live_playlist": true,
+            "decoder": "PyAV 19.0.2",
+            "pts": {
+              "video": [
+                12175.821,
+                12307.788
+              ],
+              "audio": [
+                12175.757333333333,
+                12307.746666666666
+              ]
+            },
+            "elapsed_seconds": 120.67,
+            "playlist_advanced": true,
+            "event_content_verified": false
+          }
+        }
+      ],
+      "event": {
+        "name": "\ud83d\udd34 HB K\u00f8ge vs F\u00fatbol Club Barcelona",
+        "id_sha256": "a072803ebaaea18a92e2ee7cbab757c49e7b179a132bd0498092c4118f59412b",
+        "type": "tv",
+        "catalog": "cnc_PlayZTVLiveEvents_tv"
+      },
+      "request_counts": [
+        {
+          "stage": "manifest",
+          "origin": "cncverse.dpdns.org",
+          "status_or_error": 200,
+          "count": 1
+        },
+        {
+          "stage": "catalog",
+          "origin": "cncverse.dpdns.org",
+          "status_or_error": 200,
+          "count": 1
+        },
+        {
+          "stage": "addon-stream",
+          "origin": "cncverse.dpdns.org",
+          "status_or_error": 200,
+          "count": 2
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "live2.jorvakstreamcache.com",
+          "status_or_error": 200,
+          "count": 58
+        },
+        {
+          "stage": "segment",
+          "origin": "live2.jorvakstreamcache.com",
+          "status_or_error": 200,
+          "count": 66
+        }
+      ],
+      "check": "cnc-hd-reliability"
+    },
+    {
+      "checked_utc": "2026-10-29T22:46:51.292900+00:00",
+      "scope": "PC requests/decoding; not physical Roku or audible language",
+      "provider_origin": "sports.nebulapro.xyz",
+      "rounds": [
+        {
+          "round": 1,
+          "source_count": 6,
+          "source_index": 3,
+          "sample": {
+            "requested_seconds": 0,
+            "polls": 0,
+            "unique_segments": 0,
+            "segment_bytes": 0,
+            "sequences": [],
+            "frames": {},
+            "decode_failures": 0,
+            "tracks": [],
+            "media_url_sha256": "777c926baf8f79464cb14622fcce67940b374f89fb1c4735280cbb876d028e4d",
+            "header_names": [],
+            "event_content_verified": false,
+            "failure": {
+              "stage": "entry-playlist",
+              "status": 502
+            },
+            "elapsed_seconds": 2.64,
+            "playlist_advanced": false
+          }
+        }
+      ],
+      "event": {
+        "name": "Atl\u00e9tico Mineiro vs Cruzeiro",
+        "id_sha256": "5c1296951fe6183cfb1d7734822d85f68a40e888af671960c7e8056828c0e44a",
+        "type": "sports",
+        "catalog": "streamed-events-live-now"
+      },
+      "request_counts": [
+        {
+          "stage": "manifest",
+          "origin": "sports.nebulapro.xyz",
+          "status_or_error": 200,
+          "count": 1
+        },
+        {
+          "stage": "catalog",
+          "origin": "sports.nebulapro.xyz",
+          "status_or_error": 200,
+          "count": 1
+        },
+        {
+          "stage": "addon-stream",
+          "origin": "sports.nebulapro.xyz",
+          "status_or_error": 200,
+          "count": 1
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "sports.nebulapro.xyz",
+          "status_or_error": 502,
+          "count": 1
+        }
+      ],
+      "check": "nebula-hls-short-reliability"
+    },
+    {
+      "checked_utc": "2026-10-29T22:47:52.304559+00:00",
+      "scope": "PC requests/decoding; not physical Roku or audible language",
+      "provider_origin": "sports.nebulapro.xyz",
+      "rounds": [
+        {
+          "round": 1,
+          "source_count": 6,
+          "source_index": 3,
+          "sample": {
+            "requested_seconds": 120,
+            "polls": 0,
+            "unique_segments": 0,
+            "segment_bytes": 0,
+            "sequences": [],
+            "frames": {},
+            "decode_failures": 0,
+            "tracks": [],
+            "media_url_sha256": "777c926baf8f79464cb14622fcce67940b374f89fb1c4735280cbb876d028e4d",
+            "header_names": [],
+            "event_content_verified": false,
+            "failure": {
+              "stage": "entry-playlist",
+              "status": 404
+            },
+            "elapsed_seconds": 5.81,
+            "playlist_advanced": false
+          }
+        },
+        {
+          "round": 2,
+          "source_count": 6,
+          "source_index": 3,
+          "sample": {
+            "requested_seconds": 120,
+            "polls": 0,
+            "unique_segments": 0,
+            "segment_bytes": 0,
+            "sequences": [],
+            "frames": {},
+            "decode_failures": 0,
+            "tracks": [],
+            "media_url_sha256": "777c926baf8f79464cb14622fcce67940b374f89fb1c4735280cbb876d028e4d",
+            "header_names": [],
+            "event_content_verified": false,
+            "failure": {
+              "stage": "entry-playlist",
+              "status": 404
+            },
+            "elapsed_seconds": 4.53,
+            "playlist_advanced": false
+          }
+        }
+      ],
+      "event": {
+        "name": "Atl\u00e9tico Mineiro vs Cruzeiro",
+        "id_sha256": "5c1296951fe6183cfb1d7734822d85f68a40e888af671960c7e8056828c0e44a",
+        "type": "sports",
+        "catalog": "streamed-events-live-now"
+      },
+      "request_counts": [
+        {
+          "stage": "manifest",
+          "origin": "sports.nebulapro.xyz",
+          "status_or_error": 200,
+          "count": 1
+        },
+        {
+          "stage": "catalog",
+          "origin": "sports.nebulapro.xyz",
+          "status_or_error": 200,
+          "count": 1
+        },
+        {
+          "stage": "addon-stream",
+          "origin": "sports.nebulapro.xyz",
+          "status_or_error": 200,
+          "count": 2
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "sports.nebulapro.xyz",
+          "status_or_error": 404,
+          "count": 2
+        }
+      ],
+      "check": "nebula-hls-reliability"
+    },
+    {
+      "checked_utc": "2026-10-29T23:03:20.389094+00:00",
+      "scope": "PC requests/decoding; not physical Roku or audible language",
+      "provider_origin": "cncverse.dpdns.org",
+      "rounds": [
+        {
+          "round": 1,
+          "source_count": 3,
+          "source_index": 1,
+          "sample": {
+            "requested_seconds": 120,
+            "polls": 1,
+            "unique_segments": 3,
+            "segment_bytes": 13080476,
+            "sequences": [
+              759
+            ],
+            "frames": {
+              "audio": 703,
+              "video": 420
+            },
+            "decode_failures": 0,
+            "tracks": [
+              {
+                "type": "video",
+                "codec": "h264",
+                "width": 1280,
+                "height": 720,
+                "language": null
+              },
+              {
+                "type": "audio",
+                "codec": "aac",
+                "width": null,
+                "height": null,
+                "language": null
+              }
+            ],
+            "media_url_sha256": "3f149a41ee7221ac4d4e9cef13fdd470a5c90cb6f1c43de7b16c46972bc93805",
+            "header_names": [
+              "Referer",
+              "User-Agent"
+            ],
+            "event_content_verified": false,
+            "live_playlist": true,
+            "decoder": "PyAV 19.0.2",
+            "pts": {
+              "audio": [
+                3796.43,
+                3811.4056666666665
+              ],
+              "video": [
+                3797.421333333333,
+                3811.388
+              ]
+            },
+            "failure": {
+              "stage": "variant-playlist",
+              "error": "gaierror"
+            },
+            "elapsed_seconds": 6.89,
+            "playlist_advanced": false
+          }
+        },
+        {
+          "round": 2,
+          "source_count": 3,
+          "source_index": 1,
+          "sample": {
+            "requested_seconds": 120,
+            "polls": 0,
+            "unique_segments": 0,
+            "segment_bytes": 0,
+            "sequences": [],
+            "frames": {},
+            "decode_failures": 0,
+            "tracks": [],
+            "media_url_sha256": "3f149a41ee7221ac4d4e9cef13fdd470a5c90cb6f1c43de7b16c46972bc93805",
+            "header_names": [
+              "Referer",
+              "User-Agent"
+            ],
+            "event_content_verified": false,
+            "failure": {
+              "stage": "variant-playlist",
+              "error": "gaierror"
+            },
+            "elapsed_seconds": 0.52,
+            "playlist_advanced": false
+          }
+        }
+      ],
+      "event": {
+        "name": "\ud83d\udd34 Hurricanes vs Blue Jackets",
+        "id_sha256": "bfda3f00aa14b72943f725e252c2b90510be3894b9dcb0387a127716efb0f632",
+        "type": "tv",
+        "catalog": "cnc_SportzXLiveEvents_tv"
+      },
+      "request_counts": [
+        {
+          "stage": "manifest",
+          "origin": "cncverse.dpdns.org",
+          "status_or_error": 200,
+          "count": 1
+        },
+        {
+          "stage": "catalog",
+          "origin": "cncverse.dpdns.org",
+          "status_or_error": 200,
+          "count": 1
+        },
+        {
+          "stage": "addon-stream",
+          "origin": "cncverse.dpdns.org",
+          "status_or_error": 200,
+          "count": 2
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "chatgpt.hereisman.net",
+          "status_or_error": 200,
+          "count": 3
+        },
+        {
+          "stage": "variant-playlist",
+          "origin": "pl.playlist5.space",
+          "status_or_error": 200,
+          "count": 1
+        },
+        {
+          "stage": "segment",
+          "origin": "a.fatigue7.space",
+          "status_or_error": 200,
+          "count": 3
+        },
+        {
+          "stage": "variant-playlist",
+          "origin": "pl.kamfir5.space",
+          "status_or_error": "gaierror",
+          "count": 2
+        }
+      ],
+      "check": "cnc-nhl-reliability"
+    },
+    {
+      "checked_utc": "2026-10-29T23:06:19.690033+00:00",
+      "scope": "PC requests/decoding; not physical Roku or audible language",
+      "provider_origin": "cncverse.dpdns.org",
+      "rounds": [
+        {
+          "round": 1,
+          "source_count": 3,
+          "source_index": 1,
+          "sample": {
+            "requested_seconds": 120,
+            "polls": 38,
+            "unique_segments": 27,
+            "segment_bytes": 86318884,
+            "sequences": [
+              794,
+              795,
+              796,
+              796,
+              797,
+              798,
+              798,
+              799,
+              800,
+              800,
+              801,
+              802,
+              802,
+              803,
+              804,
+              804,
+              805,
+              805,
+              805,
+              805,
+              807,
+              808,
+              808,
+              809,
+              809,
+              809,
+              811,
+              812,
+              812,
+              813,
+              813,
+              813,
+              815,
+              816,
+              816,
+              817,
+              818,
+              818
+            ],
+            "frames": {
+              "video": 3780,
+              "audio": 6328
+            },
+            "decode_failures": 0,
+            "tracks": [
+              {
+                "type": "video",
+                "codec": "h264",
+                "width": 1280,
+                "height": 720,
+                "language": null
+              },
+              {
+                "type": "audio",
+                "codec": "aac",
+                "width": null,
+                "height": null,
+                "language": null
+              }
+            ],
+            "media_url_sha256": "3f149a41ee7221ac4d4e9cef13fdd470a5c90cb6f1c43de7b16c46972bc93805",
+            "header_names": [
+              "Referer",
+              "User-Agent"
+            ],
+            "event_content_verified": false,
+            "variant_url_sha256": "8da58ed3ad44a75585c371f7099fa115313786e08fa8e1da459446c8b7cd3b73",
+            "live_playlist": true,
+            "decoder": "PyAV 19.0.2",
+            "pts": {
+              "video": [
+                3971.421333333333,
+                4106.388
+              ],
+              "audio": [
+                3971.4266666666667,
+                4106.403333333334
+              ]
+            },
+            "elapsed_seconds": 120.12,
+            "playlist_advanced": true
+          }
+        },
+        {
+          "round": 2,
+          "source_count": 3,
+          "source_index": 1,
+          "sample": {
+            "requested_seconds": 120,
+            "polls": 37,
+            "unique_segments": 29,
+            "segment_bytes": 107516448,
+            "sequences": [
+              818,
+              820,
+              821,
+              822,
+              823,
+              823,
+              823,
+              824,
+              825,
+              826,
+              826,
+              826,
+              828,
+              828,
+              828,
+              829,
+              829,
+              830,
+              832,
+              833,
+              833,
+              833,
+              833,
+              834,
+              835,
+              837,
+              837,
+              837,
+              838,
+              838,
+              839,
+              840,
+              840,
+              840,
+              842,
+              843,
+              844
+            ],
+            "frames": {
+              "video": 3990,
+              "audio": 6797
+            },
+            "decode_failures": 0,
+            "tracks": [
+              {
+                "type": "video",
+                "codec": "h264",
+                "width": 1280,
+                "height": 720,
+                "language": null
+              },
+              {
+                "type": "audio",
+                "codec": "aac",
+                "width": null,
+                "height": null,
+                "language": null
+              }
+            ],
+            "media_url_sha256": "3f149a41ee7221ac4d4e9cef13fdd470a5c90cb6f1c43de7b16c46972bc93805",
+            "header_names": [
+              "Referer",
+              "User-Agent"
+            ],
+            "event_content_verified": false,
+            "variant_url_sha256": "c87c6adf69fef8912763c7da1a201a1c8adb6105b2d034007f4ae326886d1f12",
+            "live_playlist": true,
+            "decoder": "PyAV 19.0.2",
+            "pts": {
+              "video": [
+                4091.421333333333,
+                4236.388
+              ],
+              "audio": [
+                4091.4273333333335,
+                4236.408
+              ]
+            },
+            "elapsed_seconds": 121.22,
+            "playlist_advanced": true
+          }
+        }
+      ],
+      "event": {
+        "name": "\ud83d\udd34 Hurricanes vs Blue Jackets",
+        "id_sha256": "bfda3f00aa14b72943f725e252c2b90510be3894b9dcb0387a127716efb0f632",
+        "type": "tv",
+        "catalog": "cnc_SportzXLiveEvents_tv"
+      },
+      "request_counts": [
+        {
+          "stage": "manifest",
+          "origin": "cncverse.dpdns.org",
+          "status_or_error": 200,
+          "count": 1
+        },
+        {
+          "stage": "catalog",
+          "origin": "cncverse.dpdns.org",
+          "status_or_error": 200,
+          "count": 1
+        },
+        {
+          "stage": "addon-stream",
+          "origin": "cncverse.dpdns.org",
+          "status_or_error": 200,
+          "count": 2
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "chatgpt.hereisman.net",
+          "status_or_error": 200,
+          "count": 2
+        },
+        {
+          "stage": "variant-playlist",
+          "origin": "pl.whywelove1.space",
+          "status_or_error": 200,
+          "count": 38
+        },
+        {
+          "stage": "segment",
+          "origin": "a.fatigue7.space",
+          "status_or_error": 200,
+          "count": 56
+        },
+        {
+          "stage": "variant-playlist",
+          "origin": "pl.playlist5.space",
+          "status_or_error": 200,
+          "count": 37
+        }
+      ],
+      "check": "cnc-nhl-selected-variant-reliability"
+    },
+    {
+      "checked_utc": "2026-10-29T23:08:46.995528+00:00",
+      "scope": "PC requests/decoding; not physical Roku or audible language",
+      "provider_origin": "stremverse1.alwaysdata.net",
+      "rounds": [
+        {
+          "round": 1,
+          "source_count": 1,
+          "source_index": 0,
+          "sample": {
+            "requested_seconds": 120,
+            "polls": 36,
+            "unique_segments": 27,
+            "segment_bytes": 110288320,
+            "sequences": [
+              823,
+              825,
+              825,
+              825,
+              827,
+              828,
+              828,
+              828,
+              828,
+              829,
+              830,
+              831,
+              831,
+              833,
+              833,
+              833,
+              833,
+              834,
+              835,
+              835,
+              837,
+              837,
+              838,
+              839,
+              839,
+              840,
+              841,
+              841,
+              843,
+              843,
+              843,
+              844,
+              844,
+              845,
+              847,
+              847
+            ],
+            "frames": {
+              "audio": 6328,
+              "video": 3840
+            },
+            "decode_failures": 0,
+            "tracks": [
+              {
+                "type": "video",
+                "codec": "h264",
+                "width": 1280,
+                "height": 720,
+                "language": null
+              },
+              {
+                "type": "audio",
+                "codec": "aac",
+                "width": null,
+                "height": null,
+                "language": null
+              }
+            ],
+            "media_url_sha256": "f339d19b3a7af5e91e5d2dbe8d414743b1597a255d9f649322851ecdb25151e5",
+            "header_names": [
+              "Referer",
+              "User-Agent"
+            ],
+            "event_content_verified": false,
+            "variant_url_sha256": "4a370aeeea9beb0638dcb349b1c76402d90e7336c6ef1a67a664e9706ce2155a",
+            "live_playlist": true,
+            "decoder": "PyAV 19.0.2",
+            "pts": {
+              "audio": [
+                4116.43,
+                4251.406
+              ],
+              "video": [
+                4117.421333333334,
+                4251.388
+              ]
+            },
+            "elapsed_seconds": 120.23,
+            "playlist_advanced": true
+          }
+        },
+        {
+          "round": 2,
+          "source_count": 1,
+          "source_index": 0,
+          "sample": {
+            "requested_seconds": 120,
+            "polls": 38,
+            "unique_segments": 27,
+            "segment_bytes": 97669760,
+            "sequences": [
+              848,
+              848,
+              850,
+              851,
+              852,
+              852,
+              852,
+              852,
+              854,
+              854,
+              855,
+              856,
+              856,
+              857,
+              858,
+              858,
+              859,
+              860,
+              860,
+              861,
+              862,
+              862,
+              864,
+              864,
+              864,
+              865,
+              866,
+              866,
+              867,
+              868,
+              868,
+              869,
+              870,
+              870,
+              871,
+              872,
+              872,
+              872
+            ],
+            "frames": {
+              "video": 3690,
+              "audio": 6329
+            },
+            "decode_failures": 0,
+            "tracks": [
+              {
+                "type": "video",
+                "codec": "h264",
+                "width": 1280,
+                "height": 720,
+                "language": null
+              },
+              {
+                "type": "audio",
+                "codec": "aac",
+                "width": null,
+                "height": null,
+                "language": null
+              }
+            ],
+            "media_url_sha256": "f339d19b3a7af5e91e5d2dbe8d414743b1597a255d9f649322851ecdb25151e5",
+            "header_names": [
+              "Referer",
+              "User-Agent"
+            ],
+            "event_content_verified": false,
+            "variant_url_sha256": "5cbffb4f924fb95c972ef9c3bd7e2920bae0dfbc1950ef77debbaba0e25388f1",
+            "live_playlist": true,
+            "decoder": "PyAV 19.0.2",
+            "pts": {
+              "video": [
+                4241.421333333334,
+                4376.388
+              ],
+              "audio": [
+                4241.421666666667,
+                4376.419333333333
+              ]
+            },
+            "elapsed_seconds": 120.08,
+            "playlist_advanced": true
+          }
+        }
+      ],
+      "event": {
+        "name": "NHL",
+        "id_sha256": "1d8bb4b6cd59cd040b9631dbd29bc29dbe8d02c58e3ae8a6eacdd5e8dbb5cd59",
+        "type": "tv",
+        "catalog": "stremverse_live_events"
+      },
+      "request_counts": [
+        {
+          "stage": "manifest",
+          "origin": "stremverse1.alwaysdata.net",
+          "status_or_error": 200,
+          "count": 1
+        },
+        {
+          "stage": "catalog",
+          "origin": "stremverse1.alwaysdata.net",
+          "status_or_error": 200,
+          "count": 1
+        },
+        {
+          "stage": "addon-stream",
+          "origin": "stremverse1.alwaysdata.net",
+          "status_or_error": 200,
+          "count": 2
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "chatgpt.hereisman.net",
+          "status_or_error": 200,
+          "count": 2
+        },
+        {
+          "stage": "variant-playlist",
+          "origin": "pl.whywelove2.space",
+          "status_or_error": 200,
+          "count": 36
+        },
+        {
+          "stage": "segment",
+          "origin": "a.monamor6.space",
+          "status_or_error": 200,
+          "count": 27
+        },
+        {
+          "stage": "variant-playlist",
+          "origin": "pl.playlist3.space",
+          "status_or_error": 200,
+          "count": 38
+        },
+        {
+          "stage": "segment",
+          "origin": "a.fatigue7.space",
+          "status_or_error": 200,
+          "count": 27
+        }
+      ],
+      "check": "stremverse-hurricanes-reliability"
+    }
+  ]
+}
