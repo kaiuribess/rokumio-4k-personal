@@ -1,5 +1,7 @@
 # Sports reliability investigation — October 29, 2026
 
+**October 30 follow-up:** [configured free-provider tests and fixes](SPORTS-FREE-PROVIDERS.md) supersede the earlier browser/sign-in gates below. Highfly now has two successful 120-second 1080p PC runs. The default research-client identity caused some earlier 403s; native Roku and combined NBA playback remain unverified.
+
 **StremVerse and CNCVerse both delivered the same NHL game in separate PC tests: two fresh two-minute runs per provider at 1280×720 H.264/AAC.** A decoded picture showed Blue Jackets vs Hurricanes with the first-period scoreboard, rather than a holding card. Both providers used the same gateway hostname, so the milestone's **independent delivery backup remains unproven**. No physical Roku or audible-language test occurred.
 
 The investigation also located repeated StremVerse football failures at its entry video playlist, rejected a different CNCVerse source that showed a holding card, and found Nebula HLS failures. Those negative results remain in the evidence; a later successful hockey event does not fix every source or establish broad sports coverage.

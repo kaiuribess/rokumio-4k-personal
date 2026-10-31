@@ -1,5 +1,7 @@
 # NBA multiview: find a combined feed first
 
+**October 30 follow-up:** [configured free-provider tests and fixes](SPORTS-FREE-PROVIDERS.md) supersede the earlier browser/sign-in gates below. Highfly now has two successful 120-second 1080p PC runs. The default research-client identity caused some earlier 403s; native Roku and combined NBA playback remain unverified.
+
 Investigated October 30, 2026 (Pacific; October 31 UTC). This follows the user's preference for **one video containing multiple simultaneous games**, rather than making the Roku decode several separate feeds.
 
 **No usable free, precombined NBA game feed was established.** No multiview option, placeholder channel, provider installation or player replacement was added. The existing provider-native Sports path and manual backup selection remain intact. This is a bounded negative search result, not a claim that no such broadcast exists anywhere.
