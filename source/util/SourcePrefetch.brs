@@ -31,6 +31,7 @@ function SourcePrefetch_Context(stores as dynamic, params as dynamic, hashFn = i
     providers = []
     for each addon in installed
         if Type(addon) <> "roAssociativeArray" then continue for
+        if params.livePlayback = true and addon.address <> params.addonAddress then continue for
         signature.Push({id:addon.id, name:addon.name, address:addon.address, resources:addon.resources, types:addon.types, idPrefixes:addon.idPrefixes})
         if stores.addons.callFunc("AddonsSupportsResource", addon.resources, addon.types, addon.idPrefixes, "stream", kind, videoId)
             address = SourcePrefetch_Text(addon.address)
@@ -42,8 +43,8 @@ function SourcePrefetch_Context(stores as dynamic, params as dynamic, hashFn = i
             end if
         end if
     end for
-    key = FormatJson({addons:signature, audioMode:mode, metaType:kind, metaId:SourcePrefetch_Text(params.metaId), videoId:videoId, season:SourcePrefetch_Text(params.season), episode:SourcePrefetch_Text(params.episode), addonAddress:SourcePrefetch_Text(params.addonAddress)})
-    return {key:key, audioMode:mode, metaType:kind, videoId:videoId, providers:providers, providerPriority:priority}
+    key = FormatJson({livePlayback:params.livePlayback = true,addons:signature, audioMode:mode, metaType:kind, metaId:SourcePrefetch_Text(params.metaId), videoId:videoId, season:SourcePrefetch_Text(params.season), episode:SourcePrefetch_Text(params.episode), addonAddress:SourcePrefetch_Text(params.addonAddress)})
+    return {key:key, livePlayback:params.livePlayback = true, audioMode:mode, metaType:kind, videoId:videoId, providers:providers, providerPriority:priority}
 end function
 
 function SourcePrefetch_Node(top as dynamic) as dynamic

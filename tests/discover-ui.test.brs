@@ -42,7 +42,10 @@ sub DiscoverTest_Reset()
     m.rowGap = 18
     m.status = { text: "" }
     m.header = { text: "" }
-    m.top = { screenActive: true }
+    m.top = { screenActive: true,subtitle:{text:""},FindNode:function(id as string) as dynamic
+        if id = "discoverSub" then return m.subtitle
+        return invalid
+    end function }
     m.grid = {
         rowItemFocused: [0, 0]
         itemFocused: 0
@@ -257,6 +260,38 @@ m.top.screenActive=true:OnEnter(invalid):current=m.loadTask
 m.top.screenActive=false
 onDiscoverLoaded(DiscoverTest_Event(current,{ok:true,metas:[{id:"hidden",type:"movie",name:"Hidden"}],hasMore:false}))
 Harness_Equal(m.metas[0].id,"two","even a hidden race cannot rebuild the grid during playback")
+
+Harness_Suite("Provider-native live discovery retains IDs, ownership and user audio choice")
+DiscoverTest_Reset()
+m.selectedCatalog={address:"https://sports.example/config?token=fixture",rawType:"tv",catalogId:"original-live"}
+m.liveEntry={addonAddress:m.selectedCatalog.address,metaType:"tv",catalogId:"original-live",livePlayback:true,allowUnknownLiveAudio:true}
+m.metas=[{id:"native/event:opaque?"+String(340,"x"),type:"tv",name:"Provider event"}]
+m.grid.rowItemSelected=[0,0]
+onResultSelected()
+Harness_Equal(m.top.pushRequest.screen,"streamsScreen","live item goes to source picker without metadata gate")
+Harness_Equal(m.top.pushRequest.params.videoId,m.metas[0].id,"long opaque provider ID survives untouched")
+Harness_Equal(m.top.pushRequest.params.addonAddress,m.selectedCatalog.address,"private configuration retained only in runtime params")
+Harness_Ok(m.top.pushRequest.params.livePlayback,"explicit live context survives navigation")
+Harness_Ok(m.top.pushRequest.params.allowUnknownLiveAudio,"live audio choice preserved")
+Harness_Ok(not m.top.pushRequest.params.autoPlay,"viewer sees available live sources before first play")
+Harness_Ok(not m.top.pushRequest.params.fourKOnly,"movie-only UHD filter cannot hide sports")
+Harness_Ok(not m.top.pushRequest.params.autoNextEpisode,"live event never advances episodes")
+Harness_Equal(m.top.pushRequest.params.position,0,"no movie resume forwarded to live event")
+m.selectedCatalog.catalogId="other-catalog":onResultSelected()
+Harness_Equal(m.top.pushRequest.screen,"detailsScreen","different catalog does not inherit live audio exception")
+m.selectedCatalog.catalogId="original-live":m.selectedCatalog.address="https://other.example":onResultSelected()
+Harness_Equal(m.top.pushRequest.screen,"detailsScreen","same catalog ID at another provider is isolated")
+m.top.screenActive=false:m.top.pushRequest=invalid:onResultSelected()
+Harness_Equal(m.top.pushRequest,invalid,"hidden stale selection cannot interrupt playback")
+
+Harness_Suite("Manual backup comparison label resets on normal catalog entry")
+DiscoverTest_Reset():m.sourcesSignature=CatalogSignature():m.metas=[{id:"one",type:"sports",name:"One"}]
+OnEnter({livePlayback:true,previousEventName:"Home vs Away"})
+Harness_Ok(m.top.subtitle.text.InStr("Home vs Away")>=0,"production entry displays previous event for human comparison")
+Harness_Ok(m.top.subtitle.text.InStr("Live/Recorded")>=0,"live versus replay identity remains explicit")
+OnEnter({})
+Harness_Ok(m.top.subtitle.text.InStr("Home vs Away")<0,"ordinary entry clears prior event label")
+Harness_Equal(m.liveEntry,invalid,"ordinary catalog cannot inherit live audio policy")
 
 Harness_Finish()
 if m.failed > 0

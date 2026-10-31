@@ -16,7 +16,7 @@ try {
   if (!status[0].includes('PlaybackInfo_FileFacts(media,DeliveryInfo_Duration())')) throw new Error('File facts must use source-correlated duration instead of a retained native field');
   const checkpoint = /^function CheckpointTiming_Status\([^]*?^end function/mi.exec(player);
   if (status[0].includes('CheckpointTiming_Status()') && !checkpoint) throw new Error('Missing production checkpoint timing dependency');
-  const combined = [read('tests/harness.brs'), read('source/util/PlaybackInfo.brs'),read('components/PlayerProgressRecovery.brs').replaceAll('CreateObject("roTimespan")','DeliveryFixtureClock()'),
+  const combined = [read('tests/harness.brs'), read('source/util/PlaybackInfo.brs'), read('source/util/EnglishAudio.brs'),read('components/PlayerProgressRecovery.brs').replaceAll('CreateObject("roTimespan")','DeliveryFixtureClock()'),
     read('components/PlayerDeliveryInfo.brs').replace('CreateObject("roTimespan")','DeliveryFixtureClock()'), checkpoint?.[0] || '', status[0], read('tests/delivery-info.test.brs')].join('\n');
   const file = path.join(staging, 'delivery-info.brs');
   fs.writeFileSync(file, combined);

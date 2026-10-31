@@ -204,7 +204,7 @@ sub onAudioProgressTick()
     if m.playbackActive <> true or m.retryPending = true or m.audioGuardActive <> true or m.audioGuardBlocked = true or m.audioRecoveryPending = true then return
     if m.video = invalid or m.video.state <> "playing" then return
     facts = CurrentEnglishAudioFacts()
-    if facts.verified <> true
+    if not EnglishAudio_Playable(facts)
         ClearAudioProgress()
         return
     end if

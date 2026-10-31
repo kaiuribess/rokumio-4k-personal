@@ -16,5 +16,8 @@ function PlaybackPreferences(stores as dynamic, params = invalid as dynamic) as 
             if kind = "Boolean" or kind = "roBoolean" then result[key] = source[key]
         end for
     end for
+    if Type(params) = "roAssociativeArray" and params.livePlayback = true
+        result.fourKOnly = false:result.autoNextEpisode = false:result.onlineSubtitles = false
+    end if
     return result
 end function

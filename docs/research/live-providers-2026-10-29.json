@@ -1,0 +1,221 @@
+{
+  "checked_utc": "2026-10-29T21:47:31.600121+00:00",
+  "verification": "PC network/decode only; no Roku or audible-language test",
+  "manifests": [
+    {
+      "provider": "nuvio",
+      "manifest": "https://nuviosports.xyz/manifest.json",
+      "status": 403
+    },
+    {
+      "provider": "highfly",
+      "manifest": "https://sports.highfly.to/manifest.json",
+      "status": 403
+    },
+    {
+      "provider": "highfly-free",
+      "manifest": "https://sportsfree.highfly.to/manifest.json",
+      "status": 403
+    },
+    {
+      "provider": "highfly-us2",
+      "manifest": "https://sportsfree-us2.highfly.to/manifest.json",
+      "status": 403
+    },
+    {
+      "provider": "stremverse",
+      "manifest": "https://stremverse1.alwaysdata.net/manifest.json",
+      "status": 200,
+      "id": "com.stremverse.org",
+      "version": "3.0.0",
+      "types": [
+        "tv"
+      ],
+      "resources": [
+        "catalog",
+        "meta",
+        "stream"
+      ],
+      "catalogs": [
+        {
+          "id": "stremverse_live_events",
+          "type": "tv",
+          "name": "Live Events",
+          "extra": [
+            {
+              "name": "genre",
+              "options": [
+                "Football",
+                "Cricket",
+                "Basketball",
+                "Baseball",
+                "Tennis",
+                "Motorsport",
+                "Boxing",
+                "Rugby",
+                "American Football",
+                "Cycling"
+              ]
+            },
+            {
+              "name": "search"
+            },
+            {
+              "name": "skip"
+            },
+            {
+              "name": "limit"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "stremverse": {
+    "catalog": "stremverse_live_events",
+    "type": "tv",
+    "events": [
+      {
+        "index": 3,
+        "name": "Copa del Rey",
+        "id_length": 270,
+        "id_sha256": "f21ccf0482aa0bd8950261b49038e556d07b75af20ee98ec0fd6dbf92ca72a93",
+        "sources": [
+          {
+            "origin": "www.rtmpcdn.com",
+            "scheme": "https",
+            "query_present": false,
+            "header_names": [],
+            "error": "URLError"
+          },
+          {
+            "origin": "live.vivo155.com",
+            "scheme": "https",
+            "query_present": true,
+            "header_names": [
+              "Referer",
+              "User-Agent"
+            ],
+            "status": 200,
+            "mime": "application/vnd.apple.mpegurl",
+            "kind": "HLS",
+            "advertised_resolutions": [],
+            "live_playlist": true,
+            "key_present": false,
+            "sequence": [
+              "1793305458"
+            ],
+            "segment_bytes": [
+              318848,
+              324864,
+              328060
+            ],
+            "ts_sync": true,
+            "decoder": "PyAV 19.0.2",
+            "tracks": [
+              {
+                "type": "video",
+                "codec": "h264",
+                "width": 512,
+                "height": 288,
+                "language": null
+              },
+              {
+                "type": "audio",
+                "codec": "aac",
+                "width": null,
+                "height": null,
+                "language": null
+              }
+            ],
+            "decoded_frames": {
+              "video": 300,
+              "audio": 517
+            }
+          },
+          {
+            "origin": "193.47.62.44",
+            "scheme": "http",
+            "query_present": false,
+            "header_names": [
+              "User-Agent",
+              "Referer",
+              "Origin"
+            ],
+            "error": "ValueError"
+          },
+          {
+            "origin": "live.cds78y11d.org",
+            "scheme": "https",
+            "query_present": true,
+            "header_names": [],
+            "status": 403
+          }
+        ],
+        "source_count": 4
+      },
+      {
+        "index": 9,
+        "name": "HB Koge vs Barcelona",
+        "id_length": 38,
+        "id_sha256": "72397e81f5ae3e2fbda4eb18884cf876a305ca5388cdcc2ccf05a094ec288779",
+        "sources": [
+          {
+            "origin": "live.vivo155.com",
+            "scheme": "https",
+            "query_present": true,
+            "header_names": [
+              "Referer",
+              "User-Agent"
+            ],
+            "status": 200,
+            "mime": "application/vnd.apple.mpegurl",
+            "kind": "HLS",
+            "advertised_resolutions": [],
+            "live_playlist": true,
+            "key_present": false,
+            "sequence": [
+              "1793305974"
+            ],
+            "segment_bytes": [
+              1337808,
+              1315436,
+              1315624
+            ],
+            "ts_sync": true,
+            "decoder": "PyAV 19.0.2",
+            "tracks": [
+              {
+                "type": "video",
+                "codec": "h264",
+                "width": 1920,
+                "height": 1080,
+                "language": null
+              },
+              {
+                "type": "audio",
+                "codec": "aac",
+                "width": null,
+                "height": null,
+                "language": null
+              }
+            ],
+            "decoded_frames": {
+              "video": 225,
+              "audio": 387
+            }
+          }
+        ],
+        "source_count": 1
+      }
+    ],
+    "catalog_count": 107
+  },
+  "limitations": [
+    "No physical Roku test or audible-language verification.",
+    "HTTP 200/segment decoding does not establish broadcast rights or sustained reliability.",
+    "A subsequent request for event index 9 returned HTTP 403.",
+    "Only the free Live Events catalog was queried; no Xtra/IPTV membership or proxy.",
+    "HTTP media was not admitted by the reusable probe or Crimson HTTPS source policy."
+  ]
+}

@@ -163,3 +163,30 @@ sub Test_OpaqueNativeResolve()
 end sub
 
 Test_OpaqueNativeResolve()
+
+Harness_Suite("Extensionless playlists reach the native player without bypassing header limits")
+for each format in ["hls","dash"]
+    NativeBoundarySetup()
+    text = "#EXTM3U" + Chr(10) + "#EXTINF:4," + Chr(10) + "segment.ts"
+    mime = "application/vnd.apple.mpegurl"
+    if format="dash" then text="<MPD><Period></Period></MPD>":mime="application/dash+xml"
+    bytes=CreateObject("roByteArray"):bytes.FromAsciiString(text)
+    m.nativeBoundary.bytes=bytes:m.nativeBoundary.size=bytes.Count():m.nativeBoundary.status=200:m.nativeBoundary.responseHeaders={"Content-Type":mime}
+    NativeBoundaryResolve():answer=m.top.result
+    Harness_Equal(answer.streamFormat,format,"bounded playlist bytes establish the opaque transport")
+    Harness_Ok(not answer.audioPolicy.known,"playlist detection does not fabricate language or dimensions")
+    m.playParams={name:"Live fixture",metaType:"tv",videoId:"original-event",livePlayback:true,allowUnknownLiveAudio:true,position:900,audioMode:"projector"}
+    task={id:"live-resolve",result:answer}:m.resolveTask=task
+    onResolveResult(PlayerTest_Event(task,answer))
+    Harness_Equal(m.video.content.streamFormat,format,"actual resolver callback reaches native Video")
+    Harness_Equal(m.video.content.url,m.top.stream.url,"extensionless query URL is preserved")
+    Harness_Equal(m.video.content.httpHeaders[0],"Referer:https://provider.example/","provider-required header reaches media HTTP agent")
+    Harness_Equal(m.video.content.playStart,-12,"native live handoff cannot inherit a movie offset")
+end for
+NativeBoundarySetup()
+text="<html>#EXTM3U an embed is not media</html>"
+bytes=CreateObject("roByteArray"):bytes.FromAsciiString(text)
+m.nativeBoundary.bytes=bytes:m.nativeBoundary.size=bytes.Count():m.nativeBoundary.status=200:m.nativeBoundary.responseHeaders={"Content-Type":"application/vnd.apple.mpegurl"}
+NativeBoundaryResolve()
+Harness_Equal(m.top.result.streamFormat,"","MIME alone cannot turn an HTML page into a playlist")
+Harness_Equal(NativeMedia_PlaylistFormat(invalid),"","missing bytes are harmless")

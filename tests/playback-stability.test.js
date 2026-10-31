@@ -10,7 +10,7 @@ const production=read('components/PlayerProgressRecovery.brs').replaceAll('Creat
 }).join('\n');
 const dir=path.join(root,'out-test/playback-stability');fs.mkdirSync(dir,{recursive:true});
 const file=path.join(dir,'tests.brs');
-fs.writeFileSync(file,[read('tests/harness.brs'),read('source/util/PlaybackInfo.brs'),read('source/util/CinemaStreams.brs'),read('source/util/AutoPlayback.brs'),read('source/util/TimerGuard.brs').replace('CreateObject("roTimespan")','StabilityClock()'),read('components/PlayerPosition.brs'),read('components/PlayerDeliveryInfo.brs'),read('components/PlayerBufferingRecovery.brs').replace('CreateObject("roTimespan")','StabilityClock()'),production,read('tests/playback-stability.test.brs').replace('Harness_Finish()',''),read('tests/playback-underrun.test.brs')].join('\n'));
+fs.writeFileSync(file,[read('tests/harness.brs'),read('source/util/PlaybackInfo.brs'),read('source/util/EnglishAudio.brs'),read('source/util/CinemaStreams.brs'),read('source/util/AutoPlayback.brs'),read('source/util/TimerGuard.brs').replace('CreateObject("roTimespan")','StabilityClock()'),read('components/PlayerPosition.brs'),read('components/PlayerDeliveryInfo.brs'),read('components/PlayerBufferingRecovery.brs').replace('CreateObject("roTimespan")','StabilityClock()'),production,read('tests/playback-stability.test.brs').replace('Harness_Finish()',''),read('tests/playback-underrun.test.brs')].join('\n'));
 const run=spawnSync(process.execPath,[path.join(root,'node_modules/@rokucommunity/brs/bin/cli.js'),'--root',dir,file],{cwd:root,encoding:'utf8'});
 process.stdout.write(run.stdout||'');process.stderr.write(run.stderr||'');
 process.exitCode=run.status===0&&!(run.stderr||'').trim()&&/RESULT: PASS/.test(run.stdout||'')?0:1;

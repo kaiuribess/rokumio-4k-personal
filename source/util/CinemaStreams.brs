@@ -112,6 +112,17 @@ function CinemaSourceBlockReason(stream as dynamic, patterns = invalid as dynami
     if patterns.download.IsMatch(name) then return "uncached"
     if name.InStr("torrentio") >= 0 and patterns.providerError.IsMatch(name) then return "provider-status"
     url = LCase(CinemaOptionalText(stream.url))
+    ' Observed Highfly free responses include paid upsells pointing at the
+    ' Google homepage and a player tip pointing at /health. These are status
+    ' entries, not failed videos to spend a fallback attempt on. Require the
+    ' exact destination AND annotation; never reject "Premium" movie titles
+    ' or notWebReady (which is also used for real native streams).
+    title = LCase(CinemaOptionalText(stream.title))
+    bareUrl = url.Split("?")[0].Split("#")[0]
+    if bareUrl = "https://www.google.com" or bareUrl = "https://www.google.com/"
+        if title.InStr("upgrade to premium") >= 0 or title.InStr("upgrade to watch") >= 0 then return "provider-status"
+    end if
+    if bareUrl = "https://sports.highfly.to/health" and name = "tip: use an external player" then return "provider-status"
     if Left(url, 8) <> "https://" then return ""
     rest = Mid(url, 9)
     slash = rest.InStr("/")
@@ -126,11 +137,14 @@ function CinemaSourceBlockReason(stream as dynamic, patterns = invalid as dynami
 end function
 
 function CinemaSkippedSources(streams as dynamic) as object
-    counts = { uncached: 0, status: 0, downloadOnly: 0, nonEnglish: 0 }
+    counts = { uncached: 0, status: 0, downloadOnly: 0, nonEnglish: 0, browserOnly: 0 }
     if Type(streams) <> "roArray" then return counts
     patterns = CinemaSourcePatterns()
     for each stream in streams
         reason = CinemaSourceBlockReason(stream, patterns)
+        if Type(stream) = "roAssociativeArray" and CinemaOptionalText(stream.url) = ""
+            if CinemaOptionalText(stream.externalUrl) <> "" or stream.browserOnly = true then counts.browserOnly++
+        end if
         if reason = "uncached" then counts.uncached = counts.uncached + 1
         if reason = "provider-status" then counts.status = counts.status + 1
         if reason = "download-only" then counts.downloadOnly = counts.downloadOnly + 1
@@ -407,6 +421,7 @@ function CinemaBudgetStreams(raw as dynamic, countLimit = invalid as dynamic, by
     for each item in raw
         if Type(item) <> "roAssociativeArray" then continue for
         stream = {}
+        if CinemaOptionalText(item.url) = "" and (CinemaOptionalText(item.externalUrl) <> "" or item.browserOnly = true) then stream.browserOnly = true
         unsafe = false
         for each field in ["url","infoHash","sourceMemoryProvider","streamFormat"]
             value = item[field]
@@ -422,6 +437,11 @@ function CinemaBudgetStreams(raw as dynamic, countLimit = invalid as dynamic, by
         hints = item.behaviorHints
         if Type(hints) = "roAssociativeArray"
             safeHints = {}
+            if hints.crimsonExpiresAt <> invalid
+                if GetInterface(hints.crimsonExpiresAt,"ifString") = invalid then continue for
+                if Len(hints.crimsonExpiresAt) > 32 then continue for
+                safeHints.crimsonExpiresAt = hints.crimsonExpiresAt
+            end if
             if hints.downloadOnly = true then safeHints.downloadOnly = true
             if GetInterface(hints.filename,"ifString") <> invalid and Len(hints.filename) <= 512 then safeHints.filename = hints.filename
             size = CinemaSizeNumber(hints.videoSize)

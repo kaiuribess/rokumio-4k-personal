@@ -53,6 +53,15 @@ sub Main()
     Assert(CinemaChooseStreams([download,cached,status],true).Count() = 1, "4K-only keeps ready cached source without status videos")
     Assert(CinemaSourceBlockReason({name:"4K HEVC",url:hd.url,behaviorHints:{notWebReady:true}}) = "", "notWebReady is not confused with an uncached torrent")
     Assert(CinemaSourceBlockReason({url:"https://torrentio.elfhosted.com/videos/failed_unavailable_v1.mp4"}) = "provider-status", "Known Torrentio hosted status path is recognized")
+    Assert(CinemaSourceBlockReason({title:"Upgrade to Premium",url:"https://www.google.com/"}) = "provider-status", "Highfly upgrade homepage is not a video")
+    Assert(CinemaSourceBlockReason({title:"Upgrade to watch",url:"https://www.google.com"}) = "provider-status", "Highfly locked CDN entry is a status")
+    Assert(CinemaSourceBlockReason({name:"Tip: Use an external player",url:"https://sports.highfly.to/health"}) = "provider-status", "Known player-tip health endpoint is excluded")
+    Assert(CinemaSourceBlockReason({name:"Premium",title:"Upgrade to Premium",url:hd.url}) = "", "Annotation alone cannot block a genuine movie source")
+    Assert(CinemaSourceBlockReason({name:"Tip: Use an external player",url:hd.url}) = "", "Tip text alone is not blocked at unrelated media origins")
+    Assert(CinemaSourceBlockReason({title:"Upgrade to watch",url:"https://www.google.com.example/live.m3u8"}) = "", "Lookalike hostname does not match provider status rule")
+    Assert(CinemaSourceBlockReason({title:"Upgrade to watch",url:"https://www.google.com/video.m3u8"}) = "", "Google media paths are not the observed homepage placeholder")
+    Assert(CinemaSourceBlockReason({url:"https://www.google.com"}) = "", "Homepage rule requires the observed upgrade annotation")
+    Assert(CinemaSourceBlockReason({name:42,title:42,url:hd.url}) = "", "Malformed annotation remains safe")
     large = []
     for i = 0 to 1023
         name = "1080p H264"

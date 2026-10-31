@@ -1,0 +1,3413 @@
+{
+  "checked_utc": "2026-10-31T01:55:07.420881+00:00",
+  "scope": "PC HTTP and in-memory PyAV decoding. No physical Roku, audible-room test, installation, DRM handling or broadcast-rights verification.",
+  "client_control": {
+    "checked_utc": "2026-10-31T01:53:47.563783+00:00",
+    "origin": "pengu.uk",
+    "same_private_url": true,
+    "cookies_used": false,
+    "steps": [
+      {
+        "client": "Python urllib default",
+        "status": 403,
+        "cloudflare1010": true
+      },
+      {
+        "client": "CrimsonCinema-Research/0.6",
+        "status": 200,
+        "json": true
+      },
+      {
+        "client": "Python urllib default",
+        "status": 403,
+        "cloudflare1010": true
+      }
+    ]
+  },
+  "configuration": {
+    "highfly": "User completed free US2 human verification; page issued sports.highfly.to manifest; no account/payment/trial.",
+    "pengu": "User completed Google sign-in; Live TV was initially off and enabled through the normal UI; no payment or trial.",
+    "nuvio": "Normal configuration selected Hide web streams; no account or payment."
+  },
+  "catalogs": [
+    {
+      "provider": "highfly",
+      "checked_utc": "2026-10-31T01:48:01.099932+00:00",
+      "requests": [
+        {
+          "stage": "manifest",
+          "origin": "sports.highfly.to",
+          "status": 200,
+          "bytes": 3273,
+          "mime": "application/json",
+          "final_origin": "sports.highfly.to",
+          "seconds": 0.375
+        },
+        {
+          "stage": "catalog",
+          "origin": "sports.highfly.to",
+          "status": 200,
+          "bytes": 11011,
+          "mime": "application/json",
+          "final_origin": "sports.highfly.to",
+          "seconds": 0.281
+        }
+      ],
+      "client": "CrimsonCinema-Research/0.6 (+https://github.com/kaiuribess/rokumio-4k-personal; PC compatibility test)",
+      "catalog_count": 20,
+      "matching_events": [
+        {
+          "name": "Boston Celtics vs Chicago Bulls",
+          "type": "sport",
+          "id_sha256": "3cd4fdb78a9fead6441756cc402b97e8e06102cf1e6a4b8ed7f851fc5fe28e01"
+        },
+        {
+          "name": "Orlando Magic vs Boston Celtics",
+          "type": "sport",
+          "id_sha256": "6073f01a24df5bcf7e524c11a14c0682b27a9c17b87d214c442363407d8057cb"
+        }
+      ],
+      "grid_matches": []
+    },
+    {
+      "provider": "pengu",
+      "checked_utc": "2026-10-31T01:48:04.815027+00:00",
+      "requests": [
+        {
+          "stage": "manifest",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 7026,
+          "mime": "application/json",
+          "final_origin": "pengu.uk",
+          "seconds": 0.218
+        },
+        {
+          "stage": "catalog",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 32509,
+          "mime": "application/json",
+          "final_origin": "pengu.uk",
+          "seconds": 0.157
+        }
+      ],
+      "client": "CrimsonCinema-Research/0.6 (+https://github.com/kaiuribess/rokumio-4k-personal; PC compatibility test)",
+      "catalog_count": 31,
+      "matching_events": [
+        {
+          "name": "\ud83d\udd34 LIVE: Boston Celtics - Chicago Bulls",
+          "type": "tv",
+          "id_sha256": "9764d98864b7b0e7860e26733cbce6df10baa3da777baa06da1e7d6398975008"
+        }
+      ],
+      "grid_matches": []
+    },
+    {
+      "provider": "nuvio",
+      "checked_utc": "2026-10-31T01:48:01.756527+00:00",
+      "requests": [
+        {
+          "stage": "manifest",
+          "origin": "nuviosports.xyz",
+          "status": 200,
+          "bytes": 11342,
+          "mime": "application/json",
+          "final_origin": "nuviosports.xyz",
+          "seconds": 1.625
+        },
+        {
+          "stage": "catalog",
+          "origin": "nuviosports.xyz",
+          "status": 200,
+          "bytes": 45044,
+          "mime": "application/json",
+          "final_origin": "nuviosports.xyz",
+          "seconds": 1.438
+        }
+      ],
+      "client": "CrimsonCinema-Research/0.6 (+https://github.com/kaiuribess/rokumio-4k-personal; PC compatibility test)",
+      "catalog_count": 29,
+      "matching_events": [
+        {
+          "name": "\ud83d\udd34 LIVE: Boston Celtics vs Chicago Bulls",
+          "type": "tv",
+          "id_sha256": "74ff944c2ee16dd3df8f1e93d25e0bf4499564474f9b3bb285ece6156a49be0c"
+        }
+      ],
+      "grid_matches": []
+    }
+  ],
+  "samples": {
+    "highfly_sustained": {
+      "checked_utc": "2026-10-31T01:49:12.779091+00:00",
+      "scope": "PC requests/decoding; not physical Roku or audible language",
+      "default_request_client": "CrimsonCinema-Research/0.6 (+https://github.com/kaiuribess/rokumio-4k-personal; PC compatibility test)",
+      "provider_origin": "sports.highfly.to",
+      "rounds": [
+        {
+          "round": 1,
+          "source_count": 6,
+          "source_index": 0,
+          "sample": {
+            "requested_seconds": 120,
+            "polls": 29,
+            "unique_segments": 26,
+            "segment_bytes": 100917648,
+            "sequences": [
+              1676,
+              1677,
+              1678,
+              1679,
+              1679,
+              1680,
+              1681,
+              1681,
+              1682,
+              1683,
+              1683,
+              1684,
+              1685,
+              1685,
+              1686,
+              1687,
+              1687,
+              1688,
+              1689,
+              1689,
+              1690,
+              1691,
+              1691,
+              1692,
+              1693,
+              1694,
+              1694,
+              1695,
+              1695
+            ],
+            "frames": {
+              "video": 9326,
+              "audio": 3665
+            },
+            "decode_failures": 0,
+            "tracks": [
+              {
+                "type": "video",
+                "codec": "h264",
+                "width": 1920,
+                "height": 1080,
+                "language": null
+              },
+              {
+                "type": "audio",
+                "codec": "aac",
+                "width": null,
+                "height": null,
+                "language": "eng"
+              }
+            ],
+            "media_url_sha256": "9ac841cd20b4e226a28b2bb52b2698645d5e8bc1f2fe7186640e610e0ff2b872",
+            "header_names": [],
+            "event_content_verified": false,
+            "live_playlist": true,
+            "decoder": "PyAV 19.0.2",
+            "pts": {
+              "video": [
+                5122.366,
+                5278.706
+              ],
+              "audio": [
+                5122.341333333334,
+                5278.671666666667
+              ]
+            },
+            "elapsed_seconds": 120.27,
+            "playlist_advanced": true
+          }
+        },
+        {
+          "round": 2,
+          "source_count": 6,
+          "source_index": 0,
+          "sample": {
+            "requested_seconds": 120,
+            "polls": 27,
+            "unique_segments": 26,
+            "segment_bytes": 122477676,
+            "sequences": [
+              1696,
+              1698,
+              1699,
+              1700,
+              1701,
+              1702,
+              1703,
+              1703,
+              1704,
+              1705,
+              1706,
+              1706,
+              1707,
+              1708,
+              1708,
+              1709,
+              1710,
+              1710,
+              1711,
+              1712,
+              1713,
+              1713,
+              1714,
+              1715,
+              1715,
+              1716,
+              1716
+            ],
+            "frames": {
+              "video": 9353,
+              "audio": 3660
+            },
+            "decode_failures": 0,
+            "tracks": [
+              {
+                "type": "video",
+                "codec": "h264",
+                "width": 1920,
+                "height": 1080,
+                "language": null
+              },
+              {
+                "type": "audio",
+                "codec": "aac",
+                "width": null,
+                "height": null,
+                "language": "eng"
+              }
+            ],
+            "media_url_sha256": "d83d2455c662e18fb39abde786d62771f096c76e53da0d6fce45c3277e133b57",
+            "header_names": [],
+            "event_content_verified": false,
+            "live_playlist": true,
+            "decoder": "PyAV 19.0.2",
+            "pts": {
+              "video": [
+                5248.692,
+                5404.832
+              ],
+              "audio": [
+                5248.676666666666,
+                5404.794333333333
+              ]
+            },
+            "elapsed_seconds": 120.25,
+            "playlist_advanced": true
+          }
+        }
+      ],
+      "requests": [
+        {
+          "stage": "manifest",
+          "origin": "sports.highfly.to",
+          "status": 200,
+          "bytes": 3273,
+          "mime": "application/json",
+          "final_origin": "sports.highfly.to",
+          "seconds": 0.25
+        },
+        {
+          "stage": "catalog",
+          "origin": "sports.highfly.to",
+          "status": 200,
+          "bytes": 11011,
+          "mime": "application/json",
+          "final_origin": "sports.highfly.to",
+          "seconds": 0.266
+        },
+        {
+          "stage": "addon-stream",
+          "origin": "sports.highfly.to",
+          "status": 200,
+          "bytes": 1744,
+          "mime": "application/json",
+          "final_origin": "sports.highfly.to",
+          "seconds": 0.25
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.453
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 2973972,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.234
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3543800,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.204
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3392084,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.203
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.328
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 2713780,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.219
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3793840,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3299776,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.218
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3693448,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.219
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4038804,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4842316,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.219
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.234
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3618624,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.219
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.235
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3659984,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.187
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3781432,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.266
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.234
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4336596,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.235
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.328
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3153512,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.219
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.265
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.281
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3552824,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3467096,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.219
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 2026828,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.219
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.266
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5693768,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.266
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.266
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 2916068,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.235
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.266
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4622920,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.219
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.265
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.281
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5059080,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.297
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.235
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5068480,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.265
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.282
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3030560,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.234
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4431536,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.281
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4946844,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.281
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.297
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5259676,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.235
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.266
+        },
+        {
+          "stage": "addon-stream",
+          "origin": "sports.highfly.to",
+          "status": 200,
+          "bytes": 1744,
+          "mime": "application/json",
+          "final_origin": "sports.highfly.to",
+          "seconds": 0.609
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4946844,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.234
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5259676,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3840088,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.266
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.266
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5068480,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.344
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3030560,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.265
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4431536,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.282
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5691512,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5792092,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.234
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.266
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4709776,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.219
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.281
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5486968,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.328
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.266
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5501820,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4938384,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.282
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5422296,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.218
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4811108,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.297
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5318708,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.266
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.391
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4425520,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.266
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.266
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4038052,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.281
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3616556,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5782880,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.297
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.266
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4837616,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.219
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.265
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.282
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4806220,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.234
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3609412,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.218
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.265
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4615024,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.235
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.234
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3260484,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.219
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.313
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3179644,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.218
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.266
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 6056420,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.218
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "papacito.cfd",
+          "status": 200,
+          "bytes": 796,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "papacito.cfd",
+          "seconds": 0.25
+        }
+      ],
+      "event": {
+        "name": "Boston Celtics vs Chicago Bulls",
+        "id_sha256": "3cd4fdb78a9fead6441756cc402b97e8e06102cf1e6a4b8ed7f851fc5fe28e01",
+        "type": "sport",
+        "catalog": "sports_basketball"
+      }
+    },
+    "stremverse_playlist_failure": {
+      "checked_utc": "2026-10-31T01:49:40.680781+00:00",
+      "scope": "PC requests/decoding; not physical Roku or audible language",
+      "default_request_client": "CrimsonCinema-Research/0.6 (+https://github.com/kaiuribess/rokumio-4k-personal; PC compatibility test)",
+      "provider_origin": "stremverse1.alwaysdata.net",
+      "rounds": [
+        {
+          "round": 1,
+          "source_count": 3,
+          "source_index": 0,
+          "sample": {
+            "requested_seconds": 120,
+            "polls": 0,
+            "unique_segments": 0,
+            "segment_bytes": 0,
+            "sequences": [],
+            "frames": {},
+            "decode_failures": 0,
+            "tracks": [],
+            "media_url_sha256": "2546a84afdc688be8d94545d1790d3825ce56d299873d82a10beff2780790381",
+            "header_names": [
+              "Referer",
+              "User-Agent"
+            ],
+            "event_content_verified": false,
+            "failure": {
+              "stage": "entry-playlist",
+              "status": 403
+            },
+            "elapsed_seconds": 0.52,
+            "playlist_advanced": false
+          }
+        },
+        {
+          "round": 2,
+          "source_count": 3,
+          "source_index": 0,
+          "sample": {
+            "requested_seconds": 120,
+            "polls": 0,
+            "unique_segments": 0,
+            "segment_bytes": 0,
+            "sequences": [],
+            "frames": {},
+            "decode_failures": 0,
+            "tracks": [],
+            "media_url_sha256": "2546a84afdc688be8d94545d1790d3825ce56d299873d82a10beff2780790381",
+            "header_names": [
+              "Referer",
+              "User-Agent"
+            ],
+            "event_content_verified": false,
+            "failure": {
+              "stage": "entry-playlist",
+              "status": 403
+            },
+            "elapsed_seconds": 0.52,
+            "playlist_advanced": false
+          }
+        }
+      ],
+      "requests": [
+        {
+          "stage": "manifest",
+          "origin": "stremverse1.alwaysdata.net",
+          "status": 200,
+          "bytes": 2055,
+          "mime": "application/json",
+          "final_origin": "stremverse1.alwaysdata.net",
+          "seconds": 0.469
+        },
+        {
+          "stage": "catalog",
+          "origin": "stremverse1.alwaysdata.net",
+          "status": 200,
+          "bytes": 47347,
+          "mime": "application/json",
+          "final_origin": "stremverse1.alwaysdata.net",
+          "seconds": 0.75
+        },
+        {
+          "stage": "addon-stream",
+          "origin": "stremverse1.alwaysdata.net",
+          "status": 200,
+          "bytes": 755,
+          "mime": "application/json",
+          "final_origin": "stremverse1.alwaysdata.net",
+          "seconds": 0.515
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "edgestream2.pro",
+          "status": 403,
+          "seconds": 0.516
+        },
+        {
+          "stage": "addon-stream",
+          "origin": "stremverse1.alwaysdata.net",
+          "status": 200,
+          "bytes": 755,
+          "mime": "application/json",
+          "final_origin": "stremverse1.alwaysdata.net",
+          "seconds": 0.547
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "edgestream2.pro",
+          "status": 403,
+          "seconds": 0.515
+        }
+      ],
+      "event": {
+        "name": "NBA",
+        "id_sha256": "cbc76872df5b20e38c520dc52272874ad8774635235832881239b68ec2ac53d3",
+        "type": "tv",
+        "catalog": "stremverse_live_events"
+      }
+    },
+    "stremverse_segment_failure": {
+      "checked_utc": "2026-10-31T01:50:01.138547+00:00",
+      "scope": "PC requests/decoding; not physical Roku or audible language",
+      "default_request_client": "CrimsonCinema-Research/0.6 (+https://github.com/kaiuribess/rokumio-4k-personal; PC compatibility test)",
+      "provider_origin": "stremverse1.alwaysdata.net",
+      "rounds": [
+        {
+          "round": 1,
+          "source_count": 3,
+          "source_index": 1,
+          "sample": {
+            "requested_seconds": 120,
+            "polls": 4,
+            "unique_segments": 6,
+            "segment_bytes": 18570264,
+            "sequences": [
+              2843,
+              2845,
+              2846,
+              2847
+            ],
+            "frames": {
+              "video": 720,
+              "audio": 18
+            },
+            "decode_failures": 0,
+            "tracks": [
+              {
+                "type": "video",
+                "codec": "h264",
+                "width": 1280,
+                "height": 720,
+                "language": null
+              },
+              {
+                "type": "audio",
+                "codec": "aac",
+                "width": null,
+                "height": null,
+                "language": "und"
+              }
+            ],
+            "media_url_sha256": "6d4125f9870012d943227cf0922c952630ee6803a700d8d2233cd16dea0766e2",
+            "header_names": [
+              "Referer",
+              "User-Agent"
+            ],
+            "event_content_verified": false,
+            "variant_url_sha256": "8b7d0e60ade8b4b436802e9c9857d95ce4a70ffd3c0506cc5dd871d9549cfa7e",
+            "live_playlist": true,
+            "decoder": "PyAV 19.0.2",
+            "pts": {
+              "video": [
+                11373.421333333334,
+                11397.388
+              ],
+              "audio": [
+                104095.45237777778,
+                104095.81504444445
+              ]
+            },
+            "failure": {
+              "stage": "segment",
+              "status": 404
+            },
+            "elapsed_seconds": 12.17,
+            "playlist_advanced": true
+          }
+        },
+        {
+          "round": 2,
+          "source_count": 3,
+          "source_index": 1,
+          "sample": {
+            "requested_seconds": 120,
+            "polls": 8,
+            "unique_segments": 9,
+            "segment_bytes": 23439464,
+            "sequences": [
+              2847,
+              2849,
+              2850,
+              2850,
+              2850,
+              2851,
+              2853,
+              2854
+            ],
+            "frames": {
+              "video": 1080,
+              "audio": 12
+            },
+            "decode_failures": 0,
+            "tracks": [
+              {
+                "type": "video",
+                "codec": "h264",
+                "width": 1280,
+                "height": 720,
+                "language": null
+              },
+              {
+                "type": "audio",
+                "codec": "aac",
+                "width": null,
+                "height": null,
+                "language": "und"
+              }
+            ],
+            "media_url_sha256": "6d4125f9870012d943227cf0922c952630ee6803a700d8d2233cd16dea0766e2",
+            "header_names": [
+              "Referer",
+              "User-Agent"
+            ],
+            "event_content_verified": false,
+            "variant_url_sha256": "dc446bf8a5c139fa2351640675576d26dffb195ec82e1c3a13fae695d7a9128b",
+            "live_playlist": true,
+            "decoder": "PyAV 19.0.2",
+            "pts": {
+              "video": [
+                11389.421333333334,
+                11425.388
+              ],
+              "audio": [
+                104095.70837777777,
+                104095.94304444444
+              ]
+            },
+            "failure": {
+              "stage": "segment",
+              "status": 404
+            },
+            "elapsed_seconds": 23.08,
+            "playlist_advanced": true
+          }
+        }
+      ],
+      "requests": [
+        {
+          "stage": "manifest",
+          "origin": "stremverse1.alwaysdata.net",
+          "status": 200,
+          "bytes": 2055,
+          "mime": "application/json",
+          "final_origin": "stremverse1.alwaysdata.net",
+          "seconds": 0.468
+        },
+        {
+          "stage": "catalog",
+          "origin": "stremverse1.alwaysdata.net",
+          "status": 200,
+          "bytes": 47347,
+          "mime": "application/json",
+          "final_origin": "stremverse1.alwaysdata.net",
+          "seconds": 0.75
+        },
+        {
+          "stage": "addon-stream",
+          "origin": "stremverse1.alwaysdata.net",
+          "status": 200,
+          "bytes": 755,
+          "mime": "application/json",
+          "final_origin": "stremverse1.alwaysdata.net",
+          "seconds": 0.547
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "chatgpt.hereisman.net",
+          "status": 200,
+          "bytes": 184,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "chatgpt.hereisman.net",
+          "seconds": 0.516
+        },
+        {
+          "stage": "variant-playlist",
+          "origin": "pl.playlist5.space",
+          "status": 200,
+          "bytes": 343,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pl.playlist5.space",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "a.finir10.space",
+          "status": 200,
+          "bytes": 3427240,
+          "mime": "text/plain",
+          "final_origin": "a.finir10.space",
+          "seconds": 0.453
+        },
+        {
+          "stage": "segment",
+          "origin": "a.finir10.space",
+          "status": 200,
+          "bytes": 3233788,
+          "mime": "text/plain",
+          "final_origin": "a.finir10.space",
+          "seconds": 0.344
+        },
+        {
+          "stage": "segment",
+          "origin": "a.finir10.space",
+          "status": 200,
+          "bytes": 3202204,
+          "mime": "text/plain",
+          "final_origin": "a.finir10.space",
+          "seconds": 0.328
+        },
+        {
+          "stage": "variant-playlist",
+          "origin": "pl.playlist5.space",
+          "status": 200,
+          "bytes": 343,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pl.playlist5.space",
+          "seconds": 0.235
+        },
+        {
+          "stage": "segment",
+          "origin": "a.finir10.space",
+          "status": 200,
+          "bytes": 2732956,
+          "mime": "text/plain",
+          "final_origin": "a.finir10.space",
+          "seconds": 0.406
+        },
+        {
+          "stage": "segment",
+          "origin": "a.finir10.space",
+          "status": 200,
+          "bytes": 2828648,
+          "mime": "text/plain",
+          "final_origin": "a.finir10.space",
+          "seconds": 0.312
+        },
+        {
+          "stage": "variant-playlist",
+          "origin": "pl.playlist5.space",
+          "status": 200,
+          "bytes": 343,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pl.playlist5.space",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "a.finir10.space",
+          "status": 200,
+          "bytes": 3145428,
+          "mime": "text/plain",
+          "final_origin": "a.finir10.space",
+          "seconds": 0.375
+        },
+        {
+          "stage": "variant-playlist",
+          "origin": "pl.playlist5.space",
+          "status": 200,
+          "bytes": 343,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pl.playlist5.space",
+          "seconds": 0.297
+        },
+        {
+          "stage": "segment",
+          "origin": "a.finir10.space",
+          "status": 404,
+          "seconds": 0.156
+        },
+        {
+          "stage": "addon-stream",
+          "origin": "stremverse1.alwaysdata.net",
+          "status": 200,
+          "bytes": 755,
+          "mime": "application/json",
+          "final_origin": "stremverse1.alwaysdata.net",
+          "seconds": 0.563
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "chatgpt.hereisman.net",
+          "status": 200,
+          "bytes": 186,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "chatgpt.hereisman.net",
+          "seconds": 0.515
+        },
+        {
+          "stage": "variant-playlist",
+          "origin": "pl.playlist3.space",
+          "status": 200,
+          "bytes": 349,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pl.playlist3.space",
+          "seconds": 0.282
+        },
+        {
+          "stage": "segment",
+          "origin": "a.cestamoi9.space",
+          "status": 200,
+          "bytes": 2828648,
+          "mime": "text/plain",
+          "final_origin": "a.cestamoi9.space",
+          "seconds": 0.406
+        },
+        {
+          "stage": "segment",
+          "origin": "a.cestamoi9.space",
+          "status": 200,
+          "bytes": 3145428,
+          "mime": "text/plain",
+          "final_origin": "a.cestamoi9.space",
+          "seconds": 0.328
+        },
+        {
+          "stage": "segment",
+          "origin": "a.cestamoi9.space",
+          "status": 200,
+          "bytes": 3836892,
+          "mime": "text/plain",
+          "final_origin": "a.cestamoi9.space",
+          "seconds": 0.406
+        },
+        {
+          "stage": "variant-playlist",
+          "origin": "pl.playlist3.space",
+          "status": 200,
+          "bytes": 349,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pl.playlist3.space",
+          "seconds": 0.234
+        },
+        {
+          "stage": "segment",
+          "origin": "a.cestamoi9.space",
+          "status": 200,
+          "bytes": 2121768,
+          "mime": "text/plain",
+          "final_origin": "a.cestamoi9.space",
+          "seconds": 0.281
+        },
+        {
+          "stage": "segment",
+          "origin": "a.cestamoi9.space",
+          "status": 200,
+          "bytes": 2142072,
+          "mime": "text/plain",
+          "final_origin": "a.cestamoi9.space",
+          "seconds": 0.344
+        },
+        {
+          "stage": "variant-playlist",
+          "origin": "pl.playlist3.space",
+          "status": 200,
+          "bytes": 349,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pl.playlist3.space",
+          "seconds": 0.266
+        },
+        {
+          "stage": "segment",
+          "origin": "a.cestamoi9.space",
+          "status": 200,
+          "bytes": 2350000,
+          "mime": "text/plain",
+          "final_origin": "a.cestamoi9.space",
+          "seconds": 0.437
+        },
+        {
+          "stage": "variant-playlist",
+          "origin": "pl.playlist3.space",
+          "status": 200,
+          "bytes": 349,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pl.playlist3.space",
+          "seconds": 0.266
+        },
+        {
+          "stage": "variant-playlist",
+          "origin": "pl.playlist3.space",
+          "status": 200,
+          "bytes": 349,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pl.playlist3.space",
+          "seconds": 0.078
+        },
+        {
+          "stage": "variant-playlist",
+          "origin": "pl.playlist3.space",
+          "status": 200,
+          "bytes": 349,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pl.playlist3.space",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "a.cestamoi9.space",
+          "status": 200,
+          "bytes": 2534052,
+          "mime": "text/plain",
+          "final_origin": "a.cestamoi9.space",
+          "seconds": 0.547
+        },
+        {
+          "stage": "variant-playlist",
+          "origin": "pl.playlist3.space",
+          "status": 200,
+          "bytes": 349,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pl.playlist3.space",
+          "seconds": 0.281
+        },
+        {
+          "stage": "segment",
+          "origin": "a.cestamoi9.space",
+          "status": 200,
+          "bytes": 2236260,
+          "mime": "text/plain",
+          "final_origin": "a.cestamoi9.space",
+          "seconds": 0.328
+        },
+        {
+          "stage": "segment",
+          "origin": "a.cestamoi9.space",
+          "status": 200,
+          "bytes": 2244344,
+          "mime": "text/plain",
+          "final_origin": "a.cestamoi9.space",
+          "seconds": 0.391
+        },
+        {
+          "stage": "variant-playlist",
+          "origin": "pl.playlist3.space",
+          "status": 200,
+          "bytes": 349,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pl.playlist3.space",
+          "seconds": 0.328
+        },
+        {
+          "stage": "segment",
+          "origin": "a.cestamoi9.space",
+          "status": 404,
+          "seconds": 0.172
+        }
+      ],
+      "event": {
+        "name": "NBA",
+        "id_sha256": "cbc76872df5b20e38c520dc52272874ad8774635235832881239b68ec2ac53d3",
+        "type": "tv",
+        "catalog": "stremverse_live_events"
+      }
+    },
+    "pengu_plorax_short": {
+      "provider": "pengu",
+      "index": 1,
+      "checked_utc": "2026-10-31T01:48:46.107244+00:00",
+      "sample": {
+        "requested_seconds": 0,
+        "polls": 1,
+        "unique_segments": 3,
+        "segment_bytes": 10787064,
+        "sequences": [
+          1674
+        ],
+        "frames": {
+          "video": 1080,
+          "audio": 423
+        },
+        "decode_failures": 0,
+        "tracks": [
+          {
+            "type": "video",
+            "codec": "h264",
+            "width": 1920,
+            "height": 1080,
+            "language": null
+          },
+          {
+            "type": "audio",
+            "codec": "aac",
+            "width": null,
+            "height": null,
+            "language": "eng"
+          }
+        ],
+        "media_url_sha256": "107368285015a3f1b98d3fd909162cfded1b4dcaa2ddf7faca8240f9e0816100",
+        "header_names": [],
+        "event_content_verified": false,
+        "live_playlist": true,
+        "decoder": "PyAV 19.0.2",
+        "pts": {
+          "video": [
+            5128.572,
+            5146.574
+          ],
+          "audio": [
+            5128.528,
+            5146.532666666667
+          ]
+        },
+        "elapsed_seconds": 3.73,
+        "playlist_advanced": false
+      },
+      "requests": [
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.453
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3793840,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3299776,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.235
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3693448,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.265
+        }
+      ]
+    },
+    "pengu_ppv_empty": {
+      "provider": "pengu",
+      "index": 5,
+      "checked_utc": "2026-10-31T01:48:49.723337+00:00",
+      "sample": {
+        "requested_seconds": 0,
+        "polls": 1,
+        "unique_segments": 0,
+        "segment_bytes": 0,
+        "sequences": [
+          23408
+        ],
+        "frames": {},
+        "decode_failures": 0,
+        "tracks": [],
+        "media_url_sha256": "6520dac722f145d98598626b412cb121bda37ea1ff6991184592c19e274c1a3e",
+        "header_names": [],
+        "event_content_verified": false,
+        "variant_url_sha256": "d56d559dd0b050cae98d7f9889d728d58154395bd440cad679ded7841331f02e",
+        "live_playlist": true,
+        "elapsed_seconds": 5.78,
+        "playlist_advanced": false
+      },
+      "requests": [
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 958,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.75
+        },
+        {
+          "stage": "variant-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 140,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 5.031
+        }
+      ],
+      "note": "This older short result predates explicit NoMediaSegments classification. It fetched zero segments and is NOT playback proof."
+    },
+    "pengu_ak47_encrypted_not_tested": {
+      "provider": "pengu",
+      "index": 6,
+      "checked_utc": "2026-10-31T01:48:46.557244+00:00",
+      "sample": {
+        "requested_seconds": 0,
+        "polls": 0,
+        "unique_segments": 0,
+        "segment_bytes": 0,
+        "sequences": [],
+        "frames": {},
+        "decode_failures": 0,
+        "tracks": [],
+        "media_url_sha256": "289080e185e026a9c890bc9cdc595aa3e06e7fc9372a06041c7600895117e724",
+        "header_names": [],
+        "event_content_verified": false,
+        "failure": {
+          "stage": "playlist-policy",
+          "error": "EncryptedPlaylistNotTested"
+        },
+        "elapsed_seconds": 0.44,
+        "playlist_advanced": false
+      },
+      "requests": [
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 1692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.219
+        },
+        {
+          "stage": "variant-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 3085,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.219
+        }
+      ]
+    },
+    "nuvio_ppv_fragmented_not_tested": {
+      "provider": "nuvio",
+      "index": 6,
+      "checked_utc": "2026-10-31T01:48:48.183740+00:00",
+      "sample": {
+        "requested_seconds": 0,
+        "polls": 0,
+        "unique_segments": 0,
+        "segment_bytes": 0,
+        "sequences": [],
+        "frames": {},
+        "decode_failures": 0,
+        "tracks": [],
+        "media_url_sha256": "3fc3ee2d50d6ec14fc546cf070f90a705228a1e21b8b063b0c4e674407212180",
+        "header_names": [],
+        "event_content_verified": false,
+        "failure": {
+          "stage": "playlist-policy",
+          "error": "FragmentedOrByteRangeNotTested"
+        },
+        "elapsed_seconds": 1.59,
+        "playlist_advanced": false
+      },
+      "requests": [
+        {
+          "stage": "entry-playlist",
+          "origin": "nuviosports.xyz",
+          "status": 200,
+          "bytes": 466,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "nuviosports.xyz",
+          "seconds": 0.297
+        },
+        {
+          "stage": "variant-playlist",
+          "origin": "nuviosports.xyz",
+          "status": 200,
+          "bytes": 1398,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "nuviosports.xyz",
+          "seconds": 1.297
+        }
+      ]
+    },
+    "pengu_sustained": {
+      "checked_utc": "2026-10-31T01:52:45.991367+00:00",
+      "scope": "PC requests/decoding; not physical Roku or audible language",
+      "default_request_client": "CrimsonCinema-Research/0.6 (+https://github.com/kaiuribess/rokumio-4k-personal; PC compatibility test)",
+      "provider_origin": "pengu.uk",
+      "rounds": [
+        {
+          "round": 1,
+          "source_count": 10,
+          "source_index": 1,
+          "sample": {
+            "requested_seconds": 120,
+            "polls": 25,
+            "unique_segments": 27,
+            "segment_bytes": 127636208,
+            "sequences": [
+              1716,
+              1718,
+              1718,
+              1720,
+              1720,
+              1721,
+              1721,
+              1722,
+              1723,
+              1724,
+              1725,
+              1726,
+              1726,
+              1727,
+              1728,
+              1729,
+              1730,
+              1731,
+              1731,
+              1732,
+              1733,
+              1734,
+              1734,
+              1735,
+              1737
+            ],
+            "frames": {
+              "video": 9661,
+              "audio": 3801
+            },
+            "decode_failures": 0,
+            "tracks": [
+              {
+                "type": "video",
+                "codec": "h264",
+                "width": 1920,
+                "height": 1080,
+                "language": null
+              },
+              {
+                "type": "audio",
+                "codec": "aac",
+                "width": null,
+                "height": null,
+                "language": "eng"
+              }
+            ],
+            "media_url_sha256": "8dcb2b12c33a6d18a4c7be47393ec2c1a1d192f97752e9e7e1b26ea17671c877",
+            "header_names": [],
+            "event_content_verified": false,
+            "live_playlist": true,
+            "decoder": "PyAV 19.0.2",
+            "pts": {
+              "video": [
+                5362.806,
+                5524.952
+              ],
+              "audio": [
+                5362.768,
+                5524.901333333333
+              ]
+            },
+            "elapsed_seconds": 123.22,
+            "playlist_advanced": true,
+            "maximum_consecutive_equal_sequences": 2
+          }
+        },
+        {
+          "round": 2,
+          "source_count": 10,
+          "source_index": 1,
+          "sample": {
+            "requested_seconds": 120,
+            "polls": 25,
+            "unique_segments": 28,
+            "segment_bytes": 135205464,
+            "sequences": [
+              1738,
+              1739,
+              1741,
+              1743,
+              1743,
+              1743,
+              1743,
+              1743,
+              1743,
+              1743,
+              1743,
+              1744,
+              1747,
+              1750,
+              1752,
+              1753,
+              1754,
+              1755,
+              1755,
+              1756,
+              1756,
+              1756,
+              1757,
+              1759,
+              1759
+            ],
+            "frames": {
+              "video": 10080,
+              "audio": 3942
+            },
+            "decode_failures": 0,
+            "tracks": [
+              {
+                "type": "video",
+                "codec": "h264",
+                "width": 1920,
+                "height": 1080,
+                "language": null
+              },
+              {
+                "type": "audio",
+                "codec": "aac",
+                "width": null,
+                "height": null,
+                "language": "eng"
+              }
+            ],
+            "media_url_sha256": "bb2e6b98286ef7e0ec0ebd540fa5fcb52d6dfcff803227101fbc7663b42d710d",
+            "header_names": [],
+            "event_content_verified": false,
+            "live_playlist": true,
+            "decoder": "PyAV 19.0.2",
+            "pts": {
+              "video": [
+                5488.932,
+                5653.08
+              ],
+              "audio": [
+                5488.89,
+                5653.029333333333
+              ]
+            },
+            "elapsed_seconds": 120.19,
+            "playlist_advanced": true,
+            "maximum_consecutive_equal_sequences": 8
+          }
+        }
+      ],
+      "requests": [
+        {
+          "stage": "manifest",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 7026,
+          "mime": "application/json",
+          "final_origin": "pengu.uk",
+          "seconds": 0.266
+        },
+        {
+          "stage": "catalog",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 32509,
+          "mime": "application/json",
+          "final_origin": "pengu.uk",
+          "seconds": 0.172
+        },
+        {
+          "stage": "addon-stream",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 7137,
+          "mime": "application/json",
+          "final_origin": "pengu.uk",
+          "seconds": 3.859
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.219
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4615024,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.219
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3260484,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.265
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3179644,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.219
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.172
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4837616,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4806220,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.219
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3609412,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.203
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 6056420,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.203
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 2311648,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.172
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.203
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 6120152,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5672712,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.391
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.188
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.281
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4082420,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.641
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.485
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.968
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5246704,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.219
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.203
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5609920,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.234
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.391
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5871240,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.578
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.422
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5335816,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.453
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 1.719
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5356308,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.203
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.219
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.422
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5228844,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.234
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.296
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4468760,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.235
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.469
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4351448,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.516
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.297
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5222452,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.516
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.171
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5678916,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.547
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.235
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.375
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5605784,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.625
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.422
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5463656,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.422
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.359
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3265560,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.312
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.156
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.188
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3954392,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.312
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.5
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3895736,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.375
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4528920,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.438
+        },
+        {
+          "stage": "addon-stream",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 7133,
+          "mime": "application/json",
+          "final_origin": "pengu.uk",
+          "seconds": 4.344
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.187
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3895736,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.297
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4528920,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.266
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3293760,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.344
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5605784,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.359
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5463656,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.219
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3265560,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.265
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3954392,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.203
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4233008,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.219
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.375
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5720088,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.25
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5626464,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.343
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.141
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5646768,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.672
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5571568,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.609
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.188
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.187
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.172
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 1.5
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.172
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.25
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.219
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.172
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5507648,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.265
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.188
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5345780,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.265
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3856820,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.328
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5688880,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.344
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.156
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5720276,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.266
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5481328,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.313
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5148004,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.359
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.516
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5292388,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.344
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5097808,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.343
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.187
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4609384,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.328
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.36
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3038080,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.375
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 1.141
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5144996,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.594
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.172
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.203
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 3755300,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.328
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.156
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.266
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.141
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4744556,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.281
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.219
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 5385260,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.266
+        },
+        {
+          "stage": "segment",
+          "origin": "east.papacito.cfd",
+          "status": 200,
+          "bytes": 4583252,
+          "mime": "video/mp2t",
+          "final_origin": "east.papacito.cfd",
+          "seconds": 0.312
+        },
+        {
+          "stage": "entry-playlist",
+          "origin": "pengu.uk",
+          "status": 200,
+          "bytes": 692,
+          "mime": "application/vnd.apple.mpegurl",
+          "final_origin": "pengu.uk",
+          "seconds": 0.187
+        }
+      ],
+      "event": {
+        "name": "\ud83d\udd34 LIVE: Boston Celtics - Chicago Bulls",
+        "id_sha256": "9764d98864b7b0e7860e26733cbce6df10baa3da777baa06da1e7d6398975008",
+        "type": "tv",
+        "catalog": "pp-live-basketball"
+      }
+    }
+  },
+  "channel_searches": {
+    "checked_utc": "2026-10-31T01:51:28.072659+00:00",
+    "results": [
+      {
+        "provider": "pengu",
+        "catalog": "pp-live-channels",
+        "checks": [
+          {
+            "term": "multiview",
+            "count": 0,
+            "names": []
+          },
+          {
+            "term": "RedZone",
+            "count": 0,
+            "names": []
+          },
+          {
+            "term": "NBA",
+            "count": 0,
+            "names": []
+          }
+        ],
+        "requests": [
+          {
+            "stage": "catalog-search",
+            "origin": "pengu.uk",
+            "status": 200,
+            "bytes": 12,
+            "mime": "application/json",
+            "final_origin": "pengu.uk",
+            "seconds": 0.704
+          },
+          {
+            "stage": "catalog-search",
+            "origin": "pengu.uk",
+            "status": 200,
+            "bytes": 12,
+            "mime": "application/json",
+            "final_origin": "pengu.uk",
+            "seconds": 0.187
+          },
+          {
+            "stage": "catalog-search",
+            "origin": "pengu.uk",
+            "status": 200,
+            "bytes": 12,
+            "mime": "application/json",
+            "final_origin": "pengu.uk",
+            "seconds": 0.172
+          }
+        ]
+      },
+      {
+        "provider": "nuvio",
+        "catalog": "nuvio_sports_networks",
+        "checks": [
+          {
+            "term": "multiview",
+            "count": 0,
+            "names": []
+          },
+          {
+            "term": "RedZone",
+            "count": 1,
+            "names": [
+              "\ud83d\udcfa NFL RedZone"
+            ]
+          },
+          {
+            "term": "NBA",
+            "count": 9,
+            "names": [
+              "\ud83d\udcfa NBA TV",
+              "\ud83d\udcfa Locked On NBA",
+              "\ud83d\udcfa NBA Fast Channel",
+              "\ud83d\udcfa NBA G League",
+              "\ud83d\udcfa beIN Sports NBA",
+              "\ud83d\udcfa Al Anbar",
+              "\ud83d\udcfa Of TV Offenbach",
+              "\ud83d\udcfa Sky Sports NBA",
+              "\ud83d\udcfa Sport TV NBA"
+            ]
+          }
+        ],
+        "requests": [
+          {
+            "stage": "catalog-search",
+            "origin": "nuviosports.xyz",
+            "status": 200,
+            "bytes": 68,
+            "mime": "application/json",
+            "final_origin": "nuviosports.xyz",
+            "seconds": 0.703
+          },
+          {
+            "stage": "catalog-search",
+            "origin": "nuviosports.xyz",
+            "status": 200,
+            "bytes": 859,
+            "mime": "application/json",
+            "final_origin": "nuviosports.xyz",
+            "seconds": 0.578
+          },
+          {
+            "stage": "catalog-search",
+            "origin": "nuviosports.xyz",
+            "status": 200,
+            "bytes": 7356,
+            "mime": "application/json",
+            "final_origin": "nuviosports.xyz",
+            "seconds": 0.36
+          }
+        ]
+      }
+    ]
+  },
+  "visual_observations": [
+    {
+      "provider": "Highfly Leaf / NBC Sports Boston",
+      "capture_utc": "2026-10-31T01:51:44+00:00",
+      "frame_sha256": "3b14accbfa5e11e00de5f256b63013fd6215f90d322b65ab9fd9ae656bcc56dc",
+      "observed": "Single Celtics vs Bulls game; NBC Sports Boston overlay; CHI 92 BOS 111; fourth quarter 5:29. Two preceding checks showed commercials. Not multiview."
+    },
+    {
+      "provider": "StremVerse SV6 / SportzX",
+      "capture_utc_approx": "2026-10-31T01:50:00+00:00",
+      "frame_sha256": "14a6f1a533ab5425d76f579876b36123c6d220e0eb6b4c13950b390476aa8dca",
+      "observed": "Single Celtics vs Bulls game; TSN/CHSN overlays; CHI 92 BOS 111; fourth quarter 5:40. Not a holding card."
+    },
+    {
+      "provider": "PenguPlay Plorax",
+      "capture_utc": "2026-10-31T01:57:27+00:00",
+      "frame_sha256": "5e86651679109ad81ac142661dea4a5b9506e02e015221e18d8c5c68d8947e6e",
+      "observed": "NBC Sports Boston overlay and upcoming Celtics at Magic Sunday promo. NBA broadcast footage; this frame alone does not verify current Celtics/Bulls match or multiview."
+    }
+  ],
+  "independence": {
+    "highfly_vs_stremverse": "Different observed delivery gateways: papacito.cfd/east.papacito.cfd versus chatgpt.hereisman.net and its variant CDN. Same game visually confirmed. Ownership, hidden origins and long-term independence unverified.",
+    "pengu_vs_highfly": "Pengu Plorax segments also use east.papacito.cfd; not an independent CDN backup."
+  }
+}

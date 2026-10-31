@@ -1,5 +1,22 @@
 # Changes
 
+## 0.6.0 — feature preview, not released
+
+- Add Replay on live Sources to browse another installed sports provider, retaining the event name for manual comparison. Keep native IDs, source pools and recovery isolated; reuse the existing navigation stack and preserve movie controls.
+- Include provider-declared `sports` catalogs alongside TV/channel catalogs. Exercise custom type registration, catalog selection, native stream lookup and direct resolution in production-boundary tests.
+- Add a bounded, private-profile reliability probe with fresh same-event resolution, request-stage failures and optional PC decode measurements. Record repeated StremVerse playlist 403, shared upstreams, a decodable holding card and failed Nebula media plus separate sustained 720p NHL checks through StremVerse and CNCVerse. Disclose the shared gateway rather than claim independent delivery. Correct Highfly status to require legitimate configured-manifest testing.
+- Make installed provider catalogs the Sports entry point. Preserve original event IDs, media types and private configuration; pin live fallback to the selected provider/event instead of assuming ESPN IDs are understood.
+- Add explicit live playback with near-edge start, no movie resume/next episode and a visible English/unlabelled-audio choice. Keep unknown language distinct from English verification and preserve decoder/progress/receiver checks.
+- Refresh live source lists after 30 seconds at interactive handoff boundaries; retain bounded recovery and Back cancellation. Explain browser-only results; preserve query URLs and per-item headers; recognize bounded extensionless HLS/DASH responses.
+- Verify real free StremVerse playlists/segments and PC H.264/AAC decoding (288p and 1080p). Record failed/403 sources and lack of Roku, audible-language, sustained-reliability or rights sign-off. No service, proxy or provider is silently installed.
+
+- Add Sports navigation, 13 league schedules, date/status filters and installed TV/sports catalog shortcuts. Distinguish schedule-only, upcoming and provider-backed entries; never infer video from a listing.
+- Fetch schedules directly on Roku with one retained worker, a 10-second request budget, 1 MiB response ceiling, bounded rows/fields and stale/duplicate callback protection.
+- Add a dependency-free standalone sports add-on publisher for operator-authorized public HLS/DASH feeds. Reuse existing native source ranking, audio preferences and bounded recovery; no accounts, media proxy, default streams or paid hosting required.
+- Reject expired feed sources during discovery and resolution. Preserve expiry through candidate budgeting.
+- Add paused-Down manual next episode with accepted-progress saving, fresh sources, one-use navigation authorization and cancellation guards. Preserve automatic-next preference and existing remote controls.
+- Add production-boundary regression tests, actual local HTTP protocol tests and reproducible public provider probes. Document unresolved broadcast rights/delivery and physical Roku validation rather than claim universal sports coverage.
+
 ## 0.5.29 — 2026-10-17
 
 Fair catalog previews and correct smaller-page browsing. Experimental prerelease; catalog availability is separate from stream delivery.

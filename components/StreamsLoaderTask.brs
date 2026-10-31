@@ -37,6 +37,7 @@ sub load()
             streams: streams
             readyStreams: ready
             uhdCount: CinemaFilterReadyStreams(ready,true).Count()
+            sourceDiagnostics: CinemaSkippedSources(streams)
             error: error
             providerIndex: m.top.providerIndex
             providerName: m.top.providerName

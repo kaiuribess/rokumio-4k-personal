@@ -117,6 +117,7 @@ function AddonDiagnostics_ProviderLabel(provider as object, pending as dynamic, 
     end if
     if rawCount = 0 then return "No sources returned for this title · This alone does not mean the add-on is broken"
     if visibleCount = 0 and Type(skipped) = "roAssociativeArray"
+        if skipped.browserOnly <> invalid and skipped.browserOnly > 0 then return "Browser-only links returned · No native Roku source available"
         if skipped.status > 0 then return "Provider reports an account / service problem · Check your private configuration"
         if skipped.uncached > 0 then return "Provider returned downloads still pending · Choose a cached source"
         if skipped.downloadOnly <> invalid and skipped.downloadOnly > 0 then return "Download-only / 10Gbps links skipped · Playback and seeking are not supported"

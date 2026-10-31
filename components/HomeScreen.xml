@@ -69,8 +69,8 @@
         <Poster uri="pkg:/images/crimson-mark.png" translation="[100, 76]" width="90" height="90" />
         <RowList
             id="rail"
-            translation="[80, 300]"
-            numRows="6"
+            translation="[80, 240]"
+            numRows="7"
             itemSize="[140, 100]"
             itemSpacing="[0, 12]"
             rowItemSize="[[140, 100]]"

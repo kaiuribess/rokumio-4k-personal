@@ -669,5 +669,23 @@ sub Main()
     m.providers[0].sourceDiagnostics={rawCount:1,status:0,uncached:1}
     RenderActiveProvider()
     Harness_Ok(m.streamsPlaceholder.text.InStr("uncached downloads")>=0,"warm uncached response has a readable full-screen explanation")
+    Harness_Suite("Manual live backup navigation without source identity leakage")
+    TestPaginationSetup(0)
+    m.params.livePlayback=true:m.params.allowUnknownLiveAudio=true:m.params.name="Home vs Away"
+    m.params.addonAddress="https://primary.example/private/fixture"
+    m.params.videoId="primary-opaque-id"
+    m.autoPlayEnabled=true
+    m.activeIndex=-1:m.providers=[]
+    Harness_Ok(onKeyEvent("replay",true),"Replay opens backup browsing even when provider has no sources")
+    Harness_Equal(m.top.pushRequest.screen,"sportsScreen","manual backup goes to provider catalogs, not another stream endpoint")
+    Harness_Equal(m.top.pushRequest.params.previousEventName,"Home vs Away","name retained only for human comparison")
+    Harness_Equal(m.top.pushRequest.params.videoId,invalid,"primary opaque event ID never crosses provider boundary")
+    Harness_Equal(m.top.pushRequest.params.stream,invalid,"primary media URL/pool never crosses provider boundary")
+    Harness_Ok(m.sourcesSuspended and not m.autoPlayEnabled,"late automatic selection cannot interrupt manual provider browsing")
+    m.top.pushRequest=invalid:m.top.screenActive=false
+    Harness_Ok(not onKeyEvent("replay",true),"hidden source screen cannot trigger backup navigation")
+    Harness_Equal(m.top.pushRequest,invalid,"hidden callback leaves playback untouched")
+    m.top.screenActive=true:m.params.livePlayback=false
+    Harness_Ok(not onKeyEvent("replay",true),"movie Replay behavior remains unchanged")
     Harness_Finish()
 end sub

@@ -112,8 +112,8 @@ sub resolve()
         if resolved.ok and resolved.mode = "direct"
             try
                 resolved.media = NativeMedia_Read(resolved,m.top.id)
-                if resolved.streamFormat = "" and resolved.media.streamFormat = "mkv"
-                    resolved.streamFormat = "mkv"
+                if resolved.streamFormat = "" and (resolved.media.streamFormat = "mkv" or resolved.media.streamFormat = "hls" or resolved.media.streamFormat = "dash")
+                    resolved.streamFormat = resolved.media.streamFormat
                 end if
             catch inspectError
                 ' Optional header evidence must never erase an otherwise valid

@@ -39,14 +39,26 @@ function NativeMedia_Read(resolved as object, workerId as string) as object
                 if Type(event) = "roUrlEvent"
                     unknown.reason = "header-response"
                     print "[inspect] header HTTP "; event.GetResponseCode()
-                    if event.GetResponseCode() = 206
+                    if event.GetResponseCode() = 206 or event.GetResponseCode() = 200
                         headers = event.GetResponseHeaders()
+                        playlistMime = false
+                        if Type(headers) = "roAssociativeArray"
+                            for each name in headers
+                                if LCase(name) = "content-type" and GetInterface(headers[name],"ifString") <> invalid
+                                    mime = LCase(headers[name]).Split(";")[0].Trim()
+                                    playlistMime = mime = "application/vnd.apple.mpegurl" or mime = "application/x-mpegurl" or mime = "audio/mpegurl" or mime = "application/dash+xml"
+                                end if
+                            end for
+                        end if
                         stat = fs.Stat(path)
                         if NativeMedia_HasSize(stat)
-                            if NativeMedia_ValidHeaderRange(headers,stat.size)
+                            if (event.GetResponseCode() = 206 and NativeMedia_ValidHeaderRange(headers,stat.size)) or (event.GetResponseCode() = 200 and playlistMime and stat.size > 0 and stat.size <= 262144)
                                 declaredFileBytes = NativeMedia_DeclaredFileBytes(headers)
                                 data = CreateObject("roByteArray")
                                 if not data.ReadFile(path) then data = invalid
+                                if event.GetResponseCode() = 200 and data <> invalid
+                                    if NativeMedia_PlaylistFormat(data) = "" then data = invalid
+                                end if
                             end if
                         end if
                     end if
@@ -71,6 +83,8 @@ function NativeMedia_Read(resolved as object, workerId as string) as object
     ' insufficient. Require an in-bounds EBML header followed by a Segment.
     ' Tracks may legitimately sit beyond our read budget; container evidence
     ' still lets the native MKV decoder perform its own audio verification.
+    playlistFormat = NativeMedia_PlaylistFormat(data)
+    if playlistFormat <> "" then return {complete:false,tracks:[],streamFormat:playlistFormat,reason:"playlist-signature"}
     if NativeMedia_HeaderFormat(data) <> "mkv"
         unknown.reason = "unrecognized-header"
         return unknown
@@ -84,9 +98,22 @@ function NativeMedia_Read(resolved as object, workerId as string) as object
     return parsed
 end function
 
-' Called only after ValidHeaderRange checks the received prefix length and
-' total >= body length. This helper extracts optional size, never authorizes
-' parsing a response body or enlarges the existing acquisition budget.
+' Some add-ons return extensionless media URLs. Recognize bounded playlist
+' bytes, never a MIME/header/HTML claim alone. HTTP 200 is acceptable only for
+' a small playlist, not for an unbounded server ignoring a movie range request.
+function NativeMedia_PlaylistFormat(data as dynamic) as string
+    if data = invalid or data.Count() < 8 or data.Count() > 262144 then return ""
+    text = data.ToAsciiString().Trim()
+    if Left(text,7) = "#EXTM3U"
+        if text.InStr("#EXT-X-STREAM-INF:") >= 0 or text.InStr("#EXTINF:") >= 0 then return "hls"
+    end if
+    root = CreateObject("roRegex","^(<\?xml[^>]*\?>[\r\n ]*)?<MPD([ >]|[\r\n])","")
+    if root.IsMatch(text) and text.InStr("</MPD>") >= 0 then return "dash"
+    return ""
+end function
+
+' Called only after the response/range checks above. This helper extracts
+' optional size, never authorizes parsing or enlarges the acquisition budget.
 function NativeMedia_DeclaredFileBytes(headers as dynamic) as dynamic
     if Type(headers) <> "roAssociativeArray" then return invalid
     total = invalid

@@ -658,6 +658,7 @@ sub BuildRail()
     entries = [
         { glyph: "pkg:/images/search.png", label: "Search", screen: "searchScreen" }
         { glyph: "pkg:/images/discover.png", label: "Browse", screen: "discoverScreen" }
+        { glyph: "pkg:/images/discover.png", label: "Sports", screen: "sportsScreen" }
         { glyph: "pkg:/images/library.png", label: "My list", screen: "libraryScreen" }
         { glyph: "pkg:/images/puzzle.png", label: "Add-ons", screen: "addonsScreen" }
         { glyph: "pkg:/images/settings.png", label: "Settings", screen: "settingsScreen" }

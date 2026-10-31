@@ -68,6 +68,8 @@ sub init()
     m.searchScreen.ObserveField("pushRequest", "onSearchAction")
     m.discoverScreen = m.top.FindNode("discoverScreen")
     m.discoverScreen.ObserveField("pushRequest", "onDiscoverAction")
+    m.sportsScreen = m.top.FindNode("sportsScreen")
+    m.sportsScreen.ObserveField("pushRequest", "onSportsAction")
     m.libraryScreen = m.top.FindNode("libraryScreen")
     m.libraryScreen.ObserveField("pushRequest", "onLibraryAction")
     m.uiRoot = m.top.FindNode("uiRoot")
@@ -206,6 +208,7 @@ sub init()
     m.aboutScreen.callFunc("SetStores", m.storeHost, m.top)
     m.searchScreen.callFunc("SetStores", m.storeHost, m.top)
     m.discoverScreen.callFunc("SetStores", m.storeHost, m.top)
+    m.sportsScreen.callFunc("SetStores", m.storeHost, m.top)
     m.libraryScreen.callFunc("SetStores", m.storeHost, m.top)
     m.playerScreen.callFunc("SetStores", m.storeHost, m.top)
 end sub
@@ -310,6 +313,7 @@ end sub
 
 ' DiscoverScreen's action channel; same one-action routing.
 sub onDiscoverAction()
+    if m.discoverScreen.screenActive <> true then return
     request = m.discoverScreen.pushRequest
     if request = invalid or request.screen = invalid then return
     m.stack.push(request.screen, request.params)
@@ -347,8 +351,22 @@ end sub
 
 ' StreamsScreen's action channel; same one-action routing as every other screen.
 sub onStreamsAction()
+    if m.streamsScreen.screenActive <> true then return
     request = m.streamsScreen.pushRequest
     if request = invalid or request.screen = invalid then return
+    if request.screen = "sportsScreen"
+        if Type(request.params) <> "roAssociativeArray" or request.params.backupMode <> true then return
+        shown = m.stack.top()
+        if shown = invalid or shown.id <> "streamsScreen" then return
+        ' Reuse the original Sports screen instead of duplicating static nodes
+        ' each time a viewer tries a different provider.
+        if m.stack.has("sportsScreen")
+            if m.stack.popTo("sportsScreen") then m.sportsScreen.callFunc("OnEnter",request.params)
+        else
+            m.stack.push("sportsScreen",request.params)
+        end if
+        return
+    end if
     m.stack.push(request.screen, request.params)
 end sub
 
@@ -368,6 +386,14 @@ sub onNextEpisodeRequest()
     else
         m.stack.push("streamsScreen", request.params)
     end if
+end sub
+
+sub onSportsAction()
+    if m.sportsScreen.screenActive <> true then return
+    request = m.sportsScreen.pushRequest
+    if Type(request) <> "roAssociativeArray" then return
+    if request.screen <> "streamsScreen" and request.screen <> "discoverScreen" and request.screen <> "addonsScreen" then return
+    m.stack.push(request.screen,request.params)
 end sub
 
 ' The player published a position update (pause or leave) through
