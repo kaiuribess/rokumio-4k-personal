@@ -392,7 +392,7 @@ sub onSportsAction()
     if m.sportsScreen.screenActive <> true then return
     request = m.sportsScreen.pushRequest
     if Type(request) <> "roAssociativeArray" then return
-    if request.screen <> "streamsScreen" and request.screen <> "discoverScreen" and request.screen <> "addonsScreen" then return
+    if request.screen <> "streamsScreen" and request.screen <> "discoverScreen" and request.screen <> "addonsScreen" and request.screen <> "detailsScreen" then return
     m.stack.push(request.screen,request.params)
 end sub
 

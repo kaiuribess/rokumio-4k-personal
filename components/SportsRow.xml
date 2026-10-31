@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="SportsRow" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" />
+        <field id="itemHasFocus" type="boolean" />
+        <field id="rowHasFocus" type="boolean" />
+    </interface>
+    <!-- Reuse the existing content/focus behavior with a sports-specific
+         stacked title/subtitle layout instead of the narrow settings value. -->
+    <script type="text/brightscript" uri="pkg:/components/PrefRow.brs" />
+    <script type="text/brightscript" uri="pkg:/source/core/Theme.bs" />
+    <children>
+        <Rectangle id="rowFace" width="992" height="88" translation="[4, 4]" />
+        <Label id="rowTitle" width="944" height="40" translation="[24, 8]"
+               horizAlign="left" vertAlign="center" font="font:MediumBoldSystemFont" />
+        <Label id="rowValue" width="944" height="28" translation="[24, 52]"
+               horizAlign="left" vertAlign="center" font="font:SmallSystemFont" />
+    </children>
+</component>

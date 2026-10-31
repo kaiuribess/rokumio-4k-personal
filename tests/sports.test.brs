@@ -18,7 +18,7 @@ end function
 function AsyncTask_Launch(owner as object,kind as string,callback as string,params as object,id as string,done as string) as object
     if m.failLaunch = true then broken=invalid:broken.launch()
     m.launches++
-    return {id:id,league:params.league,day:params.day,callback:callback,done:done,finished:false}
+    return {id:id,league:params.league,day:params.day,entry:params.entry,offset:params.offset,callback:callback,done:done,finished:false}
 end function
 sub AsyncTask_Reap(task as object,owner as object,doStop as boolean)
     m.reaps++
@@ -30,12 +30,16 @@ function SportsBody(state="in" as string) as object
     return {events:[{id:"123",name:"Example game",date:"2026-10-29T19:00Z",status:{type:{state:state,shortDetail:"Second half"}},competitions:[{competitors:[{team:{abbreviation:"A"},score:"3"},{team:{abbreviation:"B"},score:"2"}]}]}]}
 end function
 sub SportsReset()
+    SportsBrowserInit():m.catalogView="providers":m.browseProviders=false:m.livePlayback=true
     m.leagues = Sports_Leagues():m.leagueIndex=0:m.dayIndex=0:m.stateIndex=0
     m.days=[{raw:"20261029",label:"Today"},{raw:"20261030",label:"Tomorrow"}]
     m.states=[{raw:"",label:"All"},{raw:"in",label:"Live"},{raw:"pre",label:"Upcoming"},{raw:"post",label:"Completed"}]
     m.events=[]:m.rows=[]:m.catalogs=[]:m.task=invalid:m.sequence=0:m.desired="":m.applied="":m.loaded="":m.loadClock=invalid
     m.launches=0:m.reaps=0:m.failLaunch=false:m.top={screenActive:true}
-    m.status={text:""}:m.name={text:""}:m.detail={text:""}:m.list={rowItemFocused:[0,0],rowItemSelected:[0,0]}
+    m.status={text:""}:m.name={text:""}:m.detail={text:""}:m.list={rowItemFocused:[0,0],rowItemSelected:[0,0],callFunc:function(name as string,a=invalid as dynamic) as dynamic
+        if name="FocusRow" then m.rowItemFocused=[a,0]
+        return invalid
+    end function}
     m.filters={open:false,chipActivated:0,callFunc:function(name as string,a=invalid as dynamic,b=invalid as dynamic) as dynamic
         if name="IsMenuOpen" then return m.open
         if name="HideMenu" then m.open=false
@@ -126,6 +130,8 @@ Harness_Ok(answer.persisted,"provider registration has durable acknowledgement")
 SportsCatalogs()
 Harness_Equal(m.catalogs.Count(),2,"provider catalog appears alongside Manage add-ons")
 m.filters.optionPicked={chip:3,index:1}:onSportsOption()
+Harness_Equal(m.catalogView,"providers","schedule menu opens bounded provider browsing")
+OpenSportsCatalog(1)
 Harness_Equal(m.top.pushRequest.screen,"discoverScreen","catalog opens native Discover")
 Harness_Equal(m.top.pushRequest.params.catalogId,"crimson-sports","correct catalog routed")
 http=ScriptedTransport([{url:"https://sports.example.com/catalog/tv/crimson-sports/skip=0.json",ok:true,status:200,json:files["catalog/tv/crimson-sports/skip=0.json"]}])
@@ -133,7 +139,7 @@ catalog=CatalogStore(http).Catalog("https://sports.example.com","tv","crimson-sp
 Harness_Ok(catalog.ok,"generated skip=0 route serves actual CatalogStore")
 Harness_Equal(catalog.metas.Count(),1,"one authorized feed item")
 Harness_Ok(not catalog.hasMore,"static feed does not request nonexistent pages")
-m.events=Sports_Normalize(SportsBody(),"football/nfl").events:RenderSportsRows()
+m.browseProviders=false:m.events=Sports_Normalize(SportsBody(),"football/nfl").events:RenderSportsRows()
 Harness_Equal(SportsProviderCount(m.rows[0].id),1,"actual SupportsResource matches event ID")
 onSportsSelected()
 Harness_Equal(m.top.pushRequest.screen,"streamsScreen","game opens existing source selection")
@@ -321,7 +327,7 @@ end for
 Harness_Ok(m.addons.InstallFromDescriptor("https://large.example/manifest.json",large).ok,"large current provider is valid")
 Harness_Ok(m.addons.InstallFromDescriptor("https://backup.example/manifest.json",backup).ok,"later backup provider registers normally")
 SportsCatalogs()
-Harness_Equal(m.catalogs.Count(),40,"existing catalog row budget remains bounded")
+Harness_Equal(m.catalogs.Count(),47,"all catalogs retained; pagination replaces the old hidden cutoff")
 Harness_Equal(m.catalogs[1].params.addonAddress,"https://backup.example","large current provider cannot hide the backup before sorting")
 Harness_Ok(m.catalogs[2].label.InStr("Current")=0,"current provider remains distinguishable after priority")
 

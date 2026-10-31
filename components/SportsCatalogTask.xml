@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="SportsCatalogTask" extends="Task">
+    <interface>
+        <field id="entry" type="assocarray" />
+        <field id="offset" type="integer" value="0" />
+        <field id="result" type="assocarray" alwaysNotify="true" />
+        <field id="finished" type="boolean" value="false" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/source/stores/Transport.bs" />
+    <script type="text/brightscript" uri="pkg:/source/stores/CatalogStore.bs" />
+    <script type="text/brightscript" uri="pkg:/source/util/Sports.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/SportsCatalog.brs" />
+    <script type="text/brightscript" uri="pkg:/components/SportsCatalogTask.brs" />
+</component>

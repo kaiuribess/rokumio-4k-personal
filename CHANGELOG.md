@@ -1,5 +1,14 @@
 # Changes
 
+## 0.6.1 — sports catalog cleanup, feature preview
+
+- Replace the default flat provider list with sport categories and shared event browsing: Sports → sport → event → Watch. Keep explicit provider/catalog browsing and manual choices under More sources.
+- Remove the 40-catalog cutoff. Render 48-item catalog/event pages, keep later providers queued, and offer further event batches with a maximum of 240 retained routes.
+- Fetch and normalize one catalog page at a time off the render thread, with a 10-second request budget and the existing 1 MiB transport cap. Preserve ownership until finished, ignore stale/account-switched callbacks, and stop launching work behind playback.
+- Keep every provider's original type, event ID and private configured URL. Combine events only with matching participants, competition, explicit UTC start time and phase; ambiguous listings stay separate. Watch reuses existing automatic source selection within one provider.
+- Add failed-catalog retry, honest empty states, non-paginated catalog slicing, raw-offset pagination and local-slice fallback for providers that ignore skip. Recorded selections retain the existing Details path; movie/series playback and next episode are unchanged.
+- Add production store/task/screen/Scene regression coverage. This package has not been installed or physically tested as part of the catalog change; the earlier 0.6.0 user playback report is separate evidence.
+
 ## 0.6.0 — feature preview, not released
 
 - Add Replay on live Sources to browse another installed sports provider, retaining the event name for manual comparison. Keep native IDs, source pools and recovery isolated; reuse the existing navigation stack and preserve movie controls.

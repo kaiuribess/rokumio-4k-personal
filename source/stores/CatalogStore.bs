@@ -66,7 +66,7 @@ class CatalogStore
     ' Fetch one catalog row: GET {address}/catalog/{type}/{catalogId}/{extra}.json
     ' with the extra segment defaulting to "skip=0". Honor an explicit
     ' hasMore flag; otherwise a full advertised page implies another request.
-    function Catalog(addonAddress as string, metaType as string, catalogId as string, extra = "skip=0" as string, pageSize = invalid as dynamic) as object
+    function Catalog(addonAddress as string, metaType as string, catalogId as string, extra = "skip=0" as string, pageSize = invalid as dynamic, includePositions = false as boolean) as object
         result = { ok: false, metas: invalid, hasMore: false, error: "" }
         if addonAddress = ""
             result.error = "no addon address"
@@ -106,14 +106,17 @@ class CatalogStore
 
         ' An invalid row must not stop every other title from rendering. Keep
         ' valid metadata in server order and fill the requested type when omitted.
-        validMetas = []
+        validMetas = []:rawPositions = []:rawIndex = -1
         for each meta in metas
+            rawIndex++
             if Type(meta) <> "roAssociativeArray" then continue for
             if not m.IsNonemptyString(meta.id) or not m.IsNonemptyString(meta.name) then continue for
             if not m.IsNonemptyString(meta.type) then meta.type = metaType
             validMetas.Push(meta)
+            if includePositions then rawPositions.Push(rawIndex)
         end for
         result.metas = validMetas
+        if includePositions then result.rawPositions = rawPositions
         result.rawCount = metas.Count()
         ' Explicit boolean read of the server's flag — the chained
         ' `result.hasMore = response.json.hasMore = true` idiom is unambiguous
