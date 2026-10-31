@@ -112,6 +112,17 @@ function CinemaSourceBlockReason(stream as dynamic, patterns = invalid as dynami
     if patterns.download.IsMatch(name) then return "uncached"
     if name.InStr("torrentio") >= 0 and patterns.providerError.IsMatch(name) then return "provider-status"
     url = LCase(CinemaOptionalText(stream.url))
+    ' Observed Highfly free responses include paid upsells pointing at the
+    ' Google homepage and a player tip pointing at /health. These are status
+    ' entries, not failed videos to spend a fallback attempt on. Require the
+    ' exact destination AND annotation; never reject "Premium" movie titles
+    ' or notWebReady (which is also used for real native streams).
+    title = LCase(CinemaOptionalText(stream.title))
+    bareUrl = url.Split("?")[0].Split("#")[0]
+    if bareUrl = "https://www.google.com" or bareUrl = "https://www.google.com/"
+        if title.InStr("upgrade to premium") >= 0 or title.InStr("upgrade to watch") >= 0 then return "provider-status"
+    end if
+    if bareUrl = "https://sports.highfly.to/health" and name = "tip: use an external player" then return "provider-status"
     if Left(url, 8) <> "https://" then return ""
     rest = Mid(url, 9)
     slash = rest.InStr("/")

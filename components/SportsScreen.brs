@@ -80,7 +80,9 @@ sub SportsCatalogs()
         if Type(addon.catalogs) <> "roArray" then continue for
         for each catalog in addon.catalogs
             if Type(catalog) <> "roAssociativeArray" then continue for
-            if catalog.type <> "tv" and catalog.type <> "channel" and catalog.type <> "sports" then continue for
+            ' Hosted providers use both singular "sport" and plural "sports".
+            ' Keep the exact declared type through Discover and stream lookup.
+            if catalog.type <> "tv" and catalog.type <> "channel" and catalog.type <> "sports" and catalog.type <> "sport" then continue for
             cap = m.stores.addons.callFunc("AddonsCatalogCapabilities",catalog)
             if cap = invalid or cap.feed <> true then continue for
             if m.catalogs.Count() >= 40 then exit for

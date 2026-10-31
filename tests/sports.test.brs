@@ -236,30 +236,54 @@ Harness_Equal(m.top.pushRequest.params.addonAddress,other.addonAddress,"backup p
 OnEnter({})
 Harness_Equal(m.previousEventName,"","ordinary Sports entry clears stale comparison context")
 
-Harness_Suite("Provider sports type survives catalog and player boundaries")
-sportManifest={id:"com.example.sports-type",name:"Sports type fixture",version:"1.0.0",resources:["catalog","stream"],types:["sports"],catalogs:[{id:"sports-native-live",type:"sports",name:"Live"}]}
-Harness_Ok(m.addons.InstallFromDescriptor("https://sports-type.example/config/fixture/manifest.json",sportManifest).ok,"custom sports provider registers through production store")
+Harness_Suite("Singular and plural sports types cross registry, catalog, Discover, stream and resolver boundaries")
+for each sportType in ["sports","sport"]
+sportManifest={id:"com.example."+sportType+"-type",name:"Sports type fixture",version:"1.0.0",resources:[{name:"catalog",types:[sportType]},{name:"meta",types:[sportType],idPrefixes:["provider:"]},{name:"stream",types:[sportType],idPrefixes:["provider:"]}],types:[sportType],catalogs:[{id:sportType+"-native-live",type:sportType,name:"Live"}]}
+Harness_Ok(m.addons.InstallFromDescriptor("https://"+sportType+"-type.example/config/fixture/manifest.json?token=fixture",sportManifest).ok,"custom sports provider registers through production store")
 SportsCatalogs()
 sportIndex=-1
 for i=1 to m.catalogs.Count()-1
-    if m.catalogs[i].params.catalogId="sports-native-live" then sportIndex=i
+    if m.catalogs[i].params.catalogId=sportType+"-native-live" then sportIndex=i
 end for
 Harness_Ok(sportIndex>0,"sports resource is visible beside tv catalogs")
 OpenSportsCatalog(sportIndex):sportEntry=m.top.pushRequest.params
-Harness_Equal(sportEntry.metaType,"sports","catalog request keeps declared sports type")
-m.selectedCatalog={address:sportEntry.addonAddress,rawType:"sports",catalogId:"sports-native-live"}:m.liveEntry=sportEntry
-m.metas=[{id:"provider:sports:original",type:"sports",name:"Home vs Away"}]:m.grid={rowItemSelected:[0,0]}:m.chunk=5
+Harness_Equal(sportEntry.metaType,sportType,"catalog request keeps declared sports type")
+sportCatalogTransport=ScriptedTransport([{ok:true,status:200,json:{metas:[{id:"provider:sports:original",type:sportType,name:"Home vs Away"}]}}])
+sportCatalog=CatalogStore(sportCatalogTransport).Catalog(sportEntry.addonAddress,sportEntry.metaType,sportEntry.catalogId)
+Harness_Ok(sportCatalog.ok,"catalog returns provider-native event through production store")
+Harness_Ok(sportCatalogTransport.log[0].url.InStr("/catalog/"+sportType+"/"+sportType+"-native-live/skip=0.json?token=fixture")>=0,"catalog request preserves exact type and private query")
+m.selectedCatalog={address:sportEntry.addonAddress,rawType:sportType,catalogId:sportType+"-native-live"}:m.liveEntry=sportEntry
+m.metas=sportCatalog.metas:m.grid={rowItemSelected:[0,0]}:m.chunk=5
 SportsDiscoverSelected()
 Harness_Equal(m.top.pushRequest.screen,"streamsScreen","sports type takes explicit live source path")
-Harness_Equal(m.top.pushRequest.params.metaType,"sports","native stream request preserves provider sports type")
+Harness_Equal(m.top.pushRequest.params.metaType,sportType,"native stream request preserves provider sports type")
 Harness_Equal(m.top.pushRequest.params.videoId,"provider:sports:original","sports native ID never becomes ESPN ID")
 sportRequest=m.top.pushRequest.params
 sportTransport=ScriptedTransport([{ok:true,status:200,json:{streams:[{url:"https://media.example/live.m3u8?token=fixture"}]}}])
 sportPlayback=PlaybackStore(sportTransport)
 sportAnswer=sportPlayback.Streams(sportRequest.addonAddress,sportRequest.metaType,sportRequest.videoId)
 Harness_Ok(sportAnswer.ok,"production source store admits the custom sports type")
-Harness_Ok(sportTransport.log[0].url.InStr("/stream/sports/provider%3Asports%3Aoriginal.json")>=0,"source request retains type and escaped native ID")
+Harness_Ok(sportTransport.log[0].url.InStr("/stream/"+sportType+"/provider%3Asports%3Aoriginal.json")>=0,"source request retains type and escaped native ID")
 Harness_Ok(sportPlayback.ResolvePlayback("",sportAnswer.streams[0]).ok,"custom sports source reaches existing direct resolver")
+
+end for
+
+Harness_Suite("Free sports source response excludes provider upsells before native resolution")
+freeSource={name:"Leaf (Strong) - Fixture channel",title:"1920x1080 - Stereo",url:"https://media.example/live.m3u8?token=fixture",behaviorHints:{notWebReady:true}}
+lockedSource={name:"Leaf (Strong) - Locked",title:"1920x1080 - Upgrade to Premium",url:"https://www.google.com",behaviorHints:{notWebReady:true}}
+premiumSource={name:"CDN (Premium)",title:"Upgrade to watch",url:"https://www.google.com",behaviorHints:{notWebReady:true}}
+tipSource={name:"Tip: Use an external player",title:"MPV and VLC are recommended.",url:"https://sports.highfly.to/health",behaviorHints:{notWebReady:true}}
+sportTransport=ScriptedTransport([{ok:true,status:200,json:{streams:[lockedSource,freeSource,premiumSource,tipSource]}}])
+sportPlayback=PlaybackStore(sportTransport)
+sportAnswer=sportPlayback.Streams(sportRequest.addonAddress,sportRequest.metaType,sportRequest.videoId)
+sportBudgeted=CinemaBudgetStreams(sportAnswer.streams,256,262144)
+Harness_Equal(CinemaSkippedSources(sportBudgeted).status,3,"provider-status diagnostics count unavailable upsells and tip")
+sportRanked=CinemaChooseStreams(sportBudgeted,false,"projector",false)
+Harness_Equal(sportRanked.Count(),1,"only actual free source reaches the candidate pool")
+sportResolved=sportPlayback.ResolvePlayback("",sportRanked[0])
+Harness_Ok(sportResolved.ok,"real direct source still uses existing resolver")
+Harness_Equal(sportResolved.url,freeSource.url,"private media query retained without altering request")
+Harness_Equal(sportResolved.streamFormat,"hls","native HLS path retained")
 
 Harness_Suite("Scene backup action reuses real stack without duplicate static screens")
 scene={nodes:{},FindNode:function(id as string) as object
