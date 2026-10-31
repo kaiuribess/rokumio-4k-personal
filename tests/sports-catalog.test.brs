@@ -129,8 +129,13 @@ Harness_Ok(SportsFindRow("previous")>=0,"earlier events stay reachable")
 SportsBrowserSelect(SportsFindRow("load"))
 Harness_Equal(m.browserTask.offset,50,"next network page uses raw offset")
 SportsDeliverCatalog(metas)
-Harness_Ok(m.browserNotices>0,"provider ignoring skip ends repeated-page loop honestly")
-Harness_Equal(m.browserMore.Count(),0,"ignored skip cannot enqueue infinite next pages")
+Harness_Ok(m.browserTask<>invalid,"provider ignoring skip starts a bounded local-slice retry")
+Harness_Ok(not m.browserTask.entry.skipSupported,"repeated remote page switches to local pagination once")
+Harness_Equal(m.browserTask.offset,50,"local fallback retains raw offset including invalid records")
+SportsDeliverCatalog(metas)
+Harness_Equal(m.browserEvents.Count(),61,"local fallback retains all later valid games without duplicating first page")
+Harness_Equal(m.browserMore.Count(),0,"local last slice terminates despite ignored remote skip")
+Harness_Equal(m.browserTask,invalid,"local fallback leaves no looping request")
 
 entry=m.catalogs[1]:entry.skipSupported=false
 answer={ok:true,metas:[],rawCount:100,hasMore:true}

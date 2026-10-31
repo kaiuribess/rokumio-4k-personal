@@ -123,7 +123,16 @@ function Sports_CatalogPage(answer as dynamic, entry as object, offset as intege
     result.ok = true
     if answer.rawCount <> invalid then result.skipped = answer.rawCount - answer.metas.Count()
     start = 0
-    if entry.skipSupported <> true then start = offset
+    if entry.skipSupported <> true
+        start = offset
+        if Type(answer.rawPositions) = "roArray"
+            start = 0
+            while start < answer.rawPositions.Count()
+                if answer.rawPositions[start] >= offset then exit while
+                start++
+            end while
+        end if
+    end if
     last = start + 48
     if last > answer.metas.Count() then last = answer.metas.Count()
     if answer.metas.Count() > 0 then result.firstId = Sports_Text(answer.metas[0].id,2048)
@@ -133,14 +142,17 @@ function Sports_CatalogPage(answer as dynamic, entry as object, offset as intege
     end for
     consumed = last - start
     if consumed < 0 then consumed = 0
-    if entry.skipSupported = true and Type(answer.rawPositions) = "roArray"
+    nextOffset = offset + consumed
+    if Type(answer.rawPositions) = "roArray"
+        rawEnd = 0
         if last = answer.metas.Count()
-            consumed = answer.rawCount
+            rawEnd = answer.rawCount
         else if last > 0
-            consumed = answer.rawPositions[last-1] + 1
+            rawEnd = answer.rawPositions[last-1] + 1
         end if
+        if entry.skipSupported = true then nextOffset = offset + rawEnd else nextOffset = rawEnd
     end if
-    result.nextOffset = offset + consumed
+    result.nextOffset = nextOffset
     result.hasMore = last < answer.metas.Count()
     if entry.skipSupported = true and answer.hasMore = true and consumed > 0 then result.hasMore = true
     return result

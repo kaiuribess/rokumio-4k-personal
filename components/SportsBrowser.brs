@@ -91,10 +91,16 @@ sub SportsBrowserApply(packet as dynamic)
     if packet.ok <> true
         m.browserFailed.Push(job)
     else
-        ' A server ignoring skip must not create an infinite More events loop.
+        ' A server ignoring skip switches to bounded local slices of a fresh
+        ' page-zero response. Never loop the same remote offset indefinitely.
         repeated = job.entry.skipSupported = true and job.offset > 0 and packet.firstId <> "" and packet.firstId = job.firstId
         if repeated
-            m.browserNotices++
+            localEntry = {}
+            for each key in job.entry
+                localEntry[key] = job.entry[key]
+            end for
+            localEntry.skipSupported = false
+            m.browserQueue.Unshift({entry:localEntry,offset:job.offset,firstId:""})
         else
             for each item in packet.events
                 if m.browserRouteCount >= 240 then exit for
