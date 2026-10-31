@@ -1,10 +1,20 @@
 # Free NBA providers: configured playback checks
 
-Checked October 30, 2026 Pacific / October 31 UTC. This continues draft PR #9 on `feature/live-sports`; no merge or Roku installation.
+Checked October 30, 2026 Pacific / October 31 UTC. This continues draft PR #9 on `feature/live-sports`. The PC investigation below preceded the authorized Roku installation and user feedback recorded in the follow-up. The PR remains draft and unmerged.
 
 **Highfly's free configuration delivered real Celtics–Bulls video in two fresh 120-second PC checks at 1920×1080 H.264/AAC.** Pictures confirmed the game, not a holding card. The same game appeared through StremVerse, whose sampled NBA sources were less stable. Highfly's observed delivery gateway differs from StremVerse's, but hidden origins and operator independence are unknown. This is an additional demonstrated media route, **not hardware sign-off or an all-games guarantee**.
 
 [Sanitized measurements](research/nba-provider-validation-2026-10-31.json) retain failure stages, timings, request origins, decoder results and visual observations. Configured manifests, media links, cookies, account identifiers, header values and video files are excluded.
+
+## Roku installation and user feedback follow-up
+
+The exact tested CI package for commit `ab1e95787ebcb1ced6070d806fba23a09e28caab` was installed on a Roku Streaming Stick Plus with the owner's permission. The developer installer reported success, its stored package size/digest matched the upload, and the active-app query reported Crimson Cinema 0.6.0. This verifies installation and startup, not sustained decoding.
+
+The user then approved individual imports of **Sports Streams (Highfly), PenguPlay, Nuvio Live Sports and StremVerse** and confirmed the four-provider list. Nuvio initially failed because its 74-catalog profile exceeded the existing 64-entry manifest-array budget. Disabling replay catalogs in its normal configuration produced a 17-catalog live profile that the user confirmed imported successfully. No device budget was raised; see the setup below.
+
+After browsing an NBA catalog, selecting a game and choosing a source, the user reported successful playback on the Roku. **The provider, chosen source, playback duration, decoded resolution and audio language were not identified.** This is one user-reported hardware playback success, separate from the measured PC runs below. It does not certify any specific provider on Roku, 4K, English sound, a full match or all-sports reliability.
+
+The same feedback identified too many catalog/source choices. The [all-sports catalog cleanup plan](SPORTS-CATALOG-PLAN.md) records the requested next pass; that interface is **not implemented in this package**.
 
 ## A research-client error changed the diagnosis
 
@@ -12,7 +22,7 @@ After the user completed Highfly's normal human verification, its page issued a 
 
 The corrected probe identifies itself truthfully as `CrimsonCinema-Research/0.6`, with the repository address and PC-test purpose. It does not impersonate a browser or Roku, export browser cookies, solve a challenge, invent authorization or override a provider-supplied User-Agent. On the **same private PenguPlay manifest**, an immediate default → identified → default control returned **403 → 200 JSON → 403**. All three configured provider APIs then returned usable catalogs through the identified client.
 
-Earlier bare-client 403s therefore cannot establish that these providers universally fail. Preserve them as dated client-specific observations, not current service verdicts. This correction is in the **PC research probe**. Native Roku transport and decoder behavior are still untested; the PC result must not be described as a Roku result.
+Earlier bare-client 403s therefore cannot establish that these providers universally fail. Preserve them as dated client-specific observations, not current service verdicts. This correction is in the **PC research probe**. Native Roku transport and decoder behavior were not measured in these checks; the later user report does not turn these PC measurements into Roku results.
 
 ## Real media results
 
@@ -46,14 +56,26 @@ PenguPlay Plorax and Highfly Leaf share the Papacito segment service. They can p
 
 1. Open [free US2 setup](https://sportsfree-us2.highfly.dev/configure) or [free EU setup](https://sportsfree.highfly.dev/configure). Use the free flow, complete its normal human verification and choose **Get Addon Link**. The tested US2 page issued a `sports.highfly.to` manifest. Do not substitute a domain or manufacture a configuration path.
 2. Copy your generated add-on link privately. No Stremio app/account, payment, subscription or premium trial was required for this test.
-3. When ready, use Crimson's existing **Add-ons** import and approve it on the TV. This research did **not** install a provider or update the Roku.
+3. Use Crimson's existing **Add-ons** import and approve it on the TV. Each import requires separate TV confirmation; dismiss its summary before sending another.
 4. Open **Sports → Sports Streams · Basketball → the actual game → a free Leaf source**. Source availability changes. Premium placeholders and the instructional tip are excluded by this patch.
 
 ### PenguPlay
 
-The user completed [PenguPlay's normal Google sign-in](https://pengu.uk/). **Sources → Live TV** was initially off; enabling it made live catalogs available. Then use **Overview → Copy Addon URL** and Crimson's usual TV-approved import when ready. The profile was retained privately only for research, not bundled or installed. No payment or trial was started. Selecting Live TV changed that PenguPlay configuration, not a remote Stremio account.
+The user completed [PenguPlay's normal Google sign-in](https://pengu.uk/). **Sources → Live TV** was initially off; enabling it made live catalogs available. Then use **Overview → Copy Addon URL** and Crimson's usual TV-approved import. The configured profile stays private and is not bundled. No payment or trial was started. Selecting Live TV changed that PenguPlay configuration, not a remote Stremio account.
 
-Do not publish either configured manifest in issues or screenshots. Free operation was observed now, not promised forever. Only use broadcasts you are authorized to access; a provider's availability or disclaimer does not establish distribution rights.
+### Nuvio Live Sports
+
+1. Open [Nuvio's normal configuration](https://nuviosports.xyz/configure).
+2. Set **Replay catalog → Hide replays** and **Web Streams → Hide web streams**. Keep the desired live sports enabled. The tested profile kept all live sports and returned **17 catalogs**.
+3. Copy the newly generated add-on link privately and import it through Crimson **Add-ons**, approving it on the TV.
+
+The earlier profile returned **74 catalogs** and Roku rejected it with “manifests exceed device budget.” Crimson limits individual manifest arrays, including catalogs, to 64 entries. This was a catalog-count failure, not a playback diagnosis. Using the normal smaller profile fixed this import without relaxing memory limits. Catalog counts can change upstream; do not assume a future profile still fits just because its settings look the same. Hiding web streams excludes browser-only options; it does not prove that every remaining source plays natively.
+
+### StremVerse
+
+Import the public `https://stremverse1.alwaysdata.net/manifest.json` through Crimson **Add-ons** and approve it on the TV. Use its free Live Events catalog; no paid Xtra/IPTV membership was introduced. The sampled NBA failures above still apply even though importing the manifest succeeded.
+
+Do not publish configured manifests in issues or screenshots. Free operation was observed now, not promised forever. Only use broadcasts you are authorized to access; a provider's availability or disclaimer does not establish distribution rights.
 
 ## NBA grid / RedZone
 
@@ -63,4 +85,4 @@ The current basketball catalogs returned 20 Highfly, 29 Nuvio and 31 PenguPlay e
 
 Local commands: `npm ci --ignore-scripts`, `npm test`, `npm run build`, `python scripts/verify-package.py`, `python tests/probe-live-providers.test.py`, `python tests/probe-live-reliability.test.py` all passed. App suites: **6,616 assertions across 37 harness runs**, **151 cinema-policy assertions**, **50 playlist assertions**, **66 Node test cases**. Python: **7 + 14 cases**. Package: **212 members, 54 XML components, 281 script references, 168 declared interface implementations**. Existing two high development dependency entries remain outside the Roku ZIP; no dependency was added. The PR links the exact tested CI artifact and checksum.
 
-The probe's wall-clock fetch/decode sessions are not real-time rendering or a zero-buffer guarantee. Native startup, sustained 15+ minute playback, audible English, live edge, expired-link recovery, Back/cancel, manual same-game provider switching and unchanged movie/TorBox/next-episode behavior still require the physical stick. Keep the PR draft/unmerged until hardware acceptance. No paid proxy, serverless deployment or mandatory running PC is introduced by the app changes.
+The probe's wall-clock fetch/decode sessions are not real-time rendering or a zero-buffer guarantee. Installation/startup and the limited user-reported playback above are now recorded separately. Sustained 15+ minute playback, audible English, live edge, expired-link recovery, Back/cancel, manual same-game provider switching and unchanged movie/TorBox/next-episode behavior still need controlled physical-stick checks. Keep the PR draft/unmerged. No paid proxy, serverless deployment or mandatory running PC is introduced by the app changes. This follow-up changes documentation only; the app code and cited tested package are unchanged.
