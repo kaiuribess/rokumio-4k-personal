@@ -4,6 +4,8 @@
 
 **Reliability follow-up:** [manual backup setup and measured results](SPORTS-RELIABILITY.md). Replay on live Sources now opens other installed providers for manual same-event selection, and provider-native `sports` catalogs are supported. StremVerse's repeated 403 was at the entry playlist. A CNCVerse alternative decoded a holding card; Nebula's selected HLS failed. Highfly's free `.dev` configuration pages worked but require human verification. **StremVerse and CNCVerse separately passed two-minute NHL PC runs, but share a gateway; independent delivery and Roku validation remain open.**
 
+**NBA split screen:** [combined-feed investigation](SPORTS-NBA-MULTIVIEW.md). One upstream-combined video is the preferred route for the existing stick, but no usable free NBA grid feed has been established. Browser multiview pages are not single video streams; no nonfunctional multiview option was added.
+
 ## Quick setup and use
 
 1. Install the developer ZIP from the successful **PR #9 CI artifact**, not GitHub's source archive. This preview is not merged or hardware-certified.

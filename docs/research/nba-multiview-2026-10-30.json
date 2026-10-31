@@ -1,0 +1,314 @@
+{
+  "checked_utc": "2026-10-31T01:04:41.939823+00:00",
+  "scope": "Catalog/name and public-page inspection only; no combined NBA media candidate or physical Roku test established",
+  "catalog_terms": [
+    "multiview",
+    "multi-view",
+    "multi view",
+    "mosaic",
+    "split screen",
+    "nba mix",
+    "nba tv mix",
+    "crunchtime",
+    "crunch time"
+  ],
+  "catalog_scope": "Selected first-page catalogs only; not exhaustive across providers or configuration options",
+  "providers": [
+    {
+      "provider": "StremVerse",
+      "catalogs": [
+        {
+          "id": "stremverse_live_events",
+          "type": "tv",
+          "items": 120,
+          "grid_matches": [],
+          "nba_name_examples": [
+            "NBA",
+            "NBA",
+            "NBA",
+            "NBA",
+            "NBA"
+          ]
+        }
+      ]
+    },
+    {
+      "provider": "CNCVerse",
+      "catalogs": [
+        {
+          "id": "cnc_SportzXLiveEvents_tv",
+          "type": "tv",
+          "items": 56,
+          "grid_matches": [],
+          "nba_name_examples": [
+            "\ud83d\udd34 Wizards vs Hornets",
+            "\ud83d\udd34 Celtics vs Bulls",
+            "\ud83d\udd34 Nets vs Pistons",
+            "\ud83d\udd34 76ers vs Knicks",
+            "\ud83d\udd1c Warriors vs Lakers"
+          ]
+        },
+        {
+          "id": "cnc_PlayZTVLiveEvents_tv",
+          "type": "tv",
+          "items": 164,
+          "grid_matches": [],
+          "nba_name_examples": [
+            "\ud83d\udd34 Washington Wizards vs Charlotte Hornets",
+            "\ud83d\udd34 Brooklyn Nets vs Detroit Pistons",
+            "\ud83d\udd34 Boston Celtics vs Chicago Bulls",
+            "\ud83d\udd34 Philadelphia 76ers vs New York Knicks",
+            "\ud83d\udd1c Golden State Warriors vs Los Angeles Lakers"
+          ]
+        },
+        {
+          "id": "cnc_JIOTVPlusIND3_tv",
+          "type": "tv",
+          "failure": {
+            "stage": "catalog",
+            "error": "ValueError"
+          },
+          "nba_name_examples": []
+        },
+        {
+          "id": "cnc_JioHotstar2_tv",
+          "type": "tv",
+          "items": 146,
+          "grid_matches": [],
+          "nba_name_examples": []
+        },
+        {
+          "id": "cnc_LivXowLiveEvents_tv",
+          "type": "tv",
+          "items": 49,
+          "grid_matches": [],
+          "nba_name_examples": [
+            "\ud83d\udd34 Wizards vs Hornets",
+            "\ud83d\udd34 Nets vs Pistons",
+            "\ud83d\udd34 Celtics vs Bulls",
+            "\ud83d\udd34 76ers vs Knicks",
+            "\ud83d\udd1c Warriors vs Lakers"
+          ]
+        },
+        {
+          "id": "cnc_SKTechLiveEvents_tv",
+          "type": "tv",
+          "items": 93,
+          "grid_matches": [],
+          "nba_name_examples": [
+            "\ud83d\udd34 Washington Wizards vs Charlotte Hornets",
+            "\ud83d\udd34 Brooklyn Nets vs Detroit Pistons",
+            "\ud83d\udd34 Philadelphia 76ers vs New York Knicks",
+            "\ud83d\udd1c Golden State Warriors vs Los Angeles Lakers"
+          ]
+        },
+        {
+          "id": "cnc_SUNNXT_SKTechProvider_tv",
+          "type": "tv",
+          "items": 33,
+          "grid_matches": [],
+          "nba_name_examples": []
+        },
+        {
+          "id": "cnc_PlayFyLiveEvents_tv",
+          "type": "tv",
+          "items": 108,
+          "grid_matches": [],
+          "nba_name_examples": [
+            "\ud83d\udd34 Boston Celtics vs Chicago Bulls",
+            "\ud83d\udd1c Golden State Warriors vs Los Angeles Lakers"
+          ]
+        },
+        {
+          "id": "cnc_JIOTVIND_tv",
+          "type": "tv",
+          "failure": {
+            "stage": "catalog",
+            "error": "ValueError"
+          },
+          "nba_name_examples": []
+        }
+      ]
+    },
+    {
+      "provider": "Nebula",
+      "catalogs": [
+        {
+          "id": "streamed-events-live-now",
+          "type": "sports",
+          "items": 19,
+          "grid_matches": [],
+          "nba_name_examples": [
+            "Washington Wizards vs Charlotte Hornets",
+            "Boston Celtics vs Chicago Bulls",
+            "Brooklyn Nets vs Detroit Pistons",
+            "Philadelphia 76ers vs New York Knicks",
+            "Toronto Raptors vs Orlando Magic"
+          ]
+        },
+        {
+          "id": "all",
+          "type": "sports",
+          "items": 68,
+          "grid_matches": [],
+          "nba_name_examples": [
+            "Washington Wizards vs Charlotte Hornets",
+            "Boston Celtics vs Chicago Bulls",
+            "Brooklyn Nets vs Detroit Pistons",
+            "Philadelphia 76ers vs New York Knicks",
+            "Toronto Raptors vs Orlando Magic"
+          ]
+        }
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "url": "https://nbamonster.com/multiview/",
+      "saved_file_utc": "2026-10-31T01:08:53.317629+00:00",
+      "html_sha256": "9caa97d9be9806e2b88b5d655186bfacd6090b76598fd6d75bf6b1978329b8af",
+      "video_iframe_class": "skmv-frame",
+      "matching_iframes_in_initial_html": 4,
+      "classification": "Browser tiles with separate embedded players; no combined-media endpoint established"
+    },
+    {
+      "url": "https://buffstream.pk/multiview",
+      "saved_file_utc": "2026-10-31T01:08:55.344325+00:00",
+      "html_sha256": "d606dc6d9ea3d9cbaedfc20180bbae3b9e5e95e60fd0373e25d9cf9388a6cbed",
+      "video_iframe_class": "se-multiview-iframe",
+      "matching_iframes_in_initial_html": 1,
+      "classification": "Browser tiles with separate embedded players; no combined-media endpoint established"
+    }
+  ],
+  "public_listing_name_checks": [
+    {
+      "url": "https://iptv-org.github.io/iptv/categories/sports.m3u",
+      "entries": 464,
+      "nba_channel": "NBA TV (720p)",
+      "grid_name_matches": 0
+    },
+    {
+      "url": "https://iptv-org.github.io/iptv/countries/us.m3u",
+      "entries": 1494,
+      "nba_channel": "NBA TV (720p)",
+      "grid_name_matches": 0
+    }
+  ],
+  "listing_terms": [
+    "mosaic",
+    "multi.?view",
+    "game.?mix",
+    "split.?screen",
+    "crunch.?time"
+  ],
+  "listing_note": "Overlapping lists; names only, no stream accessed or rights inferred",
+  "combined_feed_verified": false,
+  "native_app_changed": false,
+  "roku_tested": false,
+  "community_followup": {
+    "checked_utc": "2026-10-31T01:21:01.153447+00:00",
+    "ppv": {
+      "checked_utc": "2026-10-31T01:15:45.257467+00:00",
+      "provider": "PPV",
+      "scope": "Public catalog names/descriptions only; no stream accessed",
+      "groups": 11,
+      "items": 158,
+      "grid_candidates": [],
+      "nba_names": [
+        "Chicago Bulls vs. Boston Celtics",
+        "Los Angeles Lakers vs. Golden State Warriors"
+      ]
+    },
+    "timstreams": {
+      "checked_utc": "2026-10-31T01:18:20.226024+00:00",
+      "provider": "TimStreams",
+      "scope": "Public catalog metadata; no media accessed",
+      "checks": [
+        {
+          "endpoint": "channels",
+          "items": 219,
+          "grid_candidates": [],
+          "nba_examples": [
+            "NBA TV"
+          ]
+        },
+        {
+          "endpoint": "live-upcoming",
+          "items": 23,
+          "grid_candidates": [],
+          "nba_examples": [
+            "Chicago Bulls @ Boston Celtics",
+            "Los Angeles Lakers @ Golden State Warriors"
+          ]
+        }
+      ]
+    },
+    "penguplay": {
+      "homepage_status": 200,
+      "initial_minimal_auth_config_status": 403,
+      "normal_frontend_context_auth_config_status": 200,
+      "auth_required": true,
+      "auth_available": true,
+      "account_created": false,
+      "catalog_tested": false
+    },
+    "stremverse_generic_nba_cards": {
+      "metadata_entries": 17,
+      "all_metadata_descriptions_empty": true,
+      "posters_visually_inspected": 17,
+      "all_posters_advertise_single_matchups": true,
+      "poster_matchups_by_index": [
+        "Timberwolves vs Clippers",
+        "Mavericks vs Rockets",
+        "Heat vs Pacers",
+        "Heat vs Pacers",
+        "Timberwolves vs Clippers",
+        "Mavericks vs Rockets",
+        "Nets vs Pistons",
+        "Raptors vs Magic",
+        "76ers vs Knicks",
+        "Nets vs Pistons",
+        "Celtics vs Bulls",
+        "Raptors vs Magic",
+        "76ers vs Knicks",
+        "Wizards vs Hornets",
+        "Wizards vs Hornets",
+        "Suns vs Nuggets",
+        "Warriors vs Lakers"
+      ],
+      "poster_sha256": [
+        "73ddd976120f7adc727ecbf5386837f1521a54ed10193d83959d8182fe82d521",
+        "499f0f26e9cc8b340e2d2c6bee598353d9d6b585a6c3f8af64003217bc4f03bf",
+        "845242f0cdc338d39d363c2783a2f6be10cceeb4ce877b92b74bb3486a670264",
+        "3bb479f2e07f03d0ccbb2dd25b8e517bf95aed1ba8023e94e2b540d53145ffdd",
+        "021a3129941d3b04201a00d5de356634d2febe6e48bc58a11f0b7f619e188faa",
+        "ab4e6f8225771a6e0d3cf40f3f3d0dd9867b225c52ec832a8043cb8425bc28dd",
+        "3144e9cd4f7f7348613c7d0ac81916b78cfb15e0a14d05248357092ccd1517eb",
+        "f96115e9414c422bb658bd35e8b2af73da64618f867456408a6d4003dc116c3e",
+        "1491e57107fa1658e8a190be3eb1826618e546d7b6c71411b7c69bd400f37324",
+        "adf09db320c172a92e77c4f34bbfd2d0e39401330e02ab5505d648c7fc209069",
+        "29f6a713159f8fe03610ed1cfac51549fdf08120077d3f826b8c1322fac85308",
+        "acbb6a838a3afeec63b202ef87a052e7fcfba1c5a44752bdf8eb70022ef4e366",
+        "6099c965cb6bccb3b3e0b06689342de36e70bfe616f14c0f1be894e8b09081ca",
+        "49fcd7b237439f892940a469f0f1c0fd7ecaf6a5704c5746ef29d3cdb963eb0a",
+        "18bf8a00267da41c4e7683dd9e632d62b461aa1f11196c65611b59cc596cdf28",
+        "9f155e58c640d441d3918a0210c9bcdf3f59b358f5a762f77c4fdcd3649b8f88",
+        "8683d235562b74767378428a683acd178b0b19cec70dac84a8e951597dd11fd4"
+      ]
+    },
+    "public_client_observations": [
+      {
+        "site": "PPV",
+        "source_sha256": "98fd172d8bc6223c9daf09f7d37886fdd2c8269ba61ec59a1e42b139753d599c",
+        "observation": "MultiviewCell receives its own stream, selectedSource and muted fields",
+        "code_copied_into_app": false
+      },
+      {
+        "site": "TimStreams",
+        "source_sha256": "10eb02720f30de97e95c06cc149768778e6cd990b84a9b511573c5132cb7672a",
+        "observation": "Selected streams mapped into separate iframe cells; 1/2/3/4/6/9 layouts",
+        "code_copied_into_app": false
+      }
+    ]
+  }
+}
