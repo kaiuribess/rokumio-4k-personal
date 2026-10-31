@@ -17,7 +17,7 @@
     <children>
         <Label id="sportsTitle" text="Sports" translation="[80, 54]" width="1760" height="70" font="font:LargeBoldSystemFont" />
         <Label id="sportsSubtitle" text="Choose your sport → Find a game → Watch" translation="[80, 138]" width="1760" height="50" font="font:SmallSystemFont" />
-        <ChevronList id="sportsList" translation="[80, 340]" numRows="5" itemWidth="1000" rowHeight="108" />
+        <ChevronList id="sportsList" translation="[80, 340]" numRows="5" itemWidth="1000" rowHeight="96" rowComponent="SportsRow" />
         <Group translation="[1140, 330]">
             <Rectangle id="sportsPlate" width="700" height="570" />
             <Label id="sportsName" translation="[32, 28]" width="636" height="132" wrap="true" font="font:MediumBoldSystemFont" />
