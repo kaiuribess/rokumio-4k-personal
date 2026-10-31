@@ -20,6 +20,12 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+# Identify this client truthfully. urllib's implicit Python user agent caused
+# Cloudflare 1010 responses for otherwise available, authorized add-on APIs.
+# This is not a browser/Roku identity and does not carry browser cookies.
+RESEARCH_USER_AGENT = "CrimsonCinema-Research/0.6 (+https://github.com/kaiuribess/rokumio-4k-personal; PC compatibility test)"
+
+
 MANIFESTS = {
     "nuvio": "https://nuviosports.xyz/manifest.json",
     "stremverse": "https://stremverse1.alwaysdata.net/manifest.json",
@@ -54,7 +60,10 @@ class PublicRedirect(urllib.request.HTTPRedirectHandler):
 def request(url, limit=1048576, headers=None):
     public_url(url)
     opener = urllib.request.build_opener(PublicRedirect())
-    with opener.open(urllib.request.Request(url, headers=headers or {}), timeout=10) as response:
+    request_headers = dict(headers or {})
+    if not any(name.lower() == "user-agent" for name in request_headers):
+        request_headers["User-Agent"] = RESEARCH_USER_AGENT
+    with opener.open(urllib.request.Request(url, headers=request_headers), timeout=10) as response:
         body = response.read(limit + 1)
         if len(body) > limit:
             raise ValueError("response budget")

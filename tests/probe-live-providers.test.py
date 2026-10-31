@@ -2,7 +2,7 @@
 import importlib.util
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 import urllib.request
 
 spec = importlib.util.spec_from_file_location("sports_probe", Path(__file__).parents[1] / "scripts/probe-live-providers.py")
@@ -41,6 +41,36 @@ class ProbeTests(unittest.TestCase):
             result = probe.media({"url": "https://example.org/opaque?token=never-print"})
             self.assertEqual(result["kind"], "not-HLS")
             self.assertNotIn("never-print", str(result))
+
+    def test_request_identifies_research_client_without_browser_impersonation(self):
+        response = MagicMock()
+        response.__enter__.return_value = response
+        response.read.return_value = b"{}"
+        response.geturl.return_value = "https://example.org/manifest.json"
+        response.headers.get_content_type.return_value = "application/json"
+        opener = MagicMock()
+        opener.open.return_value = response
+        supplied = {"Referer": "https://example.org/"}
+        with patch.object(probe, "public_url"), patch.object(probe.urllib.request, "build_opener", return_value=opener):
+            probe.request("https://example.org/manifest.json", headers=supplied)
+        request = opener.open.call_args.args[0]
+        self.assertEqual(request.get_header("User-agent"), probe.RESEARCH_USER_AGENT)
+        self.assertTrue(request.get_header("User-agent").startswith("CrimsonCinema-Research/"))
+        self.assertNotIn("Cookie", request.headers)
+        self.assertEqual(supplied, {"Referer": "https://example.org/"})
+        response.read.assert_called_once_with(1048577)
+        self.assertEqual(opener.open.call_args.kwargs["timeout"], 10)
+
+    def test_provider_user_agent_overrides_default_case_insensitively(self):
+        for key in ("User-Agent", "user-agent", "USER-AGENT"):
+            response = MagicMock()
+            response.__enter__.return_value = response
+            response.read.return_value = b"#EXTM3U"
+            opener = MagicMock()
+            opener.open.return_value = response
+            with patch.object(probe, "public_url"), patch.object(probe.urllib.request, "build_opener", return_value=opener):
+                probe.request("https://example.org/live.m3u8", headers={key: "ProviderRequired/1"})
+            self.assertEqual(opener.open.call_args.args[0].get_header("User-agent"), "ProviderRequired/1")
 
     def test_exception_strings_are_not_reports(self):
         self.assertEqual(probe.failure(ValueError("https://secret.example/token")), {"error": "ValueError"})

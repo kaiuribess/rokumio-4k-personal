@@ -140,6 +140,17 @@ class ReliabilityTests(unittest.TestCase):
             return self.transport(url, limit, headers)
         self.assertEqual(self.run_probe(too_many)["rounds"][0]["failure"]["error"], "SourceBudget")
 
+    def test_empty_media_playlist_is_not_a_successful_video_sample(self):
+        def transport(url, limit=1048576, headers=None):
+            if "media.example/live" in url:
+                return b"#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXT-X-MEDIA-SEQUENCE:7\n", url, "application/vnd.apple.mpegurl"
+            return self.transport(url, limit, headers)
+        report = self.run_probe(transport)
+        for entry in report["rounds"]:
+            self.assertEqual(entry["sample"]["failure"], {"stage": "segment", "error": "NoMediaSegments"})
+            self.assertEqual(entry["sample"]["unique_segments"], 0)
+            self.assertFalse(entry["sample"]["event_content_verified"])
+
     def test_sustained_polling_counts_only_new_segments(self):
         now = [0]
         def sleep(seconds):

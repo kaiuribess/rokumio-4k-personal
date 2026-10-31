@@ -200,6 +200,8 @@ def sample(reader, stream, seconds, decode=False, sleep=time.sleep, clock=time.m
         except StageFailure as error:
             report["failure"] = {"stage": error.stage, **error.detail}
             break
+    if report["unique_segments"] == 0 and "failure" not in report:
+        report["failure"] = {"stage": "segment", "error": "NoMediaSegments"}
     report["elapsed_seconds"] = round(clock()-started,2)
     report["playlist_advanced"] = len(set(report["sequences"])) > 1
     return report
@@ -209,6 +211,7 @@ def run(profile, seconds=120, rounds=2, decode=False):
     reader = Reader()
     report = {"checked_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
               "scope": "PC requests/decoding; not physical Roku or audible language",
+              "default_request_client": probe.RESEARCH_USER_AGENT,
               "provider_origin": urllib.parse.urlsplit(profile["manifest"]).hostname,
               "rounds": [], "requests": reader.events}
     try:
