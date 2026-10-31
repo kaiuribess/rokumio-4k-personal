@@ -16,6 +16,7 @@ sub init()
     m.events = []:m.rows = []:m.days = []:m.catalogs = []
     m.browseProviders = true:m.allowUnknownLiveAudio = true:m.livePlayback = true
     m.task = invalid:m.sequence = 0:m.desired = "":m.applied = "":m.loaded = "":m.loadClock = invalid
+    SportsBrowserInit()
 end sub
 
 function OnEnter(params as object) as void
@@ -31,10 +32,11 @@ function OnEnter(params as object) as void
     end if
     SportsDays()
     SportsCatalogs()
+    SportsBrowserEnter(params)
     SportsChips()
     if m.filters.callFunc("IsMenuOpen") then m.filters.callFunc("HideMenu")
     m.filters.callFunc("FocusChips")
-    if m.browseProviders = true then RenderSportsCatalogs():return
+    if m.browseProviders = true then RenderSportsCatalogs():SportsBrowserPump():return
     key = SportsQueryKey()
     if m.loaded <> key or m.loadClock = invalid
         SportsRequest()
@@ -65,8 +67,8 @@ sub SportsCatalogs()
     if m.stores = invalid then return
     addons = m.stores.addons.callFunc("AddonsGetAll")
     if Type(addons) <> "roArray" then return
-    ' Prioritize other providers before the 40-row budget, not after it. A
-    ' large current provider must not crowd every backup out of this view.
+    ' Keep manual backups first. All descriptors remain available through
+    ' 48-row pagination; a large provider cannot hide later catalogs.
     if m.previousProviderAddress <> invalid and m.previousProviderAddress <> ""
         ordered = []:current = []
         for each addon in addons
@@ -85,10 +87,26 @@ sub SportsCatalogs()
             if catalog.type <> "tv" and catalog.type <> "channel" and catalog.type <> "sports" and catalog.type <> "sport" then continue for
             cap = m.stores.addons.callFunc("AddonsCatalogCapabilities",catalog)
             if cap = invalid or cap.feed <> true then continue for
-            if m.catalogs.Count() >= 40 then exit for
             label = Sports_Text(addon.name,28) + " · " + Sports_Text(catalog.name,28)
             if addon.address = m.previousProviderAddress then label = "Current · " + label
-            m.catalogs.Push({raw:catalog.id,label:label,params:{metaType:catalog.type,catalogId:catalog.id,addonAddress:addon.address}})
+            skipSupported = false
+            if Type(catalog.extra) = "roArray"
+                for each extra in catalog.extra
+                    if Type(extra) = "roAssociativeArray"
+                        if extra.name = "skip" then skipSupported = true
+                    else if extra = "skip"
+                        skipSupported = true
+                    end if
+                end for
+            end if
+            if Type(catalog.extraSupported) = "roArray"
+                for each extra in catalog.extraSupported
+                    if extra = "skip" then skipSupported = true
+                end for
+            end if
+            catalogName = Sports_Text(catalog.name,128) + " " + Sports_Text(catalog.id,256)
+            recorded = CreateObject("roRegex","replay|highlights|recorded","i").IsMatch(catalogName)
+            m.catalogs.Push({raw:catalog.id,label:label,provider:Sports_Text(addon.name,60),groupKey:Sports_Category(catalogName),recorded:recorded,browseOnly:cap.genreRequired = true,skipSupported:skipSupported,pageSize:catalog.pageSize,params:{metaType:catalog.type,catalogId:catalog.id,addonAddress:addon.address}})
         end for
     end for
 
@@ -100,7 +118,9 @@ sub SportsChips()
         if m.allowUnknownLiveAudio <> true then audio = "Audio: verified English"
         playback = "Playback: Live"
         if m.livePlayback <> true then playback = "Playback: Recorded"
-        m.filters.callFunc("SetChips",[{raw:"mode",label:"Provider catalogs"},{raw:"playback",label:playback},{raw:"audio",label:audio},{raw:"channels",label:"Manage add-ons"}])
+        viewLabel = "Browse sports"
+        if m.catalogView = "providers" then viewLabel = "Provider catalogs"
+        m.filters.callFunc("SetChips",[{raw:"mode",label:viewLabel},{raw:"playback",label:playback},{raw:"audio",label:audio},{raw:"channels",label:"Manage add-ons"}])
         return
     end if
     m.filters.callFunc("SetChips",[{raw:"league",label:m.leagues[m.leagueIndex].label},{raw:"day",label:m.days[m.dayIndex].label},{raw:"state",label:m.states[m.stateIndex].label},{raw:"channels",label:"TV / sports add-ons"}])
@@ -111,7 +131,15 @@ function SportsQueryKey() as string
 end function
 
 sub SportsRequest()
-    if m.browseProviders = true then SportsCatalogs():RenderSportsCatalogs():return
+    if m.browseProviders = true
+        SportsCatalogs()
+        if m.catalogView = "sports" and m.browserMode = "events"
+            SportsBrowserStart(m.browserGroup,m.browserGroupLabel)
+        else
+            RenderSportsCatalogs()
+        end if
+        return
+    end if
     key = SportsQueryKey()
     if m.loaded <> key then m.events = []
     m.desired = key
@@ -201,7 +229,10 @@ function SportsProviderCount(id as string) as integer
 end function
 
 sub ShowSportsDetail(index as integer)
-    if m.browseProviders = true then ShowSportsCatalogDetail(index):return
+    if m.browseProviders = true
+        if m.catalogView = "sports" then SportsBrowserDetail(index) else ShowSportsCatalogDetail(index)
+        return
+    end if
     if index < 0 or index >= m.rows.Count()
         m.name.text = "No events in this view"
         m.detail.text = "Try another date, league or status. TV / sports add-ons opens your installed channel catalogs, including competitions outside this schedule."
@@ -230,7 +261,14 @@ sub onSportsSelected()
     if Type(selected) <> "roArray" or selected.Count() = 0 then return
     index = selected[0]
     if index < 0 or index >= m.rows.Count() then return
-    if m.browseProviders = true then OpenSportsCatalog(index):return
+    if m.browseProviders = true
+        if m.catalogView = "sports" then SportsBrowserSelect(index):return
+        row = m.rows[index]
+        if row.catalogPage <> invalid
+            m.catalogPage = row.catalogPage:RenderSportsCatalogs():m.list.callFunc("FocusRow",0):return
+        end if
+        OpenSportsCatalog(row.catalogIndex):return
+    end if
     event = m.rows[index]
     if event.state = "pre"
         m.status.text = "Upcoming event. Refresh near its start time; a stream is not guaranteed."
@@ -247,7 +285,7 @@ sub onSportsChip()
     index = m.filters.chipActivated
     options = []:current = 0
     if m.browseProviders = true
-        if index = 0 then options = [{label:"Provider catalogs",raw:"providers"},{label:"ESPN schedules (separate IDs)",raw:"schedule"}]
+        if index = 0 then options = [{label:"Browse sports",raw:"sports"},{label:"Provider catalogs",raw:"providers"},{label:"ESPN schedules",raw:"schedule"}]
         if index = 1 then options = [{label:"Live: no resume / no next episode",raw:"live"},{label:"Recorded: standard playback checks",raw:"recorded"}]
         if index = 2 then options = [{label:"Prefer English; allow unlabelled live audio",raw:"unknown"},{label:"Require verified English",raw:"english"}]
         if index = 3 then m.top.pushRequest = {screen:"addonsScreen",params:{}}:return
@@ -258,9 +296,7 @@ sub onSportsChip()
     if index = 1 then options = m.days:current = m.dayIndex
     if index = 2 then options = m.states:current = m.stateIndex
     if index = 3
-        SportsCatalogs():options = []
-        options.Append(m.catalogs)
-        options.Push({raw:"browse",label:"Return to provider catalogs"})
+        options = [{raw:"sports",label:"Browse sports"},{raw:"providers",label:"Browse provider catalogs"},{raw:"addons",label:"Manage add-ons"}]
     end if
     if options.Count() > 0 then m.filters.callFunc("ShowMenu",options,current)
 end sub
@@ -273,23 +309,25 @@ sub onSportsOption()
     if index < 0 then return
     m.filters.callFunc("HideMenu")
     if m.browseProviders = true
-        if index > 1 then return
         if pick.chip = 0
-            m.browseProviders = index = 0
+            if index > 2 then return
+            m.browseProviders = index <> 2
+            m.catalogView = "sports"
+            if index = 1 then m.catalogView = "providers"
+            SportsBrowserReset():m.catalogPage = 0
             SportsChips():SportsRequest():return
         end if
-        if pick.chip = 1 then m.livePlayback = index = 0
+        if index > 1 then return
+        if pick.chip = 1 then m.livePlayback = index = 0:SportsBrowserReset()
         if pick.chip = 2 then m.allowUnknownLiveAudio = index = 0
         SportsChips():RenderSportsCatalogs():return
     end if
     if pick.chip = 3
-        if index = m.catalogs.Count() then m.browseProviders = true:SportsChips():RenderSportsCatalogs():return
-        if index >= m.catalogs.Count() then return
-        if index = 0
-            m.top.pushRequest = {screen:"addonsScreen",params:{}}
-        else
-            OpenSportsCatalog(index)
-        end if
+        if index > 2 then return
+        if index = 2 then m.top.pushRequest = {screen:"addonsScreen",params:{}}:return
+        m.browseProviders = true:m.catalogView = "sports":m.catalogPage = 0
+        if index = 1 then m.catalogView = "providers"
+        SportsBrowserReset():SportsCatalogs():SportsChips():RenderSportsCatalogs()
         return
     end if
     if pick.chip = 0 and index < m.leagues.Count() then m.leagueIndex = index
@@ -316,12 +354,14 @@ end function
 
 function OnBackPressed() as boolean
     if m.filters.callFunc("IsMenuOpen") then m.filters.callFunc("HideMenu"):return true
+    if m.browseProviders = true and SportsBrowserBack() then return true
     m.desired = ""
     return false
 end function
 
 function OnExit() as void
     m.desired = ""
+    SportsBrowserReset()
 end function
 
 sub BlurFocus()
@@ -332,9 +372,12 @@ end sub
 ' is installed here; Manage add-ons keeps the existing explicit import flow.
 sub RenderSportsCatalogs()
     m.desired = ""
+    if m.catalogView = "sports" then SportsBrowserRender():return
     m.rows = []
     content = CreateObject("roSGNode","ContentNode")
-    for index = 0 to m.catalogs.Count() - 1
+    first = m.catalogPage * 48:last = first + 48
+    if last > m.catalogs.Count() then last = m.catalogs.Count()
+    for index = first to last - 1
         entry = m.catalogs[index]
         m.rows.Push({catalogIndex:index})
         row = content.CreateChild("ContentNode"):item = row.CreateChild("ContentNode")
@@ -342,14 +385,24 @@ sub RenderSportsCatalogs()
         item.description = "Open this provider's catalog"
         if index = 0 then item.description = "Import a provider you are authorized to use; no account required by Crimson"
     end for
+    if first > 0
+        m.rows.Push({catalogPage:m.catalogPage-1})
+        row = content.CreateChild("ContentNode"):item = row.CreateChild("ContentNode"):item.title = "Previous catalogs"
+    end if
+    if last < m.catalogs.Count()
+        m.rows.Push({catalogPage:m.catalogPage+1})
+        row = content.CreateChild("ContentNode"):item = row.CreateChild("ContentNode"):item.title = "More catalogs"
+    end if
     m.list.content = content
-    m.status.text = "Provider listings are not playback guarantees · Play/Pause refreshes installed catalogs"
+    m.status.text = "Provider catalogs · Page " + (m.catalogPage+1).ToStr() + " · Back returns to sports"
     if m.previousEventName <> invalid and m.previousEventName <> "" then m.status.text = "Find the same event: " + m.previousEventName
     ShowSportsCatalogDetail(0)
 end sub
 
 sub ShowSportsCatalogDetail(index as integer)
-    if index < 0 or index >= m.catalogs.Count() then return
+    if index < 0 or index >= m.rows.Count() then return
+    if m.rows[index].catalogIndex = invalid then m.name.text = "More catalogs":m.detail.text = "Use OK to change pages.":return
+    index = m.rows[index].catalogIndex
     m.name.text = m.catalogs[index].label
     if index = 0
         m.detail.text = "Use Add-ons to import a sports provider's HTTPS manifest. Return here to browse its own events. No third-party provider is installed automatically. Use the first filter for separate ESPN schedules."

@@ -1,8 +1,10 @@
-# Sports in Crimson Cinema — 0.6.0 feature preview
+# Sports in Crimson Cinema — 0.6.1 feature preview
+
+**Catalog cleanup:** Sports now starts with sport categories. Choose a sport, select an event and choose **Watch** for automatic source selection; **More sources** opens manual alternatives. [Implementation, limits and validation](SPORTS-CATALOG-PLAN.md). This change has software coverage; its physical Roku acceptance remains outstanding.
 
 **Latest:** [Highfly/PenguPlay/Nuvio configured checks](SPORTS-FREE-PROVIDERS.md), including a demonstrated free Highfly NBA source, the corrected research-client diagnosis, and app fixes for singular `sport` catalogs and non-video upsells.
 
-**Roku follow-up:** the same report now records successful installation/startup, user-confirmed imports of four providers, Nuvio's required smaller live profile and one user-reported NBA playback success. Its provider, duration, decoded resolution and audio language were not identified. The [all-sports catalog cleanup](SPORTS-CATALOG-PLAN.md) is planned for a later pass, not implemented in this package.
+**Earlier 0.6.0 Roku follow-up:** the same report records successful installation/startup, user-confirmed imports of four providers, Nuvio's required smaller live profile and one user-reported NBA playback success. Its provider, duration, decoded resolution and audio language were not identified. This is not a hardware test of the newer catalog interface.
 
 **Provider-native live browsing now reaches the existing native player.** During October 29 testing, the free StremVerse Live Events service returned HLS media that decoded on the PC at **1920×1080 H.264/AAC** for one event and **512×288 H.264/AAC** for another. This is real media evidence, not a mock stream. Other sources failed, and a later request for the HD event returned 403. **Sustained Roku playback, audible English, broadcast authorization and broad league coverage remain unverified.** No provider is installed or bundled automatically.
 
@@ -12,16 +14,16 @@
 
 ## Quick setup and use
 
-1. Install the developer ZIP from the successful **PR #9 CI artifact**, not GitHub's source archive. This preview is not merged or hardware-certified.
+1. Install the developer ZIP from the successful CI artifact for the desired version, not GitHub's source archive. The 0.6.1 catalog changes are not hardware-certified; the earlier PR #9 artifact contains the 0.6.0 interface.
 2. In **Add-ons**, import an HTTPS manifest for a provider you are authorized to use. The free service tested here is `https://stremverse1.alwaysdata.net/manifest.json`. Its [provider FAQ](https://stremverse1.alwaysdata.net/) distinguishes free **Live Events / Replays / Highlights** from paid **Xtra / IPTV**. The free path needs no membership, Stremio app/account, media proxy or permanently running PC. This is a technical compatibility result, not an endorsement or a grant of broadcast rights.
-3. Return to **Sports → provider · Live Events**. Sports lists your installed TV/channel/sport/sports catalogs. Choose an event, then a source. Its original ID/type goes to the original provider; no ESPN matching or per-game JSON editing is required.
+3. Return to **Sports → sport → event → Watch**. Sports groups your installed TV/channel/sport/sports catalogs and requests their events progressively. Watch asks the selected provider for fresh sources and uses the existing automatic selection. **More sources** opens manual choices; **Browse by provider** retains the original catalogs. An event's original ID/type goes to its own provider in the live path; no ESPN matching or per-game JSON editing is required.
 4. **Live mode** starts about 12 seconds behind the available live edge where supported. It disables resume, next episode and online movie subtitle lookups. Source quality depends on the provider; an “HD SERVER” label is not a measurement.
 5. **English + unlabelled** prefers English but permits missing language metadata after native codec and advancing audio/video checks. Playback details still say English is unverified. Choose **Audio: verified English** in Sports, or press **\*** in the live source picker to require it. Known foreign-language tracks remain blocked. Movie/series audio rules are unchanged.
 6. For a replay/highlight, choose **Playback: Recorded** before opening its catalog. This restores the existing Details/playback path and strict movie-style audio checks; legacy TV/channel no-resume behavior is unchanged. “Live” is the selected playback mode, not independent proof of an event's time/status.
 
 **Down** enters the list; **\*** returns to Sports filters. **Play/Pause** refreshes. **Back** exits without waiting for provider requests. Existing source pagination and bounded alternatives remain available. No source replacement occurs merely because a late result arrives.
 
-The first Sports filter also opens the separate ESPN schedule browser (13 leagues, yesterday through seven days ahead, times UTC). Schedule IDs are not shared with sports add-ons. **Schedule only** does not mean a stream exists. Use **TV / sports add-ons → Return to provider catalogs** to leave schedules. Events in a provider catalog may be upcoming, completed, mislabeled or unavailable; empty/browser-only/error responses are reported honestly.
+The first Sports filter also opens original provider catalogs or the separate ESPN schedule browser (13 leagues, yesterday through seven days ahead, times UTC). Schedule IDs are not shared with sports add-ons. **Schedule only** does not mean a stream exists. Use **TV / sports add-ons → Browse sports** to leave schedules. Events in a provider catalog may be upcoming, completed, mislabeled or unavailable; empty/browser-only/error responses are reported honestly.
 
 ## Fresh provider and video investigation
 

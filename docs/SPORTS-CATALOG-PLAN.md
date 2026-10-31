@@ -1,30 +1,44 @@
-# All-sports catalog cleanup — planned
+# Sports catalog cleanup — 0.6.1
 
-**Status: requested next pass, not implemented in the current 0.6.0 package.** This records feedback for draft [PR #9](https://github.com/kaiuribess/rokumio-4k-personal/pull/9); it does not change the player or promise additional event coverage.
+**Implemented in source; physical Roku testing of this interface is outstanding.** This follows the plan recorded with merged PR #9. The earlier user-reported NBA playback succeeded on 0.6.0 and does not certify this newer interface.
 
-## Problem and intended experience
+## Use
 
-After successfully playing an NBA selection on Roku, the user reported having to scroll through many catalog and source choices. The requested cleanup applies to **all available sports**, not only basketball.
+**Sports → sport → game/event → Watch.** Watch uses the existing automatic source selection and same-provider recovery. **More sources** opens explicit provider choices and the existing manual stream picker. **Browse by provider** keeps original catalogs accessible; the first filter also offers separate ESPN schedules.
 
-Target flow: **Sports → sport or league → game or event → Watch**.
+Categories cover basketball, American football, soccer, baseball, hockey, MMA/UFC, boxing, motorsport, tennis, golf, cricket, rugby, wrestling, volleyball, cycling, darts, snooker/pool, esports and channels. Only categories represented in installed catalog descriptors appear. Mixed or unrecognized catalogs stay under **All / other sports**. This organizes existing providers; it does not add broadcast coverage.
 
-Keep ordinary browsing focused on recognizable sport, competition and event names. Put alternate providers and backup streams under **More sources**, retaining an explicit provider-browsing route when event identity is uncertain. Source choices should show concise useful distinctions such as provider, reported quality and known language; an unverified label must remain unverified.
+Each category loads matching catalogs first, then mixed catalogs whose returned metadata identifies that sport. Provider-reported status appears beside each listing; missing status stays unverified. No team-name guessing or ESPN-ID substitution is used. Unknown categories remain accessible in mixed/provider browsing.
 
-## Proposed scope
+Select an event for two actions:
 
-- Organize the installed providers' catalogs by sport/league, with a clearly named Other sports area for unknown categories. Cover NFL, NBA, MLB, NHL, soccer, college sports, UFC, boxing and other competitions only when installed providers actually supply them.
-- Show one event entry only when duplicates can be matched confidently. Compare participants, competition, start time and live versus replay status; handle postponements and ambiguous names conservatively. Keep uncertain entries separate and identify their provider.
-- Offer a primary Watch action for an eligible source, with More sources for explicit alternatives. Do not hide useful backup choices or claim the selected source is guaranteed to work.
-- Distinguish upcoming, live, replay and unavailable entries only when the evidence supports that status. A schedule entry or catalog label does not establish playable video.
-- Preserve provider-native IDs/types and fresh source resolution. Never send one provider's opaque ID to another, silently switch to a different game, or disturb successful playback because more results arrive.
-- Reuse the existing player, same-provider refresh/recovery, pagination, bounded loading and remote navigation. Preserve movies, shows, TorBox, audio settings and manual next episode.
+- **Watch:** request fresh sources from that event's primary provider and use existing native automatic selection. It does not guarantee the first stream works or switch automatically to another provider's event.
+- **More sources:** choose a confidently matched provider route and then a stream manually, or browse another provider and locate the same event yourself.
 
-## Acceptance for the future implementation
+Known upcoming/postponed events do not automatically launch a live source. Playback: Recorded retains the existing metadata/Details path. Live audio preferences, movie/show playback, TorBox, voice, subtitles, source recovery and next episode use their existing implementations.
 
-1. Users can find an available event in each represented sport without scrolling through every provider catalog first; unknown categories remain accessible.
-2. Watch and More sources both reach the existing source/player path with the selected provider's original event ID/type. No mock or browser-page source is presented as working video.
-3. Tests cover matching and deliberate non-matching: same teams on different dates, different competitions, postponed events, replay versus live, missing times and opaque IDs from different providers.
-4. Back/cancel stays responsive while catalogs or sources load. Repeated browsing remains bounded on the stick, and all alternatives remain reachable through pagination.
-5. Hardware checks cover representative available sports, a failed primary source, manual same-event backup selection and the existing movie/series path. Report measured results separately from user feedback and PC tests.
+## Matching and privacy
 
-The current working provider-native integration stays in place until this pass is implemented and validated. No new provider installation, account, payment or hosting service is part of this documentation change.
+Exact duplicate appearances of one provider's native ID/type are folded. Cross-provider grouping requires the same normalized participant title, explicit UTC start time, competition and known phase. Different dates, competitions, participants, replay/live states, postponements or missing fields keep listings separate. Native IDs, declared types and configured addresses remain attached to each route, including private paths/query parameters. Matching changes presentation, never rewrites those identifiers.
+
+Providers often omit the required evidence. Duplicate-looking games can therefore remain visible with different provider names. A similar title alone is insufficient evidence to route playback to a different event. This implementation does not claim full alias matching, verified live status or independent upstream delivery.
+
+No profiles, temporary media URLs or account credentials are added to the repository, package or public UI. No new provider, account, subscription, proxy or hosting service is installed.
+
+## Bounds and failure handling
+
+- The 40-catalog cutoff is removed. Provider browsing renders 48 catalogs per page with previous/next navigation.
+- One catalog worker is owned until its finished notification, including across Back/category changes. Empty/duplicate/stale result events cannot release a running slot or paint another category/account. Covered screens launch no new catalog work.
+- Requests use existing CatalogStore URL assembly/validation, a 10-second request deadline and the existing 1 MiB transport response limit. Normalization runs in a Task and returns at most 48 records with bounded fields. Oversized native IDs are rejected rather than truncated.
+- Event pages render 48 listings. A batch retains at most 240 original routes; queued catalogs and further pages remain available through More events. A new batch releases older records, which remain available through original provider browsing. There is no session-long accumulated event history.
+- Raw pagination offsets include malformed records. Manifest page-size hints and explicit end markers are respected. Catalogs without declared skip are freshly fetched and sliced locally; a paginated provider returning the same first ID is stopped and reported instead of looped indefinitely.
+- Failed catalogs expose retry while keeping usable results. Worker launch failure and finished-without-result are failures, not successful empty catalogs. Completed empty responses show an empty state. Interactive return refreshes a retained event list after 30 seconds; there is no periodic fetch behind playback.
+- Catalogs requiring a genre choice remain accessible through original provider browsing instead of issuing an invalid unfiltered request.
+
+## Verification
+
+`node tests/sports.test.js` executes actual AddonsStore → CatalogStore → SportsCatalogTask → Sports screen callbacks → Scene/source request boundaries, with injected network and native-node seams. Coverage includes grouping, private URL retention, Watch/manual choices, original IDs/types, conservative matching, malformed/raw offsets, non-paginated slices, ignored skip, failure/retry, stale/duplicate callbacks, Back, hidden screens, account/registry invalidation, batch limits, later catalogs, recorded routing and refresh.
+
+The PR records full-suite, build and package results and links the tested CI artifact. These tests do not measure Roku rendering speed, audible sound or sustained decoding.
+
+Physical acceptance: browse representative installed sports, open an event and Watch, use More sources, traverse multiple pages, Back during loading, retry an unavailable provider, return after playback, and check an existing movie/show plus manual next episode. Record provider/source, duration and actual behavior separately from metadata labels.

@@ -30,8 +30,8 @@ async function main() {
     generatedRead('source/bslib.brs'), generatedRead('source/core/ScreenStack.brs'), generatedRead('source/stores/Transport.brs').replaceAll('CreateObject("roUrlTransfer")', 'invalid'),
     generatedRead('source/stores/AddonsStore.brs'), generatedRead('source/stores/CatalogStore.brs'),
     generatedRead('source/stores/PlaybackStore.brs'), generatedRead('source/stores/EpisodesStore.brs'),
-    read('source/util/CinemaStreams.brs'), read('source/util/Sports.brs'), controller, worker,
-    extract('components/MainScene.brs', 'onStreamsAction'), extract('components/MainScene.brs', 'onSportsAction'), extract('components/DiscoverScreen.brs', 'onResultSelected').replace('sub onResultSelected()', 'sub SportsDiscoverSelected()'), fixtureCode, read('tests/sports.test.brs')].join('\n');
+    read('source/util/CinemaStreams.brs'), read('source/util/Sports.brs'), read('source/util/SportsCatalog.brs'), read('source/util/AccountEpoch.brs'), read('components/SportsBrowser.brs').replaceAll('CreateObject("roSGNode","ContentNode")', 'SportsTestContent()').replaceAll('CreateObject("roTimespan")', 'SportsTestClock()'), controller, worker, extract('components/SportsCatalogTask.brs','loadSportsCatalog').replace('Transport()', 'SportsTestTransport()'),
+    extract('components/MainScene.brs', 'onStreamsAction'), extract('components/MainScene.brs', 'onSportsAction'), extract('components/DiscoverScreen.brs', 'onResultSelected').replace('sub onResultSelected()', 'sub SportsDiscoverSelected()'), fixtureCode, read('tests/sports.test.brs').replace('Harness_Finish()', ''), read('tests/sports-catalog.test.brs')].join('\n');
   const file = path.join(dir, 'tests.brs'); fs.writeFileSync(file, code);
   const run = spawnSync(process.execPath, [path.join(root, 'node_modules/@rokucommunity/brs/bin/cli.js'), '--root', dir, file], {cwd: root, encoding: 'utf8'});
   process.stdout.write(run.stdout || ''); process.stderr.write(run.stderr || '');
