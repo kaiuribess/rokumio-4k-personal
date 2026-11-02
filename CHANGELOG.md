@@ -1,5 +1,12 @@
 # Changes
 
+## 0.6.2 — autoplay intent repair
+
+- Reopening the same episode with Play now restores automatic selection and the latest resume position while reusing pending source requests. Previous manual browsing or exhausted recovery state no longer carries into a new explicit Play action.
+- Play/Pause source refresh keeps autoplay enabled when restoring a provider tab other than the first. Actual manual provider/page changes still cancel autoplay, and Back from playback does not restart it.
+- Reject stale ranking callbacks when play intent changes and refuse same-batch reuse across account generations. Preserve provider identity, 4K/audio policy, manual sports choices and source-worker limits.
+- Add production callback regressions for repeated episode selection, manual/automatic transitions, provider refresh and delayed account results. Software validation does not establish physical Roku playback; the reported device symptom still needs confirmation on the patched build.
+
 ## 0.6.1 — sports catalog cleanup, feature preview
 
 - Replace the default flat provider list with sport categories and shared event browsing: Sports → sport → event → Watch. Keep explicit provider/catalog browsing and manual choices under More sources.

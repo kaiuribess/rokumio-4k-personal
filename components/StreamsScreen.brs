@@ -144,7 +144,12 @@ function OnEnter(params as object) as void
     ' through and rebuilds as before.
     currentContext = SourcePrefetch_Context(m.stores, params)
     sameContext = currentContext <> invalid and currentContext.key = m.loadContextKey
+    if m.accountGeneration <> invalid and AccountEpoch_Read(m.top) <> m.accountGeneration then sameContext = false
     if m.pendingCount > 0 and m.loadKey <> "" and EpisodeKey(params) = m.loadKey and sameContext
+        ' Reuse the network work, not the previous Play/manual/recovery intent.
+        ' An explicit episode selection may have a newer resume position too.
+        BeginSourcePlayRequest(params)
+        ApplyParamsChrome(params)
         m.sourcesSuspended = false
         m.freshnessRefreshUsed = false
         if m.prefetchNode <> invalid and m.prefetchContext <> invalid
@@ -154,6 +159,7 @@ function OnEnter(params as object) as void
         end if
         onSourcePrefetchChanged()
         PumpProviderSources()
+        RenderActiveProvider()
         MaybeStartAutomaticPlayback()
         RestoreFocus()
         return
@@ -162,13 +168,7 @@ function OnEnter(params as object) as void
     CancelStreamsLoad()
     CancelEpisodeLoad()
     m.accountGeneration = AccountEpoch_Read(m.top)
-    m.params = params
-    m.recoveryExcluded = []
-    m.recoveryRound = 0
-    m.recoveryManual = false
-    m.fourKOnly = PlaybackPreferences(m.stores,params).fourKOnly
-    m.autoPlayEnabled = params.autoPlay = true
-    m.autoPlaySent = false
+    BeginSourcePlayRequest(params)
     m.sourcesSuspended = false
     ApplyParamsChrome(params)
 
@@ -180,6 +180,25 @@ function OnEnter(params as object) as void
     StartEpisodeLoad(params)
     ResetProviderNavigation()
 end function
+
+' Explicit navigation starts a new intent even when source requests are reused.
+' Back/recovery re-entry passes invalid and deliberately does not call this.
+sub BeginSourcePlayRequest(params as object)
+    CancelAutomaticGrace()
+    if m.selectionTask <> invalid
+        selection = m.selectionTask
+        m.selectionTask = invalid
+        AsyncTask_Reap(selection, m.top, true)
+    end if
+    m.params = params
+    m.recoveryExcluded = []
+    m.recoveryRound = 0
+    m.recoveryManual = false
+    m.fourKOnly = PlaybackPreferences(m.stores,params).fourKOnly
+    m.autoPlayEnabled = params.autoPlay = true
+    m.autoPlaySent = false
+    m.selectionRevision = -1
+end sub
 
 ' Build the left panel instantly from the params the pusher already had — title,
 ' the SxE action line (or "Movie"), the background artwork Details/Episodes were
@@ -647,11 +666,11 @@ sub ResetProviderNavigation()
 end sub
 
 ' Move the header and list onto another provider.
-sub SelectProvider(index as integer)
+sub SelectProvider(index as integer, manualBrowse = true as boolean)
     if m.providers = invalid or m.activeIndex < 0 then return
     if index < 0 or index >= m.providers.Count() then return
     if index = m.activeIndex then return
-    DisableAutomaticForManualBrowse()
+    if manualBrowse then DisableAutomaticForManualBrowse()
     m.activeIndex = index
     ResetSourcePagination()
     UpdateHeader()
@@ -682,7 +701,8 @@ sub RefreshStreams()
     if selectedAddress <> "" and m.providers <> invalid
         for i = 0 to m.providers.Count() - 1
             if ParamString(m.providers[i].address) = selectedAddress
-                SelectProvider(i)
+                ' Restoring the visible tab is not a new manual-browse action.
+                SelectProvider(i, false)
                 exit for
             end if
         end for
