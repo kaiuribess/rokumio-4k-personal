@@ -3,6 +3,7 @@
     <interface>
         <field id="streams" type="array" />
         <field id="providerGroups" type="array" />
+        <field id="providerPriority" type="assocarray" />
         <field id="excludedUrls" type="array" />
         <field id="videoId" type="string" value="" />
         <field id="audioMode" type="string" value="projector" />
@@ -16,4 +17,5 @@
     <script type="text/brightscript" uri="pkg:/components/SourceSelectionTask.brs" />
     <script type="text/brightscript" uri="pkg:/source/util/AutoPlayback.brs" />
     <script type="text/brightscript" uri="pkg:/source/util/SourceMemory.brs" />
+    <script type="text/brightscript" uri="pkg:/source/util/ProviderPriority.brs" />
 </component>

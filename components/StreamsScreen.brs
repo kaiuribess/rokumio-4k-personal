@@ -144,7 +144,12 @@ function OnEnter(params as object) as void
     ' through and rebuilds as before.
     currentContext = SourcePrefetch_Context(m.stores, params)
     sameContext = currentContext <> invalid and currentContext.key = m.loadContextKey
+    if m.accountGeneration <> invalid and AccountEpoch_Read(m.top) <> m.accountGeneration then sameContext = false
     if m.pendingCount > 0 and m.loadKey <> "" and EpisodeKey(params) = m.loadKey and sameContext
+        ' Reuse the network work, not the previous Play/manual/recovery intent.
+        ' An explicit episode selection may have a newer resume position too.
+        BeginSourcePlayRequest(params)
+        ApplyParamsChrome(params)
         m.sourcesSuspended = false
         m.freshnessRefreshUsed = false
         if m.prefetchNode <> invalid and m.prefetchContext <> invalid
@@ -154,6 +159,7 @@ function OnEnter(params as object) as void
         end if
         onSourcePrefetchChanged()
         PumpProviderSources()
+        RenderActiveProvider()
         MaybeStartAutomaticPlayback()
         RestoreFocus()
         return
@@ -162,13 +168,7 @@ function OnEnter(params as object) as void
     CancelStreamsLoad()
     CancelEpisodeLoad()
     m.accountGeneration = AccountEpoch_Read(m.top)
-    m.params = params
-    m.recoveryExcluded = []
-    m.recoveryRound = 0
-    m.recoveryManual = false
-    m.fourKOnly = PlaybackPreferences(m.stores,params).fourKOnly
-    m.autoPlayEnabled = params.autoPlay = true
-    m.autoPlaySent = false
+    BeginSourcePlayRequest(params)
     m.sourcesSuspended = false
     ApplyParamsChrome(params)
 
@@ -180,6 +180,25 @@ function OnEnter(params as object) as void
     StartEpisodeLoad(params)
     ResetProviderNavigation()
 end function
+
+' Explicit navigation starts a new intent even when source requests are reused.
+' Back/recovery re-entry passes invalid and deliberately does not call this.
+sub BeginSourcePlayRequest(params as object)
+    CancelAutomaticGrace()
+    if m.selectionTask <> invalid
+        selection = m.selectionTask
+        m.selectionTask = invalid
+        AsyncTask_Reap(selection, m.top, true)
+    end if
+    m.params = params
+    m.recoveryExcluded = []
+    m.recoveryRound = 0
+    m.recoveryManual = false
+    m.fourKOnly = PlaybackPreferences(m.stores,params).fourKOnly
+    m.autoPlayEnabled = params.autoPlay = true
+    m.autoPlaySent = false
+    m.selectionRevision = -1
+end sub
 
 ' Build the left panel instantly from the params the pusher already had — title,
 ' the SxE action line (or "Movie"), the background artwork Details/Episodes were
@@ -369,6 +388,9 @@ sub ApplyProviderSources(index as integer, result as dynamic)
     if m.providers = invalid or index < 0 or index >= m.providers.Count() then return
     if Type(result) <> "roAssociativeArray" then return
     provider = m.providers[index]
+    poolChanged = false
+    if Type(provider.streams) = "roArray" then poolChanged = provider.streams.Count() > 0
+    if Type(result.streams) = "roArray" and result.streams.Count() > 0 then poolChanged = true
     provider.readyStreams = result.readyStreams
     provider.uhdCount = 0
     countType = Type(result.uhdCount)
@@ -393,7 +415,10 @@ sub ApplyProviderSources(index as integer, result as dynamic)
     end if
     if m.pendingCount > 0 then m.pendingCount = m.pendingCount - 1
     if m.sourceRevision = invalid then m.sourceRevision = 0
-    m.sourceRevision = m.sourceRevision + 1
+    ' A failed/empty provider completes its request, but adds no candidates.
+    ' Do not discard a valid ranking just because that status arrived late.
+    ' Removing or replacing existing sources still invalidates old rankings.
+    if poolChanged then m.sourceRevision = m.sourceRevision + 1
 end sub
 
 sub onSourcePrefetchChanged()
@@ -530,7 +555,11 @@ sub MaybeStartAutomaticPlayback()
     m.selectionRevision = m.sourceRevision
     if m.selectionSequence = invalid then m.selectionSequence = 0
     m.selectionSequence = m.selectionSequence + 1
-    m.selectionTask = AsyncTask_Launch(m.top, "SourceSelectionTask", "onAutomaticSourcesReady", {providerGroups:groups,excludedUrls:m.recoveryExcluded,videoId:ParamString(m.params.videoId),audioMode:CurrentAudioMode(),fourKOnly:m.fourKOnly,loadToken:m.loadToken,sourceRevision:m.sourceRevision,skipRecentFailures:m.recoveryManual <> true}, "automaticSources" + m.loadToken + "_" + ParamString(m.selectionSequence))
+    priority = ProviderPriority_Snapshot(invalid)
+    if m.stores <> invalid and m.stores.settings <> invalid
+        priority = ProviderPriority_Snapshot(m.stores.settings.callFunc("SettingsGetProviderPriority"))
+    end if
+    m.selectionTask = AsyncTask_Launch(m.top, "SourceSelectionTask", "onAutomaticSourcesReady", {providerGroups:groups,providerPriority:priority,excludedUrls:m.recoveryExcluded,videoId:ParamString(m.params.videoId),audioMode:CurrentAudioMode(),fourKOnly:m.fourKOnly,loadToken:m.loadToken,sourceRevision:m.sourceRevision,skipRecentFailures:m.recoveryManual <> true}, "automaticSources" + m.loadToken + "_" + ParamString(m.selectionSequence))
 end sub
 
 sub onAutomaticSourcesReady(event as object)
@@ -647,11 +676,11 @@ sub ResetProviderNavigation()
 end sub
 
 ' Move the header and list onto another provider.
-sub SelectProvider(index as integer)
+sub SelectProvider(index as integer, manualBrowse = true as boolean)
     if m.providers = invalid or m.activeIndex < 0 then return
     if index < 0 or index >= m.providers.Count() then return
     if index = m.activeIndex then return
-    DisableAutomaticForManualBrowse()
+    if manualBrowse then DisableAutomaticForManualBrowse()
     m.activeIndex = index
     ResetSourcePagination()
     UpdateHeader()
@@ -682,7 +711,8 @@ sub RefreshStreams()
     if selectedAddress <> "" and m.providers <> invalid
         for i = 0 to m.providers.Count() - 1
             if ParamString(m.providers[i].address) = selectedAddress
-                SelectProvider(i)
+                ' Restoring the visible tab is not a new manual-browse action.
+                SelectProvider(i, false)
                 exit for
             end if
         end for

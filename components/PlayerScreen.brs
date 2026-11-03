@@ -137,6 +137,7 @@ function OnEnter(params as object) as void
     if params = invalid or params.stream = invalid then return
     ResetAudioRecovery()
     m.playParams = params
+    m.lastSourceFailure = ""
     PrepareNextEpisode(params)
     m.audioGuardBlocked = false
     m.audioGuardActive = false
@@ -821,9 +822,8 @@ sub onSubtitleResult(event as object)
     ' tracks in it.
     if MoreSubtitleCandidates() then LaunchSubtitleFetch()
 
-    ' Playback never waits for this fetch, so a list that lands here applies to
-    ' the live content node (and writes video.subtitleTrack) mid-play; the
-    ' native Options dialog picks the tracks up from the updated SubtitleTracks.
+    ' Playback never waits for this fetch. Late tracks join the native Options
+    ' list without choosing a new default after playback has started.
     ApplySubtitleIndex(invalid)
     picked = SelectedSubtitleTrack()
     usable = "none"
@@ -911,11 +911,16 @@ sub ApplySubtitleIndex(content as object)
     ' Later providers append choices only. Reapplying the original default
     ' would override a user who chose another track or Off in Roku Options.
     if m.subtitleSelectionApplied then return
-    if m.hasPlayed and m.video <> invalid and m.video.HasField("subtitleTrack") then
-        if PlaybackInfo_Text(m.video.subtitleTrack) <> "" then
-            m.subtitleSelectionApplied = true
-            return
-        end if
+    ' An empty selector after playback starts is also a native user choice:
+    ' Off/default embedded selection must not become a late online default.
+    ' Offer the appended tracks in Options without selecting one on resume.
+    started = m.hasPlayed = true
+    if m.video <> invalid
+        if m.video.state = "playing" or m.video.state = "paused" then started = true
+    end if
+    if started
+        m.subtitleSelectionApplied = true
+        return
     end if
 
     selected = SelectedSubtitleTrack()
@@ -1570,6 +1575,10 @@ sub ScheduleNextSource(reason as string)
     if m.playbackActive <> true or m.retryPending = true then return
     if m.sourceQueue = invalid then return
     if m.audioGuardBlocked = true and m.retryPending <> true then return
+    m.lastSourceFailure = "audio-check-failed"
+    for each knownReason in ["resolve-failed","below-UHD","file-audio-incompatible","prefer-UHD","handoff-failed","native-playback-error","unexpected-end","ended-before-audio","startup-or-buffering-timeout","repeated-buffering","playback-no-progress"]
+        if reason = knownReason then m.lastSourceFailure = knownReason
+    end for
     StopAudioRecoveryTimers()
     m.audioGuardActive = false
     m.audioGuardBlocked = true
@@ -1710,7 +1719,18 @@ function PlaybackStatus() as object
     segment = PlaybackInfo_Segment(m.playingSegment)
     remembered = false
     if Type(m.playParams) = "roAssociativeArray" then remembered = m.playParams.rememberedSource = true
-    return {rememberedSource:remembered,memorySaved:m.memorySaved = true,device:m.devicePlaybackInfo,segment:segment,position:position,videoCodec:videoCodec,muted:muted,samples:samples,diagnostic:diagnostic,inspection:NativeMedia_Reason(media),format:format,state:state,audioCodec:codec,englishVerified:audio.verified,audioPlayable:EnglishAudio_Playable(audio),audioReason:audio.reason,englishTrackCount:audio.englishTracks.Count(),attempt:m.sourceIndex + 1,retrying:m.retryPending,resolution:NativeMedia_Resolution(media),active:m.playbackActive,sourceAccepted:m.sourceAccepted = true,hasPlayed:m.hasPlayed = true,buffering:BufferingRecovery_Status(),delivery:DeliveryInfo_Status(),checkpoint:CheckpointTiming_Status(),progress:ProgressRecovery_Status(),file:PlaybackInfo_FileFacts(media,DeliveryInfo_Duration())}
+    captions = {mode:"Unknown",trackSelected:false,onlineTracks:0}
+    if m.video <> invalid
+        if m.video.HasField("globalCaptionMode")
+            nativeMode = m.video.globalCaptionMode
+            for each mode in ["Off","On","Instant replay","When mute"]
+                if nativeMode = mode then captions.mode = mode
+            end for
+        end if
+        if m.video.HasField("subtitleTrack") then captions.trackSelected = PlaybackInfo_Text(m.video.subtitleTrack) <> ""
+    end if
+    if Type(m.subtitleTracks) = "roArray" then captions.onlineTracks = m.subtitleTracks.Count()
+    return {lastFailure:PlaybackInfo_Text(m.lastSourceFailure),captions:captions,rememberedSource:remembered,memorySaved:m.memorySaved = true,device:m.devicePlaybackInfo,segment:segment,position:position,videoCodec:videoCodec,muted:muted,samples:samples,diagnostic:diagnostic,inspection:NativeMedia_Reason(media),format:format,state:state,audioCodec:codec,englishVerified:audio.verified,audioPlayable:EnglishAudio_Playable(audio),audioReason:audio.reason,englishTrackCount:audio.englishTracks.Count(),attempt:m.sourceIndex + 1,retrying:m.retryPending,resolution:NativeMedia_Resolution(media),active:m.playbackActive,sourceAccepted:m.sourceAccepted = true,hasPlayed:m.hasPlayed = true,buffering:BufferingRecovery_Status(),delivery:DeliveryInfo_Status(),checkpoint:CheckpointTiming_Status(),progress:ProgressRecovery_Status(),file:PlaybackInfo_FileFacts(media,DeliveryInfo_Duration())}
 end function
 
 sub ShowPlaybackInfo()

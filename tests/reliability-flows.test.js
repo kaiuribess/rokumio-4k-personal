@@ -18,7 +18,7 @@ async function main() {
     if (builder.getDiagnostics().some(d=>d.severity===1)) throw new Error('Store compilation failed');
     const code = [read('tests/harness.brs'),read('source/util/AccountEpoch.brs'),read('tests/mocks.brs'),read('components/AccountWork.brs'),read('components/AccountAddons.brs'),
         extract('components/MainScene.brs',['onLibrarySyncResult','onAddonSyncResult','onImportTaskResult','onSourceRecoveryRequest']),
-        read('source/util/CinemaStreams.brs'),read('source/util/PlaybackInfo.brs'),read('source/util/AutoPlayback.brs'),
+        read('source/util/CinemaStreams.brs'),read('source/util/PlaybackInfo.brs'),read('source/util/AutoPlayback.brs'),read('source/util/ProviderPriority.brs'),
         read('source/util/TimerGuard.brs').replace('CreateObject("roTimespan")','ReliabilityClock()'),read('components/PlayerPosition.brs'),
         extract('components/StoreHost.brs',['LibrarySetPosition']),
         extract('components/PlayerScreen.brs',['SavePosition','PublishWatchState','onLocalCheckpoint','CheckpointTiming_Reset','CheckpointTiming_Start','CheckpointTiming_Finish','CheckpointTiming_Status','QueueSourceDiscovery','CanRecoverSources','onAutoSourceRetry']).replace('CreateObject("roTimespan")','ReliabilityCheckpointClock()'),

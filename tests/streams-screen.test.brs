@@ -149,6 +149,7 @@ sub TestStreamsRemoteRefresh()
     Harness_Equal(m.launched.Count(), 2, "refresh launches one new request per current provider")
     Harness_Equal(m.loadToken, "8", "refresh mints a new batch identity")
     Harness_Equal(m.activeIndex, 1, "refresh preserves the selected provider")
+    Harness_Ok(m.autoPlayEnabled and not m.autoPlaySent, "restoring a provider after Play refresh must not disable autoplay")
     Harness_Ok(m.fourKOnly, "refresh preserves the explicit 4K filter")
     Harness_Ok(m.qualityHint.text.InStr("Play refresh") >= 0, "source controls advertise the refresh action")
     Harness_Equal(m.streams.Count(), 0, "refresh removes expired prior links")
@@ -167,6 +168,20 @@ sub TestStreamsRemoteRefresh()
     Harness_Equal(m.streams.Count(), 1, "duplicate refreshed result cannot repeat cards")
     Harness_Ok(not onKeyEvent("play", false), "release after a completed provider still does not refresh")
     Harness_Equal(m.launched.Count(), 2, "refresh remains one launch per key press")
+    m.stores.settings = {callFunc:function(name as string) as dynamic
+        return ""
+    end function}
+    remaining = m.loadTasks[0]
+    remaining.result = {streams:[],error:""}
+    onStreamsLoaded(TestEvent(remaining))
+    Harness_Ok(m.selectionTask <> invalid,"Play refresh reaches ranking after restoring the second provider")
+    if m.selectionTask <> invalid
+        selected = m.selectionTask
+        selected.result = {streams:current.result.streams}
+        onAutomaticSourcesReady(TestEvent(selected))
+        Harness_Equal(m.top.pushRequest.screen,"playerScreen","Play refresh starts the player without selecting a row")
+        Harness_Equal(m.top.pushRequest.params.stream.url,current.result.streams[0].url,"refresh hands off the newly resolved source")
+    end if
 end sub
 
 sub TestWorkerPreparedSources()

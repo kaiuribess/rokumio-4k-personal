@@ -44,6 +44,7 @@ const boundKeys = Array.from({ length: 40 }, (_, i) => hash('source-memory-bound
 const selection = fs.readFileSync(path.join(root,'components/SourceSelectionTask.brs'),'utf8')
     .match(/^sub choose\(\)[\s\S]*?^end sub/m)[0]
     .replace('sub choose()', 'sub TestAutomaticChoose()')
+    .replace('ProviderPriority_OrderStreams(streams,m.top.providerPriority)', 'ProviderPriority_OrderStreams(streams,m.top.providerPriority,TestProviderDigest)')
     .replace('SourceMemory_Now()', 'TestSelectionNow()')
     .replace('CreateObject("roRegistrySection", "playbackMemory")', 'm.selectionRegistry')
     .replace('now,invalid,', 'now,TestSourceDigest,')
@@ -55,6 +56,7 @@ let code = [
     fs.readFileSync(path.join(root, 'source/util/SourceMemory.brs'), 'utf8'),
     fs.readFileSync(path.join(root, 'source/util/CinemaStreams.brs'), 'utf8'),
     fs.readFileSync(path.join(root, 'source/util/AutoPlayback.brs'), 'utf8'),
+    fs.readFileSync(path.join(root, 'source/util/ProviderPriority.brs'), 'utf8'),
     selection,
     `m.sourceMemoryDigests = [${[...digests].map(([text, key]) => `{text:${quote(text)},key:${quote(key)}}`).join(',')}]`,
     `function TestSourceDigest(value as string) as string

@@ -159,6 +159,7 @@ Test_PlayerLoadingFeedback()
 Test_AutomaticPlayback()
 Test_AudioTrackContinuity()
 Test_SourceProofMemory()
+Test_PlayerLateCaptionsAcrossPause()
 Harness_Finish()
 if m.failed > 0
     failed = invalid

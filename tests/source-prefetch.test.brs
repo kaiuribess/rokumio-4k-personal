@@ -1249,4 +1249,129 @@ Harness_Equal(m.launched.Count(),2,"refresh requests provider again instead of s
 PrefetchTest_Suspend(ctx.key):m.prefetchState.clock.now=90000
 Harness_Ok(not PrefetchTest_Snapshot(ctx.key,true).refreshed,"late observations never interrupt active playback")
 
+Harness_Suite("Explicit episode Play re-arms an owned source batch after manual browsing")
+PrefetchTest_Setup(2)
+m.params = {metaType:"series",metaId:"tt123",videoId:"tt123:1:2",season:1,episode:2,autoPlay:false,position:5}
+OnEnter(m.params)
+fast = m.launched[0]
+fast.result = PrefetchTest_Result("episode-ready")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(fast))
+onSourcePrefetchChanged()
+DisableAutomaticForManualBrowse()
+oldToken = m.loadToken
+oldCalls = m.launched.Count()
+m.recoveryExcluded = [fast.result.streams[0].url]
+m.recoveryRound = 2
+play = {metaType:"series",metaId:"tt123",videoId:"tt123:1:2",season:1,episode:2,autoPlay:true,position:42}
+OnEnter(play)
+Harness_Equal(m.loadToken,oldToken,"same-episode Play keeps the pending source batch")
+Harness_Equal(m.launched.Count(),oldCalls,"explicit Play never duplicates pending provider work")
+Harness_Ok(m.autoPlayEnabled and not m.autoPlaySent,"new explicit Play replaces old manual selection intent")
+Harness_Equal(m.params.position,42,"new explicit Play uses the latest resume checkpoint")
+Harness_Equal(m.recoveryExcluded.Count(),0,"new play action does not inherit an exhausted prior pool")
+Harness_Equal(m.recoveryRound,0,"new play action gets its own bounded recovery rounds")
+m.autoClock.now = 4000
+onAutomaticGrace()
+Harness_Ok(m.selectionTask <> invalid,"ready episode reaches automatic ranking without manual source selection")
+if m.selectionTask <> invalid
+    selected = m.selectionTask
+    selected.result = {streams:fast.result.streams}
+    onAutomaticSourcesReady(PrefetchTest_Event(selected))
+end if
+Harness_Equal(m.pushCalls,1,"explicit episode Play starts the player once")
+OnEnter(invalid)
+Harness_Equal(m.pushCalls,1,"Back from playback never automatically restarts the episode")
+
+Harness_Suite("New manual intent rejects an older autoplay worker in the same batch")
+PrefetchTest_Setup(2)
+m.params.autoPlay = true
+OnEnter(m.params)
+fast = m.launched[0]:fast.result = PrefetchTest_Result("manual-reentry")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(fast)):onSourcePrefetchChanged()
+m.autoClock.now = 4000:onAutomaticGrace()
+oldSelection = m.selectionTask
+manual = {metaType:"movie",metaId:"tt123",videoId:"tt123",addonAddress:m.params.addonAddress,autoPlay:false}
+OnEnter(manual)
+Harness_Ok(oldSelection.reaped,"new intent disowns the older ranking worker")
+oldSelection.result = {streams:fast.result.streams}
+onAutomaticSourcesReady(PrefetchTest_Event(oldSelection))
+Harness_Equal(m.pushCalls,0,"late automatic result cannot override a new manual source request")
+Harness_Ok(not m.autoPlayEnabled,"manual request remains manual even on an owned batch")
+
+Harness_Suite("Fresh episode selections and Back preserve distinct automatic play intent")
+PrefetchTest_Setup(1)
+m.episodeState = {top:m.top,stores:m.stores,meta:{id:"tt123",type:"series",name:"Test show"},resume:invalid,addonAddress:"https://catalog.example.test"}
+m.episodeState.seriesMeta = m.episodeState.meta
+for each episode in [1,2,3]
+    EpisodeFlow_PushEpisode(1,{episode:episode,name:"Episode",overview:"Test"})
+    request = m.top.pushRequest
+    Harness_Ok(request.params.autoPlay,"production episode selection requests autoplay")
+    OnEnter(request.params)
+    provider = m.launched[m.launched.Count()-1]
+    Harness_Equal(provider.videoId,"tt123:1:"+episode.ToStr(),"fresh episode uses its own identity")
+    provider.result = PrefetchTest_Result("episode-"+episode.ToStr())
+    PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(provider))
+    onSourcePrefetchChanged()
+    Harness_Ok(m.selectionTask <> invalid,"fresh episode proceeds directly to automatic selection")
+    if m.selectionTask <> invalid
+        selected = m.selectionTask
+        selected.result = {streams:provider.result.streams}
+        onAutomaticSourcesReady(PrefetchTest_Event(selected))
+    end if
+    Harness_Equal(m.pushCalls,episode,"each episode starts once without a manual source pick")
+    OnEnter(invalid)
+    Harness_Equal(m.pushCalls,episode,"Back does not autoplay the episode again")
+end for
+
+Harness_Suite("Account changes cannot reuse an owned episode batch")
+PrefetchTest_Setup(2)
+OnEnter(m.params)
+oldToken = m.loadToken
+oldProvider = m.launched[0]
+m.accountGeneration = -1
+OnEnter(m.params)
+Harness_Ok(m.loadToken <> oldToken,"changed account epoch forces a fresh source batch")
+oldProvider.result = PrefetchTest_Result("old-account")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(oldProvider))
+onSourcePrefetchChanged()
+Harness_Equal(m.providers[0].streams.Count(),0,"delayed old-account result cannot populate the new batch")
+
+Harness_Suite("Late empty or failed providers do not restart a valid automatic decision")
+for each failure in [false,true]
+    PrefetchTest_Setup(2)
+    m.autoPlayEnabled = true
+    m.stores.settings.priority = {preferredProviderKey:String(64,"a"),lastWorkingProviderKey:""}
+    LoadStreams(m.params)
+    fast = m.launched[0]:fast.result = PrefetchTest_Result("ready-before-empty")
+    PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(fast)):onSourcePrefetchChanged()
+    m.autoClock.now = 4000:onAutomaticGrace()
+    selection = m.selectionTask
+    Harness_Equal(selection.providerPriority.preferredProviderKey,String(64,"a"),"saved provider preference crosses into the real ranking task")
+    oldRevision = m.sourceRevision
+    slow = m.launched[1]
+    slow.result = {streams:[],readyStreams:[],uhdCount:0,error:""}
+    if failure then slow.result.error = "Source lookup failed"
+    PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(slow)):onSourcePrefetchChanged()
+    Harness_Equal(m.sourceRevision,oldRevision,"empty completion does not change the available pool")
+    Harness_Equal(m.pendingCount,0,"empty provider still completes its lookup honestly")
+    selection.result = {streams:fast.result.streams}
+    onAutomaticSourcesReady(PrefetchTest_Event(selection))
+    Harness_Equal(m.pushCalls,1,"ready candidate hands off without another ranking pass")
+    Harness_Equal(m.launched.Count(),3,"only two provider requests and one ranking task are needed")
+end for
+
+Harness_Suite("Removal of ready sources still invalidates the old ranking")
+PrefetchTest_Setup(1)
+m.autoPlayEnabled = true
+LoadStreams(m.params)
+first = m.launched[0]:first.result = PrefetchTest_Result("removed")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(first)):onSourcePrefetchChanged()
+selected = m.selectionTask
+oldRevision = m.sourceRevision
+ApplyProviderSources(0,{streams:[],readyStreams:[],uhdCount:0,error:""})
+Harness_Ok(m.sourceRevision > oldRevision,"clearing a nonempty provider changes the pool revision")
+selected.result = {streams:first.result.streams}
+onAutomaticSourcesReady(PrefetchTest_Event(selected))
+Harness_Equal(m.pushCalls,0,"stale selected URL cannot play after removal")
+
 Harness_Finish()
