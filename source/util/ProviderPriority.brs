@@ -1,6 +1,6 @@
-' Provider scheduling stores only opaque keys. Configured paths, queries and
-' userinfo never enter the identity. No successful provider guarantees a file
-' or language will work; the key only chooses the next waiting lookup.
+' Provider priority stores only opaque keys. Configured paths, queries and
+' userinfo never enter the identity. It guides waiting lookups and candidate
+' ordering; previous provider success does not prove a file or language works.
 function ProviderPriority_Text(value as dynamic) as string
     if GetInterface(value, "ifString") <> invalid then return value.Trim()
     return ""
@@ -128,4 +128,34 @@ function ProviderPriority_Order(providers as dynamic, priority as dynamic) as ob
         end for
     end for
     return order
+end function
+
+' Rank only inside the worker. Cache each public provider identity once so a
+' large candidate list does not require one digest operation per file. The
+' caller restores quality tiers and proven-file memory after this stable sort.
+function ProviderPriority_OrderStreams(streams as dynamic, preference as dynamic, hashFn = invalid as dynamic) as object
+    if Type(streams) <> "roArray" then return []
+    priority = ProviderPriority_Snapshot(preference)
+    if priority.preferredProviderKey = "" and priority.lastWorkingProviderKey = "" then return streams
+    identities = []
+    ranked = []
+    for each stream in streams
+        if Type(stream) <> "roAssociativeArray" then continue for
+        identity = ProviderPriority_Text(stream.sourceMemoryProvider)
+        rank = invalid
+        for each known in identities
+            if known.identity = identity then rank = known.rank:exit for
+        end for
+        if rank = invalid
+            rank = ProviderPriority_Rank(ProviderPriority_StreamKey(stream,hashFn),priority)
+            identities.Push({identity:identity,rank:rank})
+        end if
+        ranked.Push({rank:rank,stream:stream})
+    end for
+    ranked.SortBy("rank","r")
+    result = []
+    for each entry in ranked
+        result.Push(entry.stream)
+    end for
+    return result
 end function

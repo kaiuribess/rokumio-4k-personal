@@ -1336,4 +1336,42 @@ PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(oldProvider))
 onSourcePrefetchChanged()
 Harness_Equal(m.providers[0].streams.Count(),0,"delayed old-account result cannot populate the new batch")
 
+Harness_Suite("Late empty or failed providers do not restart a valid automatic decision")
+for each failure in [false,true]
+    PrefetchTest_Setup(2)
+    m.autoPlayEnabled = true
+    m.stores.settings.priority = {preferredProviderKey:String(64,"a"),lastWorkingProviderKey:""}
+    LoadStreams(m.params)
+    fast = m.launched[0]:fast.result = PrefetchTest_Result("ready-before-empty")
+    PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(fast)):onSourcePrefetchChanged()
+    m.autoClock.now = 4000:onAutomaticGrace()
+    selection = m.selectionTask
+    Harness_Equal(selection.providerPriority.preferredProviderKey,String(64,"a"),"saved provider preference crosses into the real ranking task")
+    oldRevision = m.sourceRevision
+    slow = m.launched[1]
+    slow.result = {streams:[],readyStreams:[],uhdCount:0,error:""}
+    if failure then slow.result.error = "Source lookup failed"
+    PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(slow)):onSourcePrefetchChanged()
+    Harness_Equal(m.sourceRevision,oldRevision,"empty completion does not change the available pool")
+    Harness_Equal(m.pendingCount,0,"empty provider still completes its lookup honestly")
+    selection.result = {streams:fast.result.streams}
+    onAutomaticSourcesReady(PrefetchTest_Event(selection))
+    Harness_Equal(m.pushCalls,1,"ready candidate hands off without another ranking pass")
+    Harness_Equal(m.launched.Count(),3,"only two provider requests and one ranking task are needed")
+end for
+
+Harness_Suite("Removal of ready sources still invalidates the old ranking")
+PrefetchTest_Setup(1)
+m.autoPlayEnabled = true
+LoadStreams(m.params)
+first = m.launched[0]:first.result = PrefetchTest_Result("removed")
+PrefetchTest_onPrefetchLoaded(PrefetchTest_Event(first)):onSourcePrefetchChanged()
+selected = m.selectionTask
+oldRevision = m.sourceRevision
+ApplyProviderSources(0,{streams:[],readyStreams:[],uhdCount:0,error:""})
+Harness_Ok(m.sourceRevision > oldRevision,"clearing a nonempty provider changes the pool revision")
+selected.result = {streams:first.result.streams}
+onAutomaticSourcesReady(PrefetchTest_Event(selected))
+Harness_Equal(m.pushCalls,0,"stale selected URL cannot play after removal")
+
 Harness_Finish()

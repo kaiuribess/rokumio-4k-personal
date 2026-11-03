@@ -388,6 +388,9 @@ sub ApplyProviderSources(index as integer, result as dynamic)
     if m.providers = invalid or index < 0 or index >= m.providers.Count() then return
     if Type(result) <> "roAssociativeArray" then return
     provider = m.providers[index]
+    poolChanged = false
+    if Type(provider.streams) = "roArray" then poolChanged = provider.streams.Count() > 0
+    if Type(result.streams) = "roArray" and result.streams.Count() > 0 then poolChanged = true
     provider.readyStreams = result.readyStreams
     provider.uhdCount = 0
     countType = Type(result.uhdCount)
@@ -412,7 +415,10 @@ sub ApplyProviderSources(index as integer, result as dynamic)
     end if
     if m.pendingCount > 0 then m.pendingCount = m.pendingCount - 1
     if m.sourceRevision = invalid then m.sourceRevision = 0
-    m.sourceRevision = m.sourceRevision + 1
+    ' A failed/empty provider completes its request, but adds no candidates.
+    ' Do not discard a valid ranking just because that status arrived late.
+    ' Removing or replacing existing sources still invalidates old rankings.
+    if poolChanged then m.sourceRevision = m.sourceRevision + 1
 end sub
 
 sub onSourcePrefetchChanged()
@@ -549,7 +555,11 @@ sub MaybeStartAutomaticPlayback()
     m.selectionRevision = m.sourceRevision
     if m.selectionSequence = invalid then m.selectionSequence = 0
     m.selectionSequence = m.selectionSequence + 1
-    m.selectionTask = AsyncTask_Launch(m.top, "SourceSelectionTask", "onAutomaticSourcesReady", {providerGroups:groups,excludedUrls:m.recoveryExcluded,videoId:ParamString(m.params.videoId),audioMode:CurrentAudioMode(),fourKOnly:m.fourKOnly,loadToken:m.loadToken,sourceRevision:m.sourceRevision,skipRecentFailures:m.recoveryManual <> true}, "automaticSources" + m.loadToken + "_" + ParamString(m.selectionSequence))
+    priority = ProviderPriority_Snapshot(invalid)
+    if m.stores <> invalid and m.stores.settings <> invalid
+        priority = ProviderPriority_Snapshot(m.stores.settings.callFunc("SettingsGetProviderPriority"))
+    end if
+    m.selectionTask = AsyncTask_Launch(m.top, "SourceSelectionTask", "onAutomaticSourcesReady", {providerGroups:groups,providerPriority:priority,excludedUrls:m.recoveryExcluded,videoId:ParamString(m.params.videoId),audioMode:CurrentAudioMode(),fourKOnly:m.fourKOnly,loadToken:m.loadToken,sourceRevision:m.sourceRevision,skipRecentFailures:m.recoveryManual <> true}, "automaticSources" + m.loadToken + "_" + ParamString(m.selectionSequence))
 end sub
 
 sub onAutomaticSourcesReady(event as object)

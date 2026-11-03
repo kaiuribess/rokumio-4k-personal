@@ -546,6 +546,7 @@ sub Test_PlayerExplicitFourKPolicy()
     m.playParams = {fourKOnly:true,position:0}
     m.sourceQueue = [{url:"https://media.example/last.mkv"}]
     ScheduleNextSource("below-UHD")
+    Harness_Equal(PlaybackStatus().lastFailure,"below-UHD","quality recovery keeps its exact allowlisted diagnostic")
     Harness_Ok(m.status.text.InStr("English 4K") >= 0,"exhaustion reports the active 4K preference")
     Harness_Equal(m.sourceMemoryPending.Count(),0,"quality-only exhaustion leaves normal source memory untouched")
 end sub
@@ -658,6 +659,7 @@ sub Test_AutomaticPlayback()
     m.playArmed = true
     m.audioGuardBlocked = invalid
     ScheduleNextSource("no-audio")
+    Harness_Equal(PlaybackStatus().lastFailure,"audio-check-failed","unknown audio reason becomes a categorical diagnostic")
     Harness_Ok(m.retryPending,"silent source schedules retry")
     Harness_Equal(m.launched.Count(),0,"native observer never launches a replacement worker directly")
     Harness_Equal(m.retryTimer.control,"start","retry crosses deferred timer boundary")
@@ -717,4 +719,29 @@ sub Test_AudioTrackContinuity()
     m.video.availableAudioTracks = []
     m.video.audioFormat = "none"
     Harness_Ok(not CurrentEnglishAudioCheck().verified,"actual audio decoder failure cannot be hidden by continuity")
+end sub
+
+sub Test_PlayerLateCaptionsAcrossPause()
+    Harness_Suite("First late online captions cannot select a track after playback starts")
+    for each mode in ["Off","On","Instant replay","When mute"]
+        SetupPlayerFixture()
+        StartPlayback("https://media.example/movie.mkv","mkv")
+        m.hasPlayed = true
+        m.video.state = "paused"
+        m.video.globalCaptionMode = mode
+        m.video.subtitleTrack = ""
+        m.subtitleTask = {id:"late-after-pause",result:{ok:true,reached:true,status:200,subtitles:[{url:"https://sub.example/late.srt",lang:"eng",langName:"English"}]}}
+        onSubtitleResult(PlayerTest_Event(m.subtitleTask,m.subtitleTask.result))
+        Harness_Equal(m.video.subtitleTrack,"","late result preserves unselected native track while paused in "+mode)
+        Harness_Equal(m.video.content.subtitleConfig,invalid,"late default is not installed into live content in "+mode)
+        Harness_Equal(m.video.globalCaptionMode,mode,"late result preserves the real caption mode")
+        Harness_Equal(m.video.content.subtitleTracks.Count(),1,"late track stays available through native Options")
+        m.video.state = "playing"
+        ApplySubtitleIndex(invalid)
+        Harness_Equal(m.video.subtitleTrack,"","resume never reselects the online default")
+        facts = PlaybackStatus()
+        Harness_Equal(facts.captions.mode,mode,"private diagnostics report native caption mode")
+        Harness_Ok(not facts.captions.trackSelected,"private diagnostics do not invent a selected track")
+        Harness_Ok(FormatJson(facts.captions).InStr("https") < 0,"caption diagnostic never exposes a track URL")
+    end for
 end sub

@@ -1,5 +1,13 @@
 # Changes
 
+## 0.6.3 — source startup and late-caption repair
+
+- Preserve a valid automatic ranking when a late provider reports an empty result or failure. Actual candidate additions/removals still invalidate stale decisions.
+- Carry preferred/recently successful provider priority into automatic source ranking within quality tiers. Proven file history remains ahead of unproven files; UHD remains above HD, practical-size ordering and host-diverse fallbacks remain intact. Hash each provider once per ranking task.
+- Do not select a newly arriving online subtitle default after native playback starts, including pause/resume with an empty track selector. Keep tracks available in Roku Options and preserve the global caption mode.
+- Add categorical caption state and the last failure category to local diagnostics without exposing selected-track URLs or source credentials.
+- Reproduce empty-provider reranking, provider-priority omission and late subtitle selection in production-boundary tests. The owner could not perform a live test during this work; these repairs do not establish the exact device incident, end-to-end startup speed or sustained playback.
+
 ## 0.6.2 — autoplay intent repair
 
 - Reopening the same episode with Play now restores automatic selection and the latest resume position while reusing pending source requests. Previous manual browsing or exhausted recovery state no longer carries into a new explicit Play action.

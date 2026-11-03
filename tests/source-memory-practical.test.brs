@@ -137,3 +137,59 @@ m.top.audioMode = "surround"
 m.top.providerGroups = [[stereo,surround,fallback]]
 TestAutomaticChoose()
 Harness_Equal(m.top.result.streams[0].url,surround.url,"within practical class receiver DD+ preference remains intact")
+
+function TestProviderDigest(identity as string) as string
+    if m.priorityDigestCalls = invalid then m.priorityDigestCalls = 0
+    m.priorityDigestCalls = m.priorityDigestCalls + 1
+    if identity = ProviderPriority_PartsIdentity("preferred","preferred.example") then return String(64,"a")
+    if identity = ProviderPriority_PartsIdentity("recent","recent.example") then return String(64,"b")
+    return String(64,"c")
+end function
+
+Harness_Suite("Automatic worker carries provider preference into quality-tier ranking")
+m.selectionRegistry = MockRegistry()
+m.top.audioMode = "surround":m.top.fourKOnly = false:m.top.excludedUrls = []
+m.top.providerPriority = {preferredProviderKey:String(64,"a"),lastWorkingProviderKey:String(64,"b")}
+ordinary = {name:"2160p English HEVC DDP5.1",url:"https://ordinary.example/video.mkv",sourceMemoryProvider:"ordinary|ordinary.example"}
+preferred = {name:"2160p English",url:"https://preferred.example/video.mkv",sourceMemoryProvider:"preferred|preferred.example"}
+recent = {name:"2160p English",url:"https://recent.example/video.mkv",sourceMemoryProvider:"recent|recent.example"}
+m.top.providerGroups = [[ordinary],[recent],[preferred]]
+TestAutomaticChoose()
+Harness_Equal(m.top.result.streams[0].url,preferred.url,"explicit preferred UHD provider wins over a richer unverified filename")
+m.top.providerPriority.preferredProviderKey = ""
+TestAutomaticChoose()
+Harness_Equal(m.top.result.streams[0].url,recent.url,"recently successful provider wins within the UHD tier")
+m.top.providerPriority.preferredProviderKey = String(64,"a")
+preferred.name = "1080p English"
+TestAutomaticChoose()
+Harness_Equal(m.top.result.streams[0].url,recent.url,"preferred HD cannot outrank available UHD")
+m.top.providerPriority = invalid
+TestAutomaticChoose()
+Harness_Equal(m.top.result.streams[0].url,ordinary.url,"missing preferences preserve existing audio-hint ranking")
+
+m.priorityDigestCalls = 0
+many = []
+for i = 1 to 128
+    many.Push(ordinary):many.Push(recent):many.Push(preferred)
+end for
+snapshot = FormatJson([ordinary,recent,preferred])
+ordered = ProviderPriority_OrderStreams(many,{preferredProviderKey:String(64,"a")},TestProviderDigest)
+Harness_Equal(m.priorityDigestCalls,3,"ranking hashes each provider once, not every candidate")
+Harness_Equal(ordered.Count(),384,"preference never discards fallback candidates")
+Harness_Equal(FormatJson([ordinary,recent,preferred]),snapshot,"ranking never changes provider records or private source URLs")
+Harness_Equal(many[0].url,ordinary.url,"ranking does not reorder the input array")
+
+Harness_Suite("Proven file remains ahead of preferred but untested provider")
+m.top.audioMode = "projector":m.top.videoId = "tt100001"
+m.top.providerPriority = {preferredProviderKey:String(64,"a")}
+preferred.name = "2160p English AAC 2.0"
+proven = TestSource("A.2160p.mkv","English 2160p AAC 2.0")
+SourceMemory_Save(m.selectionRegistry,SourceMemory_Record(SourceMemory_Empty(),keyA,"working",now),now)
+m.top.providerGroups = [[preferred],[proven]]
+TestAutomaticChoose()
+Harness_Equal(m.top.result.streams[0].url,proven.url,"same-tier verified file outranks provider preference")
+Harness_Ok(m.top.result.rememberedSource,"worker retains proven-file flag after provider sorting")
+SourceMemory_Save(m.selectionRegistry,SourceMemory_Record(SourceMemory_Empty(),keyA,"incompatible",now),now)
+TestAutomaticChoose()
+Harness_Equal(m.top.result.streams.Count(),1,"provider ranking never re-admits a remembered incompatible file")
+Harness_Equal(m.top.result.streams[0].url,preferred.url,"eligible preferred source remains after failure filtering")

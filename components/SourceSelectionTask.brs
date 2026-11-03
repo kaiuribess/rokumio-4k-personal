@@ -27,6 +27,7 @@ sub choose()
     catch e
         streams = []
     end try
+    streams = ProviderPriority_OrderStreams(streams,m.top.providerPriority)
     try
         now = SourceMemory_Now()
         data = SourceMemory_Load(CreateObject("roRegistrySection", "playbackMemory"),now)
